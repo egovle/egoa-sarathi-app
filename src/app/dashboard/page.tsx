@@ -371,6 +371,14 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         service: finalService,
         status: 'Unassigned',
         date: new Date().toISOString(),
+        history: [{
+            timestamp: new Date().toISOString(),
+            actorName: creatorProfile?.name || form.name.value,
+            actorRole: type === 'VLE Lead' ? 'VLE' : 'Customer',
+            action: 'Task Created',
+            details: `Task created for service: ${finalService}.`
+        }],
+        acknowledgementNumber: null,
         complaint: null,
         feedback: null,
         type: type,
@@ -763,6 +771,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
                             <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
                             <TableCell>
                                 <div className="flex gap-2 items-center">
+                                <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View</Link></Button>
                                 {task.status !== 'Completed' && !task.complaint && (
                                      <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={<Button variant="outline" size="sm">Raise Complaint</Button>} />
                                 )}
@@ -841,11 +850,13 @@ const VLEDashboard = ({ tasks, vles, userId, userProfile, onTaskCreated, onVleAv
     
     return (
     <div>
-         <Tabs defaultValue="tasks">
-            <TabsList>
-                <TabsTrigger value="tasks">Assigned Tasks</TabsTrigger>
-                <TabsTrigger value="profile">Profile</TabsTrigger>
-            </TabsList>
+        <Tabs defaultValue="tasks" className="w-full">
+            <div className="flex items-center">
+                <TabsList>
+                    <TabsTrigger value="tasks">Assigned Tasks</TabsTrigger>
+                    <TabsTrigger value="profile">Profile</TabsTrigger>
+                </TabsList>
+            </div>
             <TabsContent value="tasks" className="mt-4">
                 <div className="space-y-4">
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -891,6 +902,7 @@ const VLEDashboard = ({ tasks, vles, userId, userProfile, onTaskCreated, onVleAv
                                 <TableHead>Status</TableHead>
                                 <TableHead>Customer</TableHead>
                                 <TableHead>Date</TableHead>
+                                <TableHead>Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -901,6 +913,9 @@ const VLEDashboard = ({ tasks, vles, userId, userProfile, onTaskCreated, onVleAv
                                     <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                                     <TableCell>{task.customer}</TableCell>
                                     <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
+                                    <TableCell>
+                                        <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
+                                    </TableCell>
                                 </TableRow>
                                 ))}
                             </TableBody>
@@ -1127,14 +1142,17 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                             <TableCell>{task.assignedVleName || 'N/A'}</TableCell>
                                             <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
                                             <TableCell>
-                                                {task.status === 'Unassigned' && (
-                                                    <AssignVleDialog 
-                                                        trigger={<Button variant="outline" size="sm">Assign</Button>}
-                                                        taskId={task.id}
-                                                        availableVles={availableVles}
-                                                        onAssign={onVleAssign}
-                                                    />
-                                                )}
+                                                <div className="flex items-center gap-2">
+                                                    <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View</Link></Button>
+                                                    {task.status === 'Unassigned' && (
+                                                        <AssignVleDialog 
+                                                            trigger={<Button variant="outline" size="sm">Assign</Button>}
+                                                            taskId={task.id}
+                                                            availableVles={availableVles}
+                                                            onAssign={onVleAssign}
+                                                        />
+                                                    )}
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))}
