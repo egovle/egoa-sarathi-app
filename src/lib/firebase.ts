@@ -3,12 +3,15 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-// Please replace these placeholder values with the actual configuration
-// from your Firebase project settings.
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "REPLACE_WITH_YOUR_API_KEY",
+  apiKey: "AIzaSyAVWezupcCQhE6FhdxSgsD1SVPxtjDK72w",
   authDomain: "egoasarthi.firebaseapp.com",
   projectId: "egoasarthi",
+  storageBucket: "egoasarthi.firebasestorage.app",
+  messagingSenderId: "582450828090",
+  appId: "1:582450828090:web:a0ed05ea1a74710230f603",
+  measurementId: "G-9ZGSFH8X1F"
 };
 
 // Initialize Firebase
