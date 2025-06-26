@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
@@ -722,7 +723,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     
     return (
-      <TabsContent value="customer">
+      <div>
         <Tabs defaultValue="tasks">
             <TabsList>
                 <TabsTrigger value="tasks">My Tasks</TabsTrigger>
@@ -831,7 +832,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
                 <ProfileView userType="Customer" userId={userId} profileData={userProfile} />
             </TabsContent>
         </Tabs>
-      </TabsContent>
+      </div>
     );
 }
 
@@ -839,7 +840,7 @@ const VLEDashboard = ({ tasks, vles, userId, userProfile, onTaskCreated, onVleAv
     const currentVle = vles.find(v => v.id === userId);
     
     return (
-    <TabsContent value="vle">
+    <div>
          <Tabs defaultValue="tasks">
             <TabsList>
                 <TabsTrigger value="tasks">Assigned Tasks</TabsTrigger>
@@ -912,7 +913,7 @@ const VLEDashboard = ({ tasks, vles, userId, userProfile, onTaskCreated, onVleAv
                 <ProfileView userType="VLE" userId={userId} profileData={userProfile} />
             </TabsContent>
         </Tabs>
-    </TabsContent>
+    </div>
 )};
 
 const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger: React.ReactNode, taskId: string, availableVles: any[], onAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
@@ -964,17 +965,20 @@ const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger
     )
 }
 
-const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleApprove, onVleAssign }: { allTasks: any[], vles: any[], allUsers: any[], onComplaintResponse: (taskId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
-    const vlesForManagement = vles.filter(v => !v.isAdmin);
+const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleApprove, onVleAssign, loggedInAdminId }: { allTasks: any[], vles: any[], allUsers: any[], onComplaintResponse: (taskId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void, loggedInAdminId: string }) => {
+    const vlesForManagement = vles.filter(v => !v.isAdmin && v.id !== loggedInAdminId);
     const availableVles = vlesForManagement.filter(v => v.status === 'Approved' && v.available);
     const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date}));
     const feedback = allTasks.filter(t => t.feedback).map(t => ({...t.feedback, taskId: t.id, customer: t.customer, date: t.date, service: t.service}));
 
     return (
-        <TabsContent value="admin">
+        <div>
             <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-6">
+                <div className="flex items-center">
+                    <h2 className="text-2xl font-bold tracking-tight">Admin Dashboard</h2>
+                </div>
+                <TabsList className="grid w-full grid-cols-6 mt-4">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="vle-management">VLE Management</TabsTrigger>
                     <TabsTrigger value="customer-management">Customer Management</TabsTrigger>
@@ -1218,7 +1222,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                 </TabsContent>
 
             </Tabs>
-        </TabsContent>
+        </div>
     )
 };
 
@@ -1318,24 +1322,15 @@ export default function DashboardPage() {
     const customerTasks = tasks.filter(t => t.creatorId === user.uid);
     const vleTasks = tasks.filter(t => t.assignedVleId === user.uid);
 
-    const defaultTab = userProfile.isAdmin ? 'admin' : (userProfile.role === 'vle' ? 'vle' : 'customer');
+    const primaryRole = userProfile.isAdmin ? 'admin' : userProfile.role;
 
-  return (
-      <Tabs defaultValue={defaultTab}>
-        <div className="flex items-center">
-          <TabsList>
-            {userProfile.role === 'customer' && <TabsTrigger value="customer">Customer View</TabsTrigger>}
-            {userProfile.role === 'vle' && <TabsTrigger value="vle">VLE View</TabsTrigger>}
-            {userProfile.isAdmin && <TabsTrigger value="admin">Admin View</TabsTrigger>}
-          </TabsList>
-        </div>
-        <div className="mt-4">
-            {userProfile.role === 'customer' && <CustomerDashboard tasks={customerTasks} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />}
-            {userProfile.role === 'vle' && <VLEDashboard tasks={vleTasks} vles={vles} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />}
-            {userProfile.isAdmin && <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} />}
-        </div>
-      </Tabs>
-  );
+    if (primaryRole === 'admin') {
+      return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} loggedInAdminId={user.uid} />;
+    }
+
+    if (primaryRole === 'vle') {
+      return <VLEDashboard tasks={vleTasks} vles={vles} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
+    }
+
+    return <CustomerDashboard tasks={customerTasks} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
 }
-
-    
