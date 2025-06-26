@@ -2,14 +2,14 @@
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
-import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash } from 'lucide-react';
+import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -20,40 +20,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 
-// --- DEMO USERS & DATA ---
-// Since there's no real authentication, we're using mock data to simulate different user roles.
-// You can switch between views using the tabs on the dashboard.
-//
-// - Customers: Ravi Sharma, Priya Naik
-// - VLEs: Suresh Kumar (Approved), Anjali Desai (Pending)
-// - Admin: The "Admin View" tab shows the admin perspective.
 
-const customerTasks = [
-  { id: 'SS-84621', customer: 'Ravi Sharma', service: 'Birth Certificate', status: 'In Progress', date: '2023-10-25', complaint: { id: 'C-001', text: 'The VLE has not contacted me yet after 3 days.' }, feedback: null },
-  { id: 'SS-93715', customer: 'Priya Naik', service: 'Property Tax Payment', status: 'Completed', date: '2023-10-20', complaint: null, feedback: { id: 'F-001', rating: 5, comment: 'Very fast and efficient service.' } },
-  { id: 'SS-28374', customer: 'Priya Naik', service: 'Passport Renewal', status: 'Completed', date: '2023-09-15', complaint: null, feedback: { id: 'F-002', rating: 4, comment: 'Good service.' } },
-];
-
-const vleTasks = [
-  { id: 'SS-38192', service: 'Aadhar Card Update', status: 'Assigned', customer: 'Riya Sharma', date: '2023-10-26', complaint: null, feedback: null },
-  { id: 'SS-49271', service: 'Driving License', status: 'Pending Docs', customer: 'Amit Patel', date: '2023-10-24', complaint: null, feedback: null },
-  { id: 'SS-83472', service: 'Passport Application', status: 'Unassigned', customer: 'Neha Singh', date: '2023-10-27', complaint: null, feedback: null },
-];
-
-const allTasks = [
-  ...customerTasks.map(t => ({...t, type: 'Customer Request'})),
-  ...vleTasks.map(t => ({...t, type: 'VLE Lead'}))
+// --- DEMO DATA ---
+const initialTasks = [
+  { id: 'SS-84621', customer: 'Ravi Sharma', service: 'Birth Certificate', status: 'In Progress', date: '2023-10-25', complaint: { id: 'C-001', text: 'The VLE has not contacted me yet after 3 days.', status: 'Open', response: null, documents: [] }, feedback: null, type: 'Customer Request' },
+  { id: 'SS-93715', customer: 'Priya Naik', service: 'Property Tax Payment', status: 'Completed', date: '2023-10-20', complaint: null, feedback: { id: 'F-001', rating: 5, comment: 'Very fast and efficient service.' }, type: 'Customer Request' },
+  { id: 'SS-28374', customer: 'Priya Naik', service: 'Passport Renewal', status: 'Completed', date: '2023-09-15', complaint: null, feedback: { id: 'F-002', rating: 4, comment: 'Good service.' }, type: 'Customer Request' },
+  { id: 'SS-38192', customer: 'Riya Sharma', service: 'Aadhar Card Update', status: 'Assigned', date: '2023-10-26', complaint: null, feedback: null, type: 'VLE Lead' },
+  { id: 'SS-49271', customer: 'Amit Patel', service: 'Driving License', status: 'Pending Docs', date: '2023-10-24', complaint: null, feedback: null, type: 'VLE Lead' },
+  { id: 'SS-83472', customer: 'Neha Singh', service: 'Passport Application', status: 'Unassigned', date: '2023-10-27', complaint: null, feedback: null, type: 'VLE Lead' },
 ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
 
-const vles = [
+const initialVles = [
     { id: 'VLE7362', name: 'Suresh Kumar', location: 'Panjim, Goa', status: 'Approved'},
     { id: 'VLE9451', name: 'Anjali Desai', location: 'Margao, Goa', status: 'Pending'},
 ]
-
-const allComplaints = allTasks.filter(t => t.complaint).map(t => ({ taskId: t.id, customer: t.customer, ...t.complaint, date: t.date }));
-const allFeedback = allTasks.filter(t => t.feedback).map(t => ({ taskId: t.id, customer: t.customer, ...t.feedback, date: t.date }));
-
 
 // --- HELPER COMPONENTS ---
 
@@ -72,31 +54,71 @@ const StarRating = ({ rating, setRating, readOnly = false }: { rating: number; s
     );
 };
 
-const ComplaintDialog = ({ trigger }: { trigger: React.ReactNode }) => {
+const ComplaintResponseDialog = ({ trigger, complaint, taskId, onResponseSubmit }: { trigger: React.ReactNode, complaint: any, taskId: string, onResponseSubmit: (taskId: string, response: any) => void }) => {
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
+    const [responseText, setResponseText] = useState('');
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        toast({ title: 'Complaint Submitted', description: 'Your complaint has been registered. We will look into it shortly.' });
+        const response = {
+            text: responseText,
+            documents: selectedFiles.map(f => f.name),
+            date: new Date().toISOString().split('T')[0],
+        };
+        onResponseSubmit(taskId, response);
+        toast({ title: 'Response Sent', description: 'The customer has been notified.' });
         setOpen(false);
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setSelectedFiles(prev => [...prev, ...Array.from(e.target.files as FileList)]);
+        }
+    };
+
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            setResponseText('');
+            setSelectedFiles([]);
+        }
+        setOpen(isOpen);
+    }
+    
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>{trigger}</DialogTrigger>
             <DialogContent>
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle>Raise a Complaint</DialogTitle>
-                        <DialogDescription>Describe the issue you are facing with this service request.</DialogDescription>
+                        <DialogTitle>Respond to Complaint</DialogTitle>
+                        <DialogDescription>
+                            Provide a response to the customer's complaint for Task ID: {taskId}.
+                            <p className="mt-2 text-sm bg-muted/80 p-2 rounded-md"><b>Customer's complaint:</b> "{complaint.text}"</p>
+                        </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4">
-                        <Label htmlFor="complaint" className="sr-only">Complaint Details</Label>
-                        <Textarea id="complaint" placeholder="Please provide details about your issue..." rows={5} required />
+                    <div className="py-4 grid gap-4">
+                        <Textarea id="response" value={responseText} onChange={(e) => setResponseText(e.target.value)} placeholder="Type your response here..." rows={4} required />
+                        <div>
+                             <Label>Attach Documents (Optional)</Label>
+                             <div className="flex items-center gap-2 mt-2">
+                                <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                                    <FileUp className="mr-2 h-4 w-4"/> Choose Files
+                                </Button>
+                             </div>
+                             <Input id="documents" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                            {selectedFiles.length > 0 && (
+                                <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                                    <p className='font-medium'>Selected files:</p>
+                                    {selectedFiles.map((file, i) => <p key={i}>{file.name}</p>)}
+                                </div>
+                            )}
+                        </div>
                     </div>
                     <DialogFooter>
-                        <Button type="submit">Submit Complaint</Button>
+                        <Button type="submit"><Send className="mr-2 h-4 w-4" /> Send Response</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
@@ -104,13 +126,103 @@ const ComplaintDialog = ({ trigger }: { trigger: React.ReactNode }) => {
     );
 };
 
-const FeedbackDialog = ({ trigger }: { trigger: React.ReactNode }) => {
+
+const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: React.ReactNode, taskId: string, onComplaintSubmit: (taskId: string, complaint: any) => void }) => {
+    const { toast } = useToast();
+    const [open, setOpen] = useState(false);
+    const [complaintText, setComplaintText] = useState('');
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isCameraOpen, setIsCameraOpen] = useState(false);
+    
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const newComplaint = {
+            id: `C-${Date.now().toString().slice(-4)}`,
+            text: complaintText,
+            status: 'Open',
+            response: null,
+            documents: selectedFiles.map(f => f.name),
+        };
+        onComplaintSubmit(taskId, newComplaint);
+        toast({ title: 'Complaint Submitted', description: 'Your complaint has been registered. We will look into it shortly.' });
+        setOpen(false);
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setSelectedFiles(prev => [...prev, ...Array.from(e.target.files as FileList)]);
+        }
+    };
+    
+    const handleCameraCapture = (file: File) => {
+        setSelectedFiles(prevFiles => [...prevFiles, file]);
+    };
+
+    const handleOpenChange = (isOpen: boolean) => {
+        setOpen(isOpen);
+        if (!isOpen) {
+            setComplaintText('');
+            setSelectedFiles([]);
+        }
+    }
+
+    return (
+        <>
+            <Dialog open={open} onOpenChange={handleOpenChange}>
+                <DialogTrigger asChild>{trigger}</DialogTrigger>
+                <DialogContent>
+                    <form onSubmit={handleSubmit}>
+                        <DialogHeader>
+                            <DialogTitle>Raise a Complaint</DialogTitle>
+                            <DialogDescription>Describe the issue you are facing and attach relevant documents if any.</DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4 grid gap-4">
+                            <Textarea id="complaint" value={complaintText} onChange={e => setComplaintText(e.target.value)} placeholder="Please provide details about your issue..." rows={4} required />
+                             <div>
+                                <Label>Attach Documents</Label>
+                                <div className="flex gap-2 mt-2">
+                                    <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="outline">
+                                        <FileUp className="mr-2 h-4 w-4"/> Choose Files
+                                    </Button>
+                                    <Button type="button" variant="outline" onClick={() => setIsCameraOpen(true)} size="sm">
+                                        <Camera className="mr-2 h-4 w-4" /> Use Camera
+                                    </Button>
+                                </div>
+                                <Input id="documents" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                                {selectedFiles.length > 0 && (
+                                    <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                                        <p className='font-medium'>Selected files:</p>
+                                        {selectedFiles.map((file, i) => <p key={i}>{file.name}</p>)}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="submit">Submit Complaint</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+            <CameraUploadDialog open={isCameraOpen} onOpenChange={setIsCameraOpen} onCapture={handleCameraCapture} />
+        </>
+    );
+};
+
+const FeedbackDialog = ({ trigger, onFeedbackSubmit }: { trigger: React.ReactNode, onFeedbackSubmit: (feedback: any) => void }) => {
     const { toast } = useToast();
     const [rating, setRating] = useState(0);
+    const [comment, setComment] = useState('');
     const [open, setOpen] = useState(false);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const newFeedback = {
+            id: `F-${Date.now().toString().slice(-4)}`,
+            rating,
+            comment,
+        }
+        onFeedbackSubmit(newFeedback);
         toast({ title: 'Feedback Submitted', description: 'Thank you for your valuable feedback!' });
         setOpen(false);
     };
@@ -119,6 +231,7 @@ const FeedbackDialog = ({ trigger }: { trigger: React.ReactNode }) => {
         setOpen(isOpen);
         if (!isOpen) {
             setRating(0);
+            setComment('');
         }
     }
 
@@ -135,7 +248,7 @@ const FeedbackDialog = ({ trigger }: { trigger: React.ReactNode }) => {
                         <div className="flex justify-center">
                            <StarRating rating={rating} setRating={setRating} />
                         </div>
-                        <Textarea id="feedback" placeholder="Any additional comments? (Optional)" rows={3} />
+                        <Textarea id="feedback" value={comment} onChange={e => setComment(e.target.value)} placeholder="Any additional comments? (Optional)" rows={3} />
                     </div>
                     <DialogFooter>
                         <Button type="submit">Submit Feedback</Button>
@@ -238,7 +351,7 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
     );
 };
 
-const TaskCreatorDialog = ({ buttonTrigger }: { buttonTrigger: React.ReactNode }) => {
+const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any) => void, type: 'Customer Request' | 'VLE Lead' }) => {
   const { toast } = useToast();
   const [service, setService] = useState('');
   const [otherService, setOtherService] = useState('');
@@ -257,7 +370,23 @@ const TaskCreatorDialog = ({ buttonTrigger }: { buttonTrigger: React.ReactNode }
         });
         return;
     }
+    const form = e.target as HTMLFormElement;
     const newTaskId = `SS-${Date.now().toString().slice(-6)}`;
+    const finalService = service === 'Other' ? otherService : service;
+    const newTask = {
+        id: newTaskId,
+        customer: form.name.value,
+        service: finalService,
+        status: type === 'Customer Request' ? 'Unassigned' : 'Assigned',
+        date: new Date().toISOString().split('T')[0],
+        complaint: null,
+        feedback: null,
+        type: type,
+        documents: selectedFiles.map(f => f.name),
+    };
+
+    onTaskCreated(newTask);
+    
     toast({
       title: 'Task Created!',
       description: `Your new task ID is ${newTaskId}.`,
@@ -299,7 +428,7 @@ const TaskCreatorDialog = ({ buttonTrigger }: { buttonTrigger: React.ReactNode }
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">Name</Label>
-                <Input id="name" defaultValue="Ravi Sharma" className="col-span-3" required />
+                <Input id="name" name="name" defaultValue="Ravi Sharma" className="col-span-3" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="address" className="text-right">Address</Label>
@@ -568,7 +697,7 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
 )};
 
 
-const CustomerDashboard = () => (
+const CustomerDashboard = ({ tasks, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], onTaskCreated: (task: any) => void, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => (
   <TabsContent value="customer">
     <Tabs defaultValue="requests">
         <TabsList>
@@ -585,7 +714,7 @@ const CustomerDashboard = () => (
                         </CardDescription>
                     </div>
                     <div className="ml-auto flex items-center gap-2">
-                        <TaskCreatorDialog buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
+                        <TaskCreatorDialog type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -600,20 +729,28 @@ const CustomerDashboard = () => (
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {customerTasks.map(task => (
+                    {tasks.map(task => (
                         <TableRow key={task.id}>
                         <TableCell className="font-medium">{task.id}</TableCell>
                         <TableCell>{task.service}</TableCell>
                         <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                         <TableCell>{task.date}</TableCell>
                         <TableCell>
-                            <div className="flex gap-2">
-                            {task.status === 'In Progress' && (
-                                 <ComplaintDialog trigger={<Button variant="outline" size="sm">Raise Complaint</Button>} />
+                            <div className="flex gap-2 items-center">
+                            {task.status !== 'Completed' && !task.complaint && (
+                                 <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={<Button variant="outline" size="sm">Raise Complaint</Button>} />
                             )}
-                            {task.status === 'Completed' && (
-                                <FeedbackDialog trigger={<Button variant="outline" size="sm">Give Feedback</Button>} />
+                             {task.complaint && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <Badge variant="destructive">Complaint: {task.complaint.status}</Badge>
+                                </div>
+                             )}
+                            {task.status === 'Completed' && !task.feedback && (
+                                <FeedbackDialog onFeedbackSubmit={(feedback) => onFeedbackSubmit(task.id, feedback)} trigger={<Button variant="outline" size="sm">Give Feedback</Button>} />
                             )}
+                             {task.feedback && (
+                                <StarRating rating={task.feedback.rating} readOnly />
+                             )}
                             </div>
                         </TableCell>
                         </TableRow>
@@ -630,7 +767,7 @@ const CustomerDashboard = () => (
   </TabsContent>
 );
 
-const VLEDashboard = () => (
+const VLEDashboard = ({ tasks, onTaskCreated }: { tasks: any[], onTaskCreated: (task: any) => void }) => (
     <TabsContent value="vle">
          <Tabs defaultValue="tasks">
             <TabsList>
@@ -661,7 +798,7 @@ const VLEDashboard = () => (
                                 <CardDescription>Tasks assigned to you for fulfillment.</CardDescription>
                             </div>
                             <div className="ml-auto flex items-center gap-2">
-                                <TaskCreatorDialog buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
+                                <TaskCreatorDialog type="VLE Lead" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
                                 <Button asChild variant="outline" size="sm" className="h-8 gap-1"><Link href="/dashboard/extract"><BrainCircuit className="h-3.5 w-3.5" />Special Request</Link></Button>
                             </div>
                         </CardHeader>
@@ -677,7 +814,7 @@ const VLEDashboard = () => (
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {vleTasks.map(task => (
+                                {tasks.map(task => (
                                 <TableRow key={task.id}>
                                     <TableCell className="font-medium">{task.id}</TableCell>
                                     <TableCell>{task.service}</TableCell>
@@ -699,7 +836,7 @@ const VLEDashboard = () => (
     </TabsContent>
 );
 
-const AdminDashboard = () => (
+const AdminDashboard = ({ allTasks, vles, complaints, feedback, onComplaintResponse, onVleApprove }: { allTasks: any[], vles: any[], complaints: any[], feedback: any[], onComplaintResponse: (taskId: string, response: any) => void, onVleApprove: (vleId: string) => void }) => (
   <TabsContent value="admin">
     <Tabs defaultValue="overview" className="w-full">
         <TabsList className="grid w-full grid-cols-5">
@@ -736,7 +873,7 @@ const AdminDashboard = () => (
                         <MessageSquareWarning className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{allComplaints.length}</div>
+                        <div className="text-2xl font-bold">{complaints.length}</div>
                     </CardContent>
                 </Card>
             </div>
@@ -765,7 +902,7 @@ const AdminDashboard = () => (
                           <TableCell>{vle.name}</TableCell>
                           <TableCell><Badge variant={vle.status === 'Approved' ? 'default' : 'secondary'}>{vle.status}</Badge></TableCell>
                           <TableCell>
-                              {vle.status === 'Pending' && <Button variant="outline" size="sm">Approve</Button>}
+                              {vle.status === 'Pending' && <Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}>Approve</Button>}
                           </TableCell>
                       </TableRow>
                       ))}
@@ -825,16 +962,29 @@ const AdminDashboard = () => (
                           <TableHead>Task ID</TableHead>
                           <TableHead>Customer</TableHead>
                           <TableHead>Complaint</TableHead>
-                          <TableHead>Date</TableHead>
+                          <TableHead>Docs</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Action</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
-                      {allComplaints.map(complaint => (
-                      <TableRow key={complaint.id}>
-                          <TableCell className="font-medium">{complaint.taskId}</TableCell>
-                          <TableCell>{complaint.customer}</TableCell>
-                          <TableCell>{complaint.text}</TableCell>
-                          <TableCell>{complaint.date}</TableCell>
+                      {complaints.map(c => (
+                      <TableRow key={c.id}>
+                          <TableCell className="font-medium">{c.taskId}</TableCell>
+                          <TableCell>{c.customer}</TableCell>
+                          <TableCell className="max-w-xs break-words">{c.text}</TableCell>
+                          <TableCell>{c.documents?.length > 0 ? <FileText className="h-4 w-4" /> : 'N/A'}</TableCell>
+                          <TableCell><Badge variant={c.status === 'Open' ? 'destructive' : 'default'}>{c.status}</Badge></TableCell>
+                          <TableCell>
+                            {c.status === 'Open' && (
+                                <ComplaintResponseDialog
+                                    trigger={<Button size="sm">Respond</Button>}
+                                    complaint={c}
+                                    taskId={c.taskId}
+                                    onResponseSubmit={onComplaintResponse}
+                                />
+                            )}
+                          </TableCell>
                       </TableRow>
                       ))}
                   </TableBody>
@@ -861,7 +1011,7 @@ const AdminDashboard = () => (
                       </TableRow>
                   </TableHeader>
                   <TableBody>
-                      {allFeedback.map(fb => (
+                      {feedback.map(fb => (
                       <TableRow key={fb.id}>
                           <TableCell className="font-medium">{fb.taskId}</TableCell>
                           <TableCell>{fb.customer}</TableCell>
@@ -881,6 +1031,41 @@ const AdminDashboard = () => (
 );
 
 export default function DashboardPage() {
+    const { toast } = useToast();
+    const [tasks, setTasks] = useState(initialTasks);
+    const [vles, setVles] = useState(initialVles);
+
+    const handleCreateTask = (newTask: any) => {
+        setTasks(prev => [newTask, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    }
+
+    const handleComplaintSubmit = (taskId: string, complaint: any) => {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, complaint, status: 'Complaint Raised' } : t));
+    }
+    
+    const handleFeedbackSubmit = (taskId: string, feedback: any) => {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, feedback } : t));
+    }
+
+    const handleComplaintResponse = (taskId: string, response: any) => {
+        setTasks(prev => prev.map(t => {
+            if (t.id === taskId) {
+                return { ...t, complaint: { ...t.complaint, response, status: 'Responded' } }
+            }
+            return t;
+        }));
+    }
+    
+    const handleVleApprove = (vleId: string) => {
+        setVles(prev => prev.map(v => v.id === vleId ? { ...v, status: 'Approved'} : v));
+        toast({ title: 'VLE Approved', description: 'The VLE has been approved and can now take tasks.'});
+    }
+
+    const customerTasks = tasks.filter(t => t.type === 'Customer Request');
+    const vleTasks = tasks.filter(t => t.type === 'VLE Lead');
+    const allComplaints = tasks.filter(t => t.complaint).map(t => ({ taskId: t.id, customer: t.customer, date: t.date, ...t.complaint }));
+    const allFeedback = tasks.filter(t => t.feedback).map(t => ({ taskId: t.id, customer: t.customer, date: t.date, ...t.feedback }));
+
   return (
       <Tabs defaultValue="customer">
         <div className="flex items-center">
@@ -891,10 +1076,12 @@ export default function DashboardPage() {
           </TabsList>
         </div>
         <div className="mt-4">
-            <CustomerDashboard />
-            <VLEDashboard />
-            <AdminDashboard />
+            <CustomerDashboard tasks={customerTasks} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />
+            <VLEDashboard tasks={vleTasks} onTaskCreated={handleCreateTask} />
+            <AdminDashboard allTasks={tasks} vles={vles} complaints={allComplaints} feedback={allFeedback} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} />
         </div>
       </Tabs>
   );
 }
+
+    
