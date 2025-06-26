@@ -15,6 +15,7 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 type PostOffice = {
   Name: string;
@@ -42,6 +43,7 @@ export default function RegisterPage() {
   // UI State
   const [loading, setLoading] = useState(false);
   const [isPincodeLoading, setIsPincodeLoading] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   useEffect(() => {
     if (pincode.length !== 6) {
@@ -98,19 +100,32 @@ export default function RegisterPage() {
     
   }, [pincode, toast]);
 
+  const validateEmail = (emailToValidate: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (emailRegex.test(emailToValidate)) {
+      setEmailError('');
+      return true;
+    }
+    setEmailError('Please enter a valid email address.');
+    return false;
+  };
+
+  const handleEmailBlur = () => {
+    if (email) {
+      validateEmail(email);
+    }
+  };
+
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     
     // Validation Checks
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        toast({
-            title: 'Invalid Email Format',
-            description: 'Please enter a valid email address (e.g., user@example.com).',
-            variant: 'destructive',
-        });
-        return;
+    if (!email || !validateEmail(email)) {
+      if (!email) {
+        setEmailError('Email is required.');
+      }
+      return;
     }
 
     if (mobile.length !== 10) {
@@ -206,7 +221,21 @@ export default function RegisterPage() {
             </div>
             <div className="grid gap-2 text-left">
               <Label htmlFor="email" className="text-blue-100">Email</Label>
-              <Input id="email" name="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="m@example.com" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+              <Input 
+                id="email" 
+                name="email" 
+                type="email" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)}
+                onBlur={handleEmailBlur}
+                placeholder="m@example.com" 
+                required 
+                className={cn(
+                  "bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11",
+                  emailError && "border-destructive focus-visible:ring-destructive"
+                )}
+              />
+              {emailError && <p className="text-sm text-destructive mt-1">{emailError}</p>}
             </div>
              <div className="grid gap-2 text-left">
               <Label htmlFor="password"  className="text-blue-100">Password</Label>
