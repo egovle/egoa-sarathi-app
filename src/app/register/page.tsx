@@ -10,10 +10,17 @@ import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useState, type FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ShieldCheck } from 'lucide-react';
+import { Loader2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+type PostOffice = {
+  Name: string;
+  District: string;
+  State: string;
+};
 
 export default function RegisterPage() {
   const { toast } = useToast();
@@ -23,9 +30,11 @@ export default function RegisterPage() {
   const [role, setRole] = useState('customer');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState('');
   const [mobile, setMobile] = useState('');
   const [pincode, setPincode] = useState('');
+  const [postOffices, setPostOffices] = useState<PostOffice[]>([]);
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
   const [address, setAddress] = useState('');
@@ -35,24 +44,36 @@ export default function RegisterPage() {
   const [isPincodeLoading, setIsPincodeLoading] = useState(false);
 
   useEffect(() => {
-    if (pincode.length === 6) {
+    if (pincode.length !== 6) {
+      setCity('');
+      setDistrict('');
+      setPostOffices([]);
+      return;
+    }
+
       const fetchLocation = async () => {
         setIsPincodeLoading(true);
         setCity('');
         setDistrict('');
+        setPostOffices([]);
         try {
           const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
           const data = await response.json();
           if (data && data[0] && data[0].Status === 'Success') {
-            const postOffice = data[0].PostOffice[0];
-            setCity(postOffice.Name);
-            setDistrict(postOffice.District);
+            const fetchedPostOffices: PostOffice[] = data[0].PostOffice;
+            setPostOffices(fetchedPostOffices);
+            setDistrict(fetchedPostOffices[0].District);
+            
+            if (fetchedPostOffices.length === 1) {
+              setCity(fetchedPostOffices[0].Name);
+            }
+            
             toast({
               title: 'Location Found',
-              description: `${postOffice.Name}, ${postOffice.District}, ${postOffice.State}`,
+              description: `${fetchedPostOffices[0].District}, ${fetchedPostOffices[0].State}`,
             });
           } else {
-            setCity('');
+            setPostOffices([]);
             setDistrict('');
             toast({
               title: 'Invalid Pincode',
@@ -62,7 +83,7 @@ export default function RegisterPage() {
           }
         } catch (error) {
           console.error('Failed to fetch pincode data:', error);
-          setCity('');
+          setPostOffices([]);
           setDistrict('');
           toast({
             title: 'API Error',
@@ -74,10 +95,7 @@ export default function RegisterPage() {
         }
       };
       fetchLocation();
-    } else {
-        setCity('');
-        setDistrict('');
-    }
+    
   }, [pincode, toast]);
 
 
@@ -88,7 +106,7 @@ export default function RegisterPage() {
     if (!city || !district) {
         toast({
             title: 'Invalid Location',
-            description: 'Please provide a valid pincode to determine the city and district.',
+            description: 'Please provide a valid pincode and select a city.',
             variant: 'destructive',
         });
         setLoading(false);
@@ -172,7 +190,28 @@ export default function RegisterPage() {
             </div>
              <div className="grid gap-2 text-left">
               <Label htmlFor="password"  className="text-blue-100">Password</Label>
-              <Input id="password" name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+                <div className="relative">
+                    <Input 
+                        id="password" 
+                        name="password" 
+                        type={showPassword ? 'text' : 'password'} 
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)} 
+                        placeholder="••••••••" 
+                        required 
+                        className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11 pr-10"
+                    />
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-0 top-0 h-11 w-11 text-gray-400 hover:text-white hover:bg-transparent"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </Button>
+                </div>
             </div>
             <div className="grid gap-2 text-left">
               <Label htmlFor="mobile" className="text-blue-100">Mobile Number</Label>
@@ -188,7 +227,20 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2 text-left">
                     <Label htmlFor="city" className="text-blue-100">City</Label>
-                    <Input id="city" name="city" value={city} placeholder="Auto-populated" readOnly required className="bg-black/10 border-white/20 text-white placeholder:text-gray-400 h-11 cursor-not-allowed" />
+                     {postOffices.length > 1 ? (
+                        <Select onValueChange={setCity} value={city} required>
+                            <SelectTrigger id="city" className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11">
+                                <SelectValue placeholder="Select your city" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {postOffices.map((po) => (
+                                    <SelectItem key={po.Name} value={po.Name}>{po.Name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    ) : (
+                        <Input id="city" name="city" value={city} placeholder="Auto-populated" readOnly required className="bg-black/10 border-white/20 text-white placeholder:text-gray-400 h-11 cursor-not-allowed" />
+                    )}
                 </div>
                 <div className="grid gap-2 text-left">
                     <Label htmlFor="district" className="text-blue-100">District</Label>
