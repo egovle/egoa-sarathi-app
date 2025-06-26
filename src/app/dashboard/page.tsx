@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
-import { File, MoreHorizontal, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, UserCircle, Edit, Banknote, Camera, FileUp } from 'lucide-react';
+import { File, MoreHorizontal, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, UserCircle, Edit, Banknote, Camera, FileUp, AtSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -379,7 +379,50 @@ const TaskCreatorDialog = ({ buttonTrigger }: { buttonTrigger: React.ReactNode }
 };
 
 
-const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => (
+const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
+    const { toast } = useToast();
+    const [bankDetails, setBankDetails] = useState<{
+        bankName: string;
+        accountNumber: string;
+        ifscCode: string;
+        upiId: string;
+    } | null>(null);
+
+    const [isEditingBank, setIsEditingBank] = useState(false);
+    
+    const [formState, setFormState] = useState({
+        bankName: '',
+        accountNumber: '',
+        ifscCode: '',
+        upiId: ''
+    });
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setFormState(prevState => ({ ...prevState, [id]: value }));
+    };
+
+    const handleEditBankDetails = () => {
+        if (bankDetails) {
+            setFormState(bankDetails);
+        } else {
+             setFormState({ bankName: '', accountNumber: '', ifscCode: '', upiId: ''});
+        }
+        setIsEditingBank(true);
+    };
+
+    const handleSaveBankDetails = (e: React.FormEvent) => {
+        e.preventDefault();
+        setBankDetails(formState);
+        setIsEditingBank(false);
+        toast({ title: "Bank Details Saved", description: "Your bank details have been updated successfully."});
+    };
+    
+    const handleCancelEdit = () => {
+        setIsEditingBank(false);
+    }
+    
+    return (
     <div className="space-y-4">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -420,31 +463,76 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => (
                 <CardHeader>
                     <CardTitle className="flex items-center justify-between">
                         <span>Bank Details</span>
-                        <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
+                         {bankDetails && !isEditingBank && (
+                            <Button variant="ghost" size="icon" onClick={handleEditBankDetails}>
+                                <Edit className="h-4 w-4" />
+                            </Button>
+                        )}
                     </CardTitle>
-                    <CardDescription>Securely add your bank account for transactions.</CardDescription>
+                    <CardDescription>Securely manage your bank account for transactions.</CardDescription>
                 </CardHeader>
-                 <CardContent className="space-y-4">
-                     <div className="space-y-2">
-                        <Label htmlFor="bank-name">Bank Name</Label>
-                        <Input id="bank-name" placeholder="e.g., State Bank of India" />
-                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="account-number">Account Number</Label>
-                        <Input id="account-number" placeholder="Enter your account number" />
-                     </div>
-                     <div className="space-y-2">
-                        <Label htmlFor="ifsc-code">IFSC Code</Label>
-                        <Input id="ifsc-code" placeholder="Enter IFSC Code" />
-                     </div>
-                </CardContent>
-                 <CardFooter>
-                    <Button>Save Bank Details</Button>
-                </CardFooter>
+                 {isEditingBank ? (
+                     <form onSubmit={handleSaveBankDetails}>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="bankName">Bank Name</Label>
+                                <Input id="bankName" placeholder="e.g., State Bank of India" value={formState.bankName} onChange={handleInputChange} required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="accountNumber">Account Number</Label>
+                                <Input id="accountNumber" placeholder="Enter your account number" value={formState.accountNumber} onChange={handleInputChange} required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="ifscCode">IFSC Code</Label>
+                                <Input id="ifscCode" placeholder="Enter IFSC Code" value={formState.ifscCode} onChange={handleInputChange} required />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="upiId">UPI ID (Optional)</Label>
+                                <div className="relative">
+                                    <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input id="upiId" placeholder="your-name@okbank" className="pl-10" value={formState.upiId} onChange={handleInputChange} />
+                                </div>
+                            </div>
+                        </CardContent>
+                        <CardFooter className="justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={handleCancelEdit}>Cancel</Button>
+                            <Button type="submit">Save Changes</Button>
+                        </CardFooter>
+                     </form>
+                 ) : bankDetails ? (
+                     <>
+                        <CardContent className="space-y-4 text-sm">
+                             <div className="space-y-1">
+                                <p className="text-muted-foreground">Bank Name</p>
+                                <p className="font-medium">{bankDetails.bankName}</p>
+                             </div>
+                             <div className="space-y-1">
+                                <p className="text-muted-foreground">Account Number</p>
+                                <p className="font-medium">{bankDetails.accountNumber}</p>
+                             </div>
+                             <div className="space-y-1">
+                                <p className="text-muted-foreground">IFSC Code</p>
+                                <p className="font-medium">{bankDetails.ifscCode}</p>
+                             </div>
+                             <div className="space-y-1">
+                                <p className="text-muted-foreground">UPI ID</p>
+                                <p className="font-medium">{bankDetails.upiId || 'N/A'}</p>
+                             </div>
+                        </CardContent>
+                     </>
+                 ) : (
+                    <CardContent>
+                        <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50">
+                            <Banknote className="h-8 w-8 text-muted-foreground mb-2" />
+                            <p className="mb-4 text-muted-foreground">No bank account added yet.</p>
+                            <Button onClick={handleEditBankDetails}>Add Bank Details</Button>
+                        </div>
+                    </CardContent>
+                 )}
             </Card>
         </div>
     </div>
-);
+)};
 
 
 const CustomerDashboard = () => (
