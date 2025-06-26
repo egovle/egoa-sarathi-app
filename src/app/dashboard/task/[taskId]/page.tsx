@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 
@@ -18,8 +18,22 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 
+// --- NOTIFICATION HELPER ---
+async function createNotification(userId: string, title: string, description: string, link?: string) {
+    if (!userId) return;
+    await addDoc(collection(db, "notifications"), {
+        userId,
+        title,
+        description,
+        link: link || '/dashboard',
+        read: false,
+        date: new Date().toISOString(),
+    });
+}
+
+
 // Dialog for VLE to request more info
-const RequestInfoDialog = ({ taskId, vleName }: { taskId: string, vleName: string }) => {
+const RequestInfoDialog = ({ taskId, vleName, customerId }: { taskId: string, vleName: string, customerId: string }) => {
     const [open, setOpen] = useState(false);
     const [message, setMessage] = useState('');
     const { toast } = useToast();
@@ -45,6 +59,12 @@ const RequestInfoDialog = ({ taskId, vleName }: { taskId: string, vleName: strin
                 status: 'Awaiting Documents',
                 history: arrayUnion(historyEntry)
             });
+            await createNotification(
+                customerId,
+                'Action Required on Your Task',
+                `More information has been requested for task ${taskId.slice(-6).toUpperCase()}.`,
+                `/dashboard/task/${taskId}`
+            );
             toast({ title: 'Request Sent', description: 'The customer has been notified.' });
             setMessage('');
             setOpen(false);
@@ -88,7 +108,7 @@ const RequestInfoDialog = ({ taskId, vleName }: { taskId: string, vleName: strin
 };
 
 // Dialog for VLE to complete a task
-const CompleteTaskDialog = ({ taskId, vleName }: { taskId: string, vleName: string }) => {
+const CompleteTaskDialog = ({ taskId, vleName, customerId }: { taskId: string, vleName: string, customerId: string }) => {
     const [open, setOpen] = useState(false);
     const [ackNumber, setAckNumber] = useState('');
     const { toast } = useToast();
@@ -115,6 +135,12 @@ const CompleteTaskDialog = ({ taskId, vleName }: { taskId: string, vleName: stri
                 acknowledgementNumber: ackNumber,
                 history: arrayUnion(historyEntry)
             });
+             await createNotification(
+                customerId,
+                'Your Task is Complete!',
+                `Task ${taskId.slice(-6).toUpperCase()} has been marked as complete.`,
+                `/dashboard/task/${taskId}`
+            );
             toast({ title: 'Task Marked as Complete', description: 'The customer and admin have been notified.' });
             setAckNumber('');
             setOpen(false);
@@ -279,8 +305,8 @@ export default function TaskDetailPage() {
                         <CardContent className="space-y-4">
                            {canVleTakeAction ? (
                                 <div className='flex flex-col gap-2'>
-                                    <RequestInfoDialog taskId={task.id} vleName={userProfile.name} />
-                                    <CompleteTaskDialog taskId={task.id} vleName={userProfile.name} />
+                                    <RequestInfoDialog taskId={task.id} vleName={userProfile.name} customerId={task.creatorId} />
+                                    <CompleteTaskDialog taskId={task.id} vleName={userProfile.name} customerId={task.creatorId} />
                                 </div>
                            ) : (
                                 <p className="text-sm text-muted-foreground">

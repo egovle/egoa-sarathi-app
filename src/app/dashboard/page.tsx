@@ -1,11 +1,9 @@
-
-
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where } from 'firebase/firestore';
-import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users } from 'lucide-react';
+import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs } from 'firebase/firestore';
+import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, EyeIcon, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +22,41 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+
+
+// --- NOTIFICATION HELPERS ---
+async function createNotification(userId: string, title: string, description: string, link?: string) {
+    if (!userId) return;
+    await addDoc(collection(db, "notifications"), {
+        userId,
+        title,
+        description,
+        link: link || '/dashboard',
+        read: false,
+        date: new Date().toISOString(),
+    });
+}
+
+async function createNotificationForAdmins(title: string, description: string, link?: string) {
+    try {
+        const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true));
+        const adminSnapshot = await getDocs(adminsQuery);
+        
+        if (adminSnapshot.empty) {
+            console.log("No admin users found to notify.");
+            return;
+        }
+
+        const notificationPromises = adminSnapshot.docs.map(adminDoc => {
+            return createNotification(adminDoc.id, title, description, link);
+        });
+
+        await Promise.all(notificationPromises);
+    } catch (error) {
+        console.error("Error creating notifications for admins:", error);
+    }
+}
 
 
 // --- HELPER COMPONENTS ---
@@ -43,7 +76,7 @@ const StarRating = ({ rating, setRating, readOnly = false }: { rating: number; s
     );
 };
 
-const ComplaintResponseDialog = ({ trigger, complaint, taskId, onResponseSubmit }: { trigger: React.ReactNode, complaint: any, taskId: string, onResponseSubmit: (taskId: string, response: any) => void }) => {
+const ComplaintResponseDialog = ({ trigger, complaint, taskId, customerId, onResponseSubmit }: { trigger: React.ReactNode, complaint: any, taskId: string, customerId: string, onResponseSubmit: (taskId: string, customerId: string, response: any) => void }) => {
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
     const [responseText, setResponseText] = useState('');
@@ -57,7 +90,7 @@ const ComplaintResponseDialog = ({ trigger, complaint, taskId, onResponseSubmit 
             documents: selectedFiles.map(f => ({ name: f.name, url: '' })), // Placeholder for storage URL
             date: new Date().toISOString(),
         };
-        onResponseSubmit(taskId, response);
+        onResponseSubmit(taskId, customerId, response);
         toast({ title: 'Response Sent', description: 'The customer has been notified.' });
         setOpen(false);
     };
@@ -84,7 +117,7 @@ const ComplaintResponseDialog = ({ trigger, complaint, taskId, onResponseSubmit 
                     <DialogHeader>
                         <DialogTitle>Respond to Complaint</DialogTitle>
                         <DialogDescription>
-                            Provide a response to the customer's complaint for Task ID: {taskId}.
+                            Provide a response to the customer's complaint for Task ID: {taskId.slice(-6).toUpperCase()}.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 grid gap-4">
@@ -759,7 +792,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
                             <TableHead>Service</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Date</TableHead>
-                            <TableHead>Actions</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -769,24 +802,25 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
                             <TableCell>{task.service}</TableCell>
                             <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                             <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
-                            <TableCell>
-                                <div className="flex gap-2 items-center">
-                                <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View</Link></Button>
-                                {task.status !== 'Completed' && !task.complaint && (
-                                     <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={<Button variant="outline" size="sm">Raise Complaint</Button>} />
-                                )}
-                                 {task.complaint && (
-                                    <div className="flex items-center gap-2 text-sm">
-                                        <Badge variant={task.complaint.status === 'Open' ? 'destructive' : 'default'}>Complaint: {task.complaint.status}</Badge>
-                                    </div>
-                                 )}
-                                {task.status === 'Completed' && !task.feedback && (
-                                    <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={<Button variant="outline" size="sm">Give Feedback</Button>} />
-                                )}
-                                 {task.feedback && (
-                                    <StarRating rating={task.feedback.rating} readOnly />
-                                 )}
-                                </div>
+                            <TableCell className="text-right">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`}><EyeIcon className="mr-2"/>View Details</Link></DropdownMenuItem>
+                                        {task.status !== 'Completed' && !task.complaint && (
+                                            <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={
+                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}><ShieldAlert className="mr-2"/>Raise Complaint</DropdownMenuItem>
+                                            } />
+                                        )}
+                                        {task.status === 'Completed' && !task.feedback && (
+                                             <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={
+                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}><StarIcon className="mr-2"/>Give Feedback</DropdownMenuItem>
+                                            } />
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </TableCell>
                             </TableRow>
                         ))}
@@ -902,7 +936,7 @@ const VLEDashboard = ({ tasks, vles, userId, userProfile, onTaskCreated, onVleAv
                                 <TableHead>Status</TableHead>
                                 <TableHead>Customer</TableHead>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Actions</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -913,7 +947,7 @@ const VLEDashboard = ({ tasks, vles, userId, userProfile, onTaskCreated, onVleAv
                                     <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                                     <TableCell>{task.customer}</TableCell>
                                     <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
-                                    <TableCell>
+                                    <TableCell className="text-right">
                                         <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
                                     </TableCell>
                                 </TableRow>
@@ -980,11 +1014,11 @@ const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger
     )
 }
 
-const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleApprove, onVleAssign, loggedInAdminId }: { allTasks: any[], vles: any[], allUsers: any[], onComplaintResponse: (taskId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void, loggedInAdminId: string }) => {
-    const vlesForManagement = vles.filter(v => !v.isAdmin && v.id !== loggedInAdminId);
+const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleApprove, onVleAssign, loggedInAdminId }: { allTasks: any[], vles: any[], allUsers: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void, loggedInAdminId: string }) => {
+    const vlesForManagement = vles.filter(v => !v.isAdmin);
     const availableVles = vlesForManagement.filter(v => v.status === 'Approved' && v.available);
     const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
-    const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date}));
+    const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
     const feedback = allTasks.filter(t => t.feedback).map(t => ({...t.feedback, taskId: t.id, customer: t.customer, date: t.date, service: t.service}));
 
     return (
@@ -1057,7 +1091,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                 <TableHead>Location</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Availability</TableHead>
-                                <TableHead>Action</TableHead>
+                                <TableHead className="text-right">Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1071,8 +1105,12 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                          <Badge variant={vle.available ? 'outline' : 'destructive'} className={cn(vle.available && 'border-green-500 text-green-600')}>{vle.available ? 'Available' : 'Unavailable'}</Badge>
                                     ) : 'N/A'}
                                 </TableCell>
-                                <TableCell>
-                                    {vle.status === 'Pending' && <Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}>Approve</Button>}
+                                <TableCell className="text-right">
+                                    {vle.status === 'Pending' && 
+                                    <Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}>
+                                        <UserPlus className="mr-2 h-4 w-4" /> Approve
+                                    </Button>
+                                    }
                                 </TableCell>
                             </TableRow>
                             ))}
@@ -1129,7 +1167,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                         <TableHead>Status</TableHead>
                                         <TableHead>Assigned VLE</TableHead>
                                         <TableHead>Date</TableHead>
-                                        <TableHead>Action</TableHead>
+                                        <TableHead className="text-right">Action</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -1141,18 +1179,23 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                             <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                                             <TableCell>{task.assignedVleName || 'N/A'}</TableCell>
                                             <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-2">
-                                                    <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View</Link></Button>
-                                                    {task.status === 'Unassigned' && (
-                                                        <AssignVleDialog 
-                                                            trigger={<Button variant="outline" size="sm">Assign</Button>}
-                                                            taskId={task.id}
-                                                            availableVles={availableVles}
-                                                            onAssign={onVleAssign}
-                                                        />
-                                                    )}
-                                                </div>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`}><EyeIcon className="mr-2"/>View Details</Link></DropdownMenuItem>
+                                                        {task.status === 'Unassigned' && (
+                                                            <AssignVleDialog 
+                                                                trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><GitFork className="mr-2"/>Assign VLE</DropdownMenuItem>}
+                                                                taskId={task.id}
+                                                                availableVles={availableVles}
+                                                                onAssign={onVleAssign}
+                                                            />
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -1177,7 +1220,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                 <TableHead>Complaint</TableHead>
                                 <TableHead>Docs</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Action</TableHead>
+                                <TableHead className="text-right">Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1188,12 +1231,13 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                 <TableCell className="max-w-xs break-words">{c.text}</TableCell>
                                 <TableCell>{c.documents?.length > 0 ? <FileText className="h-4 w-4" /> : 'N/A'}</TableCell>
                                 <TableCell><Badge variant={c.status === 'Open' ? 'destructive' : 'default'}>{c.status}</Badge></TableCell>
-                                <TableCell>
+                                <TableCell className="text-right">
                                     {c.status === 'Open' && (
                                         <ComplaintResponseDialog
-                                            trigger={<Button size="sm">Respond</Button>}
+                                            trigger={<Button size="sm"><MessageCircleMore className="mr-2 h-4 w-4" />Respond</Button>}
                                             complaint={c}
                                             taskId={c.taskId}
+                                            customerId={c.customerId}
                                             onResponseSubmit={onComplaintResponse}
                                         />
                                     )}
@@ -1288,12 +1332,24 @@ export default function DashboardPage() {
     }, []);
 
     const handleCreateTask = async (newTask: any) => {
-        await addDoc(collection(db, "tasks"), newTask);
+        const docRef = await addDoc(collection(db, "tasks"), newTask);
+        await createNotificationForAdmins(
+            'New Task Created',
+            `A new task '${newTask.service}' has been created by ${newTask.customer}.`,
+            `/dashboard/task/${docRef.id}`
+        );
     }
 
     const handleComplaintSubmit = async (taskId: string, complaint: any) => {
         const taskRef = doc(db, "tasks", taskId);
         await updateDoc(taskRef, { complaint: complaint, status: 'Complaint Raised' });
+        const taskSnap = await getDoc(taskRef);
+        const taskData = taskSnap.data();
+        await createNotificationForAdmins(
+            'New Complaint Raised',
+            `A complaint was raised for task ${taskId.slice(-6).toUpperCase()} by ${taskData?.customer}.`,
+            `/dashboard/task/${taskId}`
+        );
     }
     
     const handleFeedbackSubmit = async (taskId: string, feedback: any) => {
@@ -1301,19 +1357,30 @@ export default function DashboardPage() {
         await updateDoc(taskRef, { feedback: feedback });
     }
 
-    const handleComplaintResponse = async (taskId: string, response: any) => {
+    const handleComplaintResponse = async (taskId: string, customerId: string, response: any) => {
         const taskRef = doc(db, "tasks", taskId);
         const taskSnap = await getDoc(taskRef);
         if (taskSnap.exists()) {
             const taskData = taskSnap.data();
             const updatedComplaint = { ...taskData.complaint, response, status: 'Responded' };
             await updateDoc(taskRef, { complaint: updatedComplaint });
+            await createNotification(
+                customerId,
+                'Response to your Complaint',
+                `An admin has responded to your complaint for task ${taskId.slice(-6).toUpperCase()}.`,
+                `/dashboard/task/${taskId}`
+            );
         }
     }
     
     const handleVleApprove = async (vleId: string) => {
         const vleRef = doc(db, "vles", vleId);
         await updateDoc(vleRef, { status: 'Approved' });
+        await createNotification(
+            vleId,
+            'Account Approved',
+            'Congratulations! Your VLE account has been approved by an admin.'
+        );
         toast({ title: 'VLE Approved', description: 'The VLE has been approved and can now take tasks.'});
     }
 
@@ -1325,7 +1392,25 @@ export default function DashboardPage() {
 
     const handleAssignVle = async (taskId: string, vleId: string, vleName: string) => {
         const taskRef = doc(db, "tasks", taskId);
-        await updateDoc(taskRef, { status: 'Assigned', assignedVleId: vleId, assignedVleName: vleName });
+        const historyEntry = {
+            timestamp: new Date().toISOString(),
+            actorName: userProfile?.name || 'Admin',
+            actorRole: 'Admin',
+            action: 'Task Assigned',
+            details: `Task assigned to VLE: ${vleName}.`
+        };
+        await updateDoc(taskRef, { 
+            status: 'Assigned', 
+            assignedVleId: vleId, 
+            assignedVleName: vleName,
+            history: arrayUnion(historyEntry)
+        });
+        await createNotification(
+            vleId,
+            'New Task Assigned',
+            `You have been assigned a new task: ${taskId.slice(-6).toUpperCase()}.`,
+            `/dashboard/task/${taskId}`
+        );
     }
     
     if (loading || !user || !userProfile) {

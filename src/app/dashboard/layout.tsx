@@ -6,8 +6,11 @@ import {
   ShieldCheck,
   Bell,
   LogOut,
+  Check,
 } from "lucide-react"
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { collection, onSnapshot, query, where, doc, writeBatch, orderBy } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -20,18 +23,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
-
-const notifications = [
-    { title: "New Task Assigned", description: "Task #SS-83472 assigned to Suresh Kumar.", date: "5 min ago", read: false },
-    { title: "Complaint Received", description: "Complaint raised for Task #SS-84621 by Ravi Sharma.", date: "1 hour ago", read: false },
-    { title: "VLE Application", description: "Anjali Desai has applied to be a VLE.", date: "2 hours ago", read: true },
-    { title: "Feedback Received", description: "5-star feedback for Task #SS-93715.", date: "1 day ago", read: true },
-];
-const unreadNotifications = notifications.filter(n => !n.read).length;
-
+import { useAuth } from "@/context/AuthContext";
+import { formatDistanceToNow } from 'date-fns';
 
 export default function DashboardLayout({
   children,
@@ -40,6 +36,47 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  const unreadNotifications = notifications.filter(n => !n.read).length;
+
+  useEffect(() => {
+    if (!user) return;
+
+    const q = query(
+      collection(db, "notifications"),
+      where("userId", "==", user.uid),
+      orderBy("date", "desc")
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setNotifications(notifs);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleMarkAllRead = async () => {
+    if (!user || unreadNotifications === 0) return;
+
+    const batch = writeBatch(db);
+    const unreadNotifIds = notifications.filter(n => !n.read).map(n => n.id);
+    
+    unreadNotifIds.forEach(notifId => {
+      const notifRef = doc(db, "notifications", notifId);
+      batch.update(notifRef, { read: true });
+    });
+
+    try {
+      await batch.commit();
+      toast({ title: 'Notifications marked as read.' });
+    } catch (error) {
+      console.error("Error marking notifications as read:", error);
+      toast({ title: 'Error', description: 'Could not mark notifications as read.', variant: 'destructive' });
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -84,22 +121,37 @@ export default function DashboardLayout({
                   <span className="sr-only">Toggle notifications</span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-[350px] p-0">
+              <PopoverContent align="end" className="w-[380px] p-0">
                   <div className="p-4 border-b">
-                      <h4 className="font-medium">Notifications</h4>
-                      <p className="text-sm text-muted-foreground">You have {unreadNotifications} unread messages.</p>
+                      <div className="flex items-center justify-between">
+                         <div>
+                            <h4 className="font-medium">Notifications</h4>
+                            <p className="text-sm text-muted-foreground">You have {unreadNotifications} unread messages.</p>
+                         </div>
+                         {unreadNotifications > 0 && (
+                            <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="text-xs">
+                                <Check className="mr-1 h-3 w-3" />
+                                Mark all as read
+                            </Button>
+                         )}
+                      </div>
                   </div>
                   <div className="space-y-1 p-2 max-h-80 overflow-y-auto">
-                      {notifications.map((notif, i) => (
-                          <div key={i} className={`p-2 rounded-md transition-colors hover:bg-muted ${!notif.read ? 'bg-accent/50' : 'bg-transparent'}`}>
-                              <p className="font-semibold text-sm">{notif.title}</p>
-                              <p className="text-sm text-muted-foreground">{notif.description}</p>
-                              <p className="text-xs text-muted-foreground mt-1">{notif.date}</p>
+                      {notifications.length > 0 ? (
+                        notifications.map((notif) => (
+                          <div key={notif.id} className={`p-3 rounded-md transition-colors hover:bg-muted ${!notif.read ? 'bg-accent/50' : 'bg-transparent'}`}>
+                              <Link href={notif.link || '/dashboard'} className="block">
+                                <p className="font-semibold text-sm">{notif.title}</p>
+                                <p className="text-sm text-muted-foreground">{notif.description}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(notif.date), { addSuffix: true })}</p>
+                              </Link>
                           </div>
-                      ))}
-                  </div>
-                  <div className="p-2 border-t text-center">
-                    <Button variant="link" size="sm">View all notifications</Button>
+                        ))
+                      ) : (
+                        <div className="p-8 text-center text-sm text-muted-foreground">
+                            You have no new notifications.
+                        </div>
+                      )}
                   </div>
               </PopoverContent>
             </Popover>
