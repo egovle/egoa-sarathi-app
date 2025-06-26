@@ -2,6 +2,8 @@
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
+import { db } from '@/lib/firebase';
+import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where } from 'firebase/firestore';
 import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,22 +23,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 
 
-// --- DEMO DATA ---
-const initialTasks = [
-  { id: 'SS-84621', customer: 'Ravi Sharma', service: 'Birth Certificate', status: 'In Progress', date: '2023-10-25', complaint: { id: 'C-001', text: 'The VLE has not contacted me yet after 3 days.', status: 'Open', response: null, documents: [] }, feedback: null, type: 'Customer Request', assignedVle: 'Suresh Kumar' },
-  { id: 'SS-93715', customer: 'Priya Naik', service: 'Property Tax Payment', status: 'Completed', date: '2023-10-20', complaint: null, feedback: { id: 'F-001', rating: 5, comment: 'Very fast and efficient service.' }, type: 'Customer Request', assignedVle: 'Suresh Kumar' },
-  { id: 'SS-28374', customer: 'Priya Naik', service: 'Passport Renewal', status: 'Completed', date: '2023-09-15', complaint: null, feedback: { id: 'F-002', rating: 4, comment: 'Good service.' }, type: 'Customer Request', assignedVle: 'Suresh Kumar' },
-  { id: 'SS-38192', customer: 'Riya Sharma', service: 'Aadhar Card Update', status: 'Assigned', date: '2023-10-26', complaint: null, feedback: null, type: 'VLE Lead', assignedVle: 'Suresh Kumar' },
-  { id: 'SS-49271', customer: 'Amit Patel', service: 'Driving License', status: 'Pending Docs', date: '2023-10-24', complaint: null, feedback: null, type: 'VLE Lead', assignedVle: 'Suresh Kumar' },
-  { id: 'SS-83472', customer: 'Neha Singh', service: 'Passport Application', status: 'Unassigned', date: '2023-10-27', complaint: null, feedback: null, type: 'Customer Request', assignedVle: null },
-].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+// --- DEMO USER IDs ---
+// Since we don't have auth, we'll hardcode the document IDs for our demo users.
+const DEMO_CUSTOMER_ID = 'customer-ravi-sharma';
+const DEMO_VLE_ID = 'vle-suresh-kumar';
 
-
-const initialVles = [
-    { id: 'VLE7362', name: 'Suresh Kumar', location: 'Panjim, Goa', status: 'Approved', available: true},
-    { id: 'VLE9451', name: 'Anjali Desai', location: 'Margao, Goa', status: 'Pending', available: false},
-    { id: 'VLE8214', name: 'Rajesh Gupta', location: 'Vasco, Goa', status: 'Approved', available: false},
-]
 
 // --- HELPER COMPONENTS ---
 
@@ -66,8 +57,8 @@ const ComplaintResponseDialog = ({ trigger, complaint, taskId, onResponseSubmit 
         e.preventDefault();
         const response = {
             text: responseText,
-            documents: selectedFiles.map(f => f.name),
-            date: new Date().toISOString().split('T')[0],
+            documents: selectedFiles.map(f => ({ name: f.name, url: '' })), // Placeholder for storage URL
+            date: new Date().toISOString(),
         };
         onResponseSubmit(taskId, response);
         toast({ title: 'Response Sent', description: 'The customer has been notified.' });
@@ -139,11 +130,11 @@ const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: Reac
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const newComplaint = {
-            id: `C-${Date.now().toString().slice(-4)}`,
             text: complaintText,
             status: 'Open',
             response: null,
-            documents: selectedFiles.map(f => f.name),
+            documents: selectedFiles.map(f => ({ name: f.name, url: '' })), // Placeholder for storage URL
+            date: new Date().toISOString(),
         };
         onComplaintSubmit(taskId, newComplaint);
         toast({ title: 'Complaint Submitted', description: 'Your complaint has been registered. We will look into it shortly.' });
@@ -161,12 +152,12 @@ const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: Reac
     };
 
     const handleOpenChange = (isOpen: boolean) => {
-        setOpen(isOpen);
         if (!isOpen) {
             setComplaintText('');
             setSelectedFiles([]);
             setIsCameraOpen(false);
         }
+        setOpen(isOpen);
     }
 
     return (
@@ -184,7 +175,7 @@ const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: Reac
                              <div>
                                 <Label>Attach Documents</Label>
                                 <div className="flex gap-2 mt-2">
-                                    <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="secondary">
+                                    <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="secondary" className="bg-primary/20 text-primary hover:bg-primary/30">
                                         <FileUp className="mr-2 h-4 w-4"/> Choose Files
                                     </Button>
                                     <Button type="button" variant="outline" onClick={() => setIsCameraOpen(true)} size="sm">
@@ -220,9 +211,9 @@ const FeedbackDialog = ({ trigger, taskId, onFeedbackSubmit }: { trigger: React.
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const newFeedback = {
-            id: `F-${Date.now().toString().slice(-4)}`,
             rating,
             comment,
+            date: new Date().toISOString(),
         }
         onFeedbackSubmit(taskId, newFeedback);
         toast({ title: 'Feedback Submitted', description: 'Thank you for your valuable feedback!' });
@@ -230,11 +221,11 @@ const FeedbackDialog = ({ trigger, taskId, onFeedbackSubmit }: { trigger: React.
     };
 
     const handleOpenChange = (isOpen: boolean) => {
-        setOpen(isOpen);
         if (!isOpen) {
             setRating(0);
             setComment('');
         }
+        setOpen(isOpen);
     }
 
     return (
@@ -353,7 +344,7 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
     );
 };
 
-const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any) => void, type: 'Customer Request' | 'VLE Lead' }) => {
+const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, vleCreatorId }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any) => void, type: 'Customer Request' | 'VLE Lead', vleCreatorId?: string }) => {
   const { toast } = useToast();
   const [service, setService] = useState('');
   const [otherService, setOtherService] = useState('');
@@ -362,7 +353,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const handleCreateTask = (e: FormEvent) => {
+  const handleCreateTask = async (e: FormEvent) => {
     e.preventDefault();
     if(selectedFiles.length === 0) {
         toast({
@@ -373,26 +364,30 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
         return;
     }
     const form = e.target as HTMLFormElement;
-    const newTaskId = `SS-${Date.now().toString().slice(-6)}`;
     const finalService = service === 'Other' ? otherService : service;
+
     const newTask = {
-        id: newTaskId,
         customer: form.name.value,
+        customerAddress: form.address.value,
+        customerMobile: form.mobile.value,
+        customerEmail: form.email.value,
         service: finalService,
         status: 'Unassigned',
-        date: new Date().toISOString().split('T')[0],
+        date: new Date().toISOString(),
         complaint: null,
         feedback: null,
         type: type,
-        documents: selectedFiles.map(f => f.name),
-        assignedVle: null,
+        documents: selectedFiles.map(f => ({ name: f.name, url: '' })), // Placeholder for storage URL
+        assignedVleId: null,
+        assignedVleName: null,
+        creatorId: type === 'VLE Lead' ? vleCreatorId : DEMO_CUSTOMER_ID,
     };
 
-    onTaskCreated(newTask);
+    await onTaskCreated(newTask);
     
     toast({
       title: 'Task Created!',
-      description: `Your new task ID is ${newTaskId}.`,
+      description: `Your new service request has been submitted.`,
     });
     setDialogOpen(false);
   };
@@ -475,7 +470,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
                 </Label>
                 <div className="col-span-3 grid gap-2">
                   <div className="flex gap-2">
-                    <Button type="button" onClick={() => fileInputRef.current?.click()} variant="secondary">
+                    <Button type="button" onClick={() => fileInputRef.current?.click()} variant="secondary" className="bg-primary/20 text-primary hover:bg-primary/30">
                         <FileUp className="mr-2 h-4 w-4"/> Choose Files
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setIsCameraOpen(true)}>
@@ -504,7 +499,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
 };
 
 
-const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
+const ProfileView = ({ userType, userId }: {userType: 'Customer' | 'VLE', userId: string}) => {
     const { toast } = useToast();
 
     type BankAccount = {
@@ -515,6 +510,7 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
         upiId: string;
     };
     
+    const [userProfile, setUserProfile] = useState<any>(null);
     const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [isEditing, setIsEditing] = useState(false);
     const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
@@ -524,6 +520,26 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
     const [formState, setFormState] = useState<BankAccount>({
         id: '', bankName: '', accountNumber: '', ifscCode: '', upiId: ''
     });
+
+    useEffect(() => {
+        if (!userId) return;
+
+        const collectionName = userType === 'Customer' ? 'users' : 'vles';
+        const docRef = doc(db, collectionName, userId);
+
+        const unsubscribe = onSnapshot(docRef, (doc) => {
+            if (doc.exists()) {
+                const data = doc.data();
+                setUserProfile(data);
+                setBankAccounts(data.bankAccounts || []);
+            } else {
+                console.log("No such document!");
+            }
+        });
+
+        return () => unsubscribe();
+    }, [userId, userType]);
+
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -542,16 +558,22 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
         setIsEditing(true);
     };
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        let updatedAccounts;
         if (editingAccount) {
-            setBankAccounts(accounts => accounts.map(acc => acc.id === editingAccount.id ? formState : acc));
+            updatedAccounts = bankAccounts.map(acc => acc.id === editingAccount.id ? formState : acc);
             toast({ title: "Bank Details Updated", description: "Your bank account has been updated."});
         } else {
             const newAccount = { ...formState, id: Date.now().toString() };
-            setBankAccounts(accounts => [...accounts, newAccount]);
+            updatedAccounts = [...bankAccounts, newAccount];
             toast({ title: "Bank Account Added", description: "Your new bank account has been added."});
         }
+        
+        const collectionName = userType === 'Customer' ? 'users' : 'vles';
+        const docRef = doc(db, collectionName, userId);
+        await updateDoc(docRef, { bankAccounts: updatedAccounts });
+
         setIsEditing(false);
         setEditingAccount(null);
     };
@@ -561,9 +583,13 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
         setIsDeleteDialogOpen(true);
     }
     
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (accountToDelete) {
-            setBankAccounts(accounts => accounts.filter(acc => acc.id !== accountToDelete));
+            const updatedAccounts = bankAccounts.filter(acc => acc.id !== accountToDelete);
+            const collectionName = userType === 'Customer' ? 'users' : 'vles';
+            const docRef = doc(db, collectionName, userId);
+            await updateDoc(docRef, { bankAccounts: updatedAccounts });
+
             toast({ title: "Bank Account Removed", description: "The bank account has been removed."});
         }
         setIsDeleteDialogOpen(false);
@@ -575,6 +601,10 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
         setEditingAccount(null);
     }
     
+    if (!userProfile) {
+        return <div>Loading profile...</div>;
+    }
+
     return (
     <div className="space-y-4">
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -599,8 +629,8 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
                 <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">₹1000</div>
-                <p className="text-xs text-muted-foreground">Preloaded for demo</p>
+                <div className="text-2xl font-bold">₹{userProfile.walletBalance || 0}</div>
+                <p className="text-xs text-muted-foreground">Available balance</p>
             </CardContent>
             </Card>
         </div>
@@ -615,15 +645,15 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
                 <CardContent className="space-y-4">
                      <div className="space-y-2">
                         <Label htmlFor="profile-name">Full Name</Label>
-                        <Input id="profile-name" defaultValue={userType === 'Customer' ? 'Ravi Sharma' : 'Suresh Kumar'} readOnly />
+                        <Input id="profile-name" defaultValue={userProfile.name} readOnly />
                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="profile-email">Email Address</Label>
-                        <Input id="profile-email" type="email" defaultValue={userType === 'Customer' ? 'ravi.sharma@example.com' : 'suresh.k@example.com'} readOnly />
+                        <Input id="profile-email" type="email" defaultValue={userProfile.email} readOnly />
                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="profile-mobile">Mobile Number</Label>
-                        <Input id="profile-mobile" defaultValue={userType === 'Customer' ? "9876543210" : "9988776655"} readOnly />
+                        <Input id="profile-mobile" defaultValue={userProfile.mobile} readOnly />
                      </div>
                 </CardContent>
             </Card>
@@ -632,7 +662,7 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
                     <div className="flex justify-between items-start">
                         <div>
                             <h3 className="text-lg font-semibold leading-none tracking-tight">Bank Details</h3>
-                            <CardDescription>Securely manage your bank accounts for transactions.</CardDescription>
+                            <CardDescription>Manage your bank accounts for transactions.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -705,121 +735,125 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
 )};
 
 
-const CustomerDashboard = ({ tasks, customerComplaints, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], customerComplaints: any[], onTaskCreated: (task: any) => void, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => (
-  <TabsContent value="customer">
-    <Tabs defaultValue="tasks">
-        <TabsList>
-            <TabsTrigger value="tasks">My Tasks</TabsTrigger>
-            <TabsTrigger value="complaints">My Complaints</TabsTrigger>
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-        </TabsList>
-        <TabsContent value="tasks" className="mt-4">
-            <Card>
-                <CardHeader className="flex flex-row items-center">
-                    <div className="grid gap-2">
-                        <CardTitle>My Service Requests</CardTitle>
-                        <CardDescription>
-                        Track your ongoing and completed service requests.
-                        </CardDescription>
-                    </div>
-                    <div className="ml-auto flex items-center gap-2">
-                        <TaskCreatorDialog type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
-                    </div>
-                </CardHeader>
-                <CardContent>
-                <Table>
-                    <TableHeader>
-                    <TableRow>
-                        <TableHead>Task ID</TableHead>
-                        <TableHead>Service</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Actions</TableHead>
-                    </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                    {tasks.map(task => (
-                        <TableRow key={task.id}>
-                        <TableCell className="font-medium">{task.id}</TableCell>
-                        <TableCell>{task.service}</TableCell>
-                        <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                        <TableCell>{task.date}</TableCell>
-                        <TableCell>
-                            <div className="flex gap-2 items-center">
-                            {task.status !== 'Completed' && !task.complaint && (
-                                 <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={<Button variant="outline" size="sm">Raise Complaint</Button>} />
-                            )}
-                             {task.complaint && (
-                                <div className="flex items-center gap-2 text-sm">
-                                    <Badge variant={task.complaint.status === 'Open' ? 'destructive' : 'default'}>Complaint: {task.complaint.status}</Badge>
-                                </div>
-                             )}
-                            {task.status === 'Completed' && !task.feedback && (
-                                <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={<Button variant="outline" size="sm">Give Feedback</Button>} />
-                            )}
-                             {task.feedback && (
-                                <StarRating rating={task.feedback.rating} readOnly />
-                             )}
-                            </div>
-                        </TableCell>
-                        </TableRow>
-                    ))}
-                    </TableBody>
-                </Table>
-                </CardContent>
-            </Card>
-        </TabsContent>
-        <TabsContent value="complaints" className="mt-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle>My Complaints</CardTitle>
-                    <CardDescription>View and track all your complaints.</CardDescription>
-                </CardHeader>
-                <CardContent>
+const CustomerDashboard = ({ tasks, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], onTaskCreated: (task: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+    const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
+    
+    return (
+      <TabsContent value="customer">
+        <Tabs defaultValue="tasks">
+            <TabsList>
+                <TabsTrigger value="tasks">My Tasks</TabsTrigger>
+                <TabsTrigger value="complaints">My Complaints</TabsTrigger>
+                <TabsTrigger value="profile">Profile</TabsTrigger>
+            </TabsList>
+            <TabsContent value="tasks" className="mt-4">
+                <Card>
+                    <CardHeader className="flex flex-row items-center">
+                        <div className="grid gap-2">
+                            <CardTitle>My Service Requests</CardTitle>
+                            <CardDescription>
+                            Track your ongoing and completed service requests.
+                            </CardDescription>
+                        </div>
+                        <div className="ml-auto flex items-center gap-2">
+                            <TaskCreatorDialog type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
                     <Table>
                         <TableHeader>
-                            <TableRow>
-                                <TableHead>Task ID</TableHead>
-                                <TableHead>Service</TableHead>
-                                <TableHead>Complaint</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Admin Response</TableHead>
-                            </TableRow>
+                        <TableRow>
+                            <TableHead>Task ID</TableHead>
+                            <TableHead>Service</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Actions</TableHead>
+                        </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {customerComplaints.length > 0 ? (
-                                customerComplaints.map(c => (
-                                <TableRow key={c.id}>
-                                    <TableCell className="font-medium">{c.taskId}</TableCell>
-                                    <TableCell>{c.service}</TableCell>
-                                    <TableCell className="max-w-xs break-words">{c.text}</TableCell>
-                                    <TableCell><Badge variant={c.status === 'Open' ? 'destructive' : 'default'}>{c.status}</Badge></TableCell>
-                                    <TableCell className="max-w-xs break-words">
-                                        {c.response ? c.response.text : 'No response yet.'}
-                                    </TableCell>
-                                </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={5} className="h-24 text-center">
-                                        You have not raised any complaints.
-                                    </TableCell>
-                                </TableRow>
-                            )}
+                        {tasks.map(task => (
+                            <TableRow key={task.id}>
+                            <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
+                            <TableCell>{task.service}</TableCell>
+                            <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
+                            <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
+                            <TableCell>
+                                <div className="flex gap-2 items-center">
+                                {task.status !== 'Completed' && !task.complaint && (
+                                     <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={<Button variant="outline" size="sm">Raise Complaint</Button>} />
+                                )}
+                                 {task.complaint && (
+                                    <div className="flex items-center gap-2 text-sm">
+                                        <Badge variant={task.complaint.status === 'Open' ? 'destructive' : 'default'}>Complaint: {task.complaint.status}</Badge>
+                                    </div>
+                                 )}
+                                {task.status === 'Completed' && !task.feedback && (
+                                    <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={<Button variant="outline" size="sm">Give Feedback</Button>} />
+                                )}
+                                 {task.feedback && (
+                                    <StarRating rating={task.feedback.rating} readOnly />
+                                 )}
+                                </div>
+                            </TableCell>
+                            </TableRow>
+                        ))}
                         </TableBody>
                     </Table>
-                </CardContent>
-            </Card>
-        </TabsContent>
-        <TabsContent value="profile" className="mt-4">
-            <ProfileView userType="Customer" />
-        </TabsContent>
-    </Tabs>
-  </TabsContent>
-);
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="complaints" className="mt-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>My Complaints</CardTitle>
+                        <CardDescription>View and track all your complaints.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Task ID</TableHead>
+                                    <TableHead>Service</TableHead>
+                                    <TableHead>Complaint</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Admin Response</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {customerComplaints.length > 0 ? (
+                                    customerComplaints.map(c => (
+                                    <TableRow key={c.date}>
+                                        <TableCell className="font-medium">{c.taskId.slice(-6).toUpperCase()}</TableCell>
+                                        <TableCell>{c.service}</TableCell>
+                                        <TableCell className="max-w-xs break-words">{c.text}</TableCell>
+                                        <TableCell><Badge variant={c.status === 'Open' ? 'destructive' : 'default'}>{c.status}</Badge></TableCell>
+                                        <TableCell className="max-w-xs break-words">
+                                            {c.response ? c.response.text : 'No response yet.'}
+                                        </TableCell>
+                                    </TableRow>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell colSpan={5} className="h-24 text-center">
+                                            You have not raised any complaints.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="profile" className="mt-4">
+                <ProfileView userType="Customer" userId={DEMO_CUSTOMER_ID}/>
+            </TabsContent>
+        </Tabs>
+      </TabsContent>
+    );
+}
 
-const VLEDashboard = ({ tasks, vles, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], vles: any[], onTaskCreated: (task: any) => void, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
-    const currentVle = vles.find(v => v.id === 'VLE7362'); // Demo: Using Suresh Kumar's ID
+const VLEDashboard = ({ tasks, vles, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], vles: any[], onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+    const currentVle = vles.find(v => v.id === DEMO_VLE_ID);
     
     return (
     <TabsContent value="vle">
@@ -860,7 +894,7 @@ const VLEDashboard = ({ tasks, vles, onTaskCreated, onVleAvailabilityChange }: {
                                 <CardDescription>Tasks assigned to you for fulfillment.</CardDescription>
                             </div>
                             <div className="ml-auto flex items-center gap-2">
-                                <TaskCreatorDialog type="VLE Lead" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
+                                <TaskCreatorDialog type="VLE Lead" onTaskCreated={onTaskCreated} vleCreatorId={DEMO_VLE_ID} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
                                 <Button asChild variant="outline" size="sm" className="h-8 gap-1"><Link href="/dashboard/extract"><BrainCircuit className="h-3.5 w-3.5" />Special Request</Link></Button>
                             </div>
                         </CardHeader>
@@ -878,11 +912,11 @@ const VLEDashboard = ({ tasks, vles, onTaskCreated, onVleAvailabilityChange }: {
                             <TableBody>
                                 {tasks.map(task => (
                                 <TableRow key={task.id}>
-                                    <TableCell className="font-medium">{task.id}</TableCell>
+                                    <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
                                     <TableCell>{task.service}</TableCell>
                                     <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                                     <TableCell>{task.customer}</TableCell>
-                                    <TableCell>{task.date}</TableCell>
+                                    <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
                                 </TableRow>
                                 ))}
                             </TableBody>
@@ -892,32 +926,33 @@ const VLEDashboard = ({ tasks, vles, onTaskCreated, onVleAvailabilityChange }: {
                 </div>
             </TabsContent>
             <TabsContent value="profile" className="mt-4">
-                <ProfileView userType="VLE" />
+                <ProfileView userType="VLE" userId={DEMO_VLE_ID} />
             </TabsContent>
         </Tabs>
     </TabsContent>
 )};
 
-const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger: React.ReactNode, taskId: string, availableVles: any[], onAssign: (taskId: string, vleId: string) => void }) => {
+const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger: React.ReactNode, taskId: string, availableVles: any[], onAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
-    const [selectedVle, setSelectedVle] = useState('');
+    const [selectedVleId, setSelectedVleId] = useState('');
 
     const handleAssign = () => {
-        if (!selectedVle) {
+        if (!selectedVleId) {
             toast({ title: 'Select a VLE', description: 'Please select a VLE to assign the task.', variant: 'destructive' });
             return;
         }
-        onAssign(taskId, selectedVle);
-        toast({ title: 'Task Assigned', description: `Task ${taskId} has been assigned.`});
+        const vle = availableVles.find(v => v.id === selectedVleId);
+        onAssign(taskId, selectedVleId, vle.name);
+        toast({ title: 'Task Assigned', description: `Task ${taskId.slice(-6).toUpperCase()} has been assigned.`});
         setOpen(false);
     }
 
     const handleOpenChange = (isOpen: boolean) => {
-        setOpen(isOpen);
         if (!isOpen) {
-            setSelectedVle('');
+            setSelectedVleId('');
         }
+        setOpen(isOpen);
     }
 
     return (
@@ -925,11 +960,11 @@ const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger
             <DialogTrigger asChild>{trigger}</DialogTrigger>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Assign Task {taskId}</DialogTitle>
+                    <DialogTitle>Assign Task {taskId.slice(-6).toUpperCase()}</DialogTitle>
                     <DialogDescription>Select an available VLE to assign this task to.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
-                    <Select onValueChange={setSelectedVle} value={selectedVle}>
+                    <Select onValueChange={setSelectedVleId} value={selectedVleId}>
                         <SelectTrigger><SelectValue placeholder="Select an available VLE" /></SelectTrigger>
                         <SelectContent>
                             {availableVles.map(vle => (
@@ -946,8 +981,10 @@ const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger
     )
 }
 
-const AdminDashboard = ({ allTasks, vles, complaints, feedback, onComplaintResponse, onVleApprove, onVleAssign }: { allTasks: any[], vles: any[], complaints: any[], feedback: any[], onComplaintResponse: (taskId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string) => void }) => {
+const AdminDashboard = ({ allTasks, vles, onComplaintResponse, onVleApprove, onVleAssign }: { allTasks: any[], vles: any[], onComplaintResponse: (taskId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
     const availableVles = vles.filter(v => v.status === 'Approved' && v.available);
+    const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date}));
+    const feedback = allTasks.filter(t => t.feedback).map(t => ({...t.feedback, taskId: t.id, customer: t.customer, date: t.date, service: t.service}));
 
     return (
         <TabsContent value="admin">
@@ -1021,7 +1058,7 @@ const AdminDashboard = ({ allTasks, vles, complaints, feedback, onComplaintRespo
                         <TableBody>
                             {vles.map(vle => (
                             <TableRow key={vle.id}>
-                                <TableCell className="font-medium">{vle.id}</TableCell>
+                                <TableCell className="font-medium">{vle.id.slice(0,10)}...</TableCell>
                                 <TableCell>{vle.name}</TableCell>
                                 <TableCell><Badge variant={vle.status === 'Approved' ? 'default' : 'secondary'}>{vle.status}</Badge></TableCell>
                                 <TableCell>
@@ -1062,12 +1099,12 @@ const AdminDashboard = ({ allTasks, vles, complaints, feedback, onComplaintRespo
                                 <TableBody>
                                     {allTasks.map(task => (
                                         <TableRow key={task.id}>
-                                            <TableCell className="font-medium">{task.id}</TableCell>
+                                            <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
                                             <TableCell>{task.customer}</TableCell>
                                             <TableCell>{task.service}</TableCell>
                                             <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                                            <TableCell>{task.assignedVle || 'N/A'}</TableCell>
-                                            <TableCell>{task.date}</TableCell>
+                                            <TableCell>{task.assignedVleName || 'N/A'}</TableCell>
+                                            <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
                                             <TableCell>
                                                 {task.status === 'Unassigned' && (
                                                     <AssignVleDialog 
@@ -1106,8 +1143,8 @@ const AdminDashboard = ({ allTasks, vles, complaints, feedback, onComplaintRespo
                         </TableHeader>
                         <TableBody>
                             {complaints.map(c => (
-                            <TableRow key={c.id}>
-                                <TableCell className="font-medium">{c.taskId}</TableCell>
+                            <TableRow key={c.date}>
+                                <TableCell className="font-medium">{c.taskId.slice(-6).toUpperCase()}</TableCell>
                                 <TableCell>{c.customer}</TableCell>
                                 <TableCell className="max-w-xs break-words">{c.text}</TableCell>
                                 <TableCell>{c.documents?.length > 0 ? <FileText className="h-4 w-4" /> : 'N/A'}</TableCell>
@@ -1149,12 +1186,12 @@ const AdminDashboard = ({ allTasks, vles, complaints, feedback, onComplaintRespo
                         </TableHeader>
                         <TableBody>
                             {feedback.map(fb => (
-                            <TableRow key={fb.id}>
-                                <TableCell className="font-medium">{fb.taskId}</TableCell>
+                            <TableRow key={fb.date}>
+                                <TableCell className="font-medium">{fb.taskId.slice(-6).toUpperCase()}</TableCell>
                                 <TableCell>{fb.customer}</TableCell>
                                 <TableCell><StarRating rating={fb.rating} readOnly={true} /></TableCell>
                                 <TableCell>{fb.comment}</TableCell>
-                                <TableCell>{fb.date}</TableCell>
+                                <TableCell>{new Date(fb.date).toLocaleDateString()}</TableCell>
                             </TableRow>
                             ))}
                         </TableBody>
@@ -1170,51 +1207,71 @@ const AdminDashboard = ({ allTasks, vles, complaints, feedback, onComplaintRespo
 
 export default function DashboardPage() {
     const { toast } = useToast();
-    const [tasks, setTasks] = useState(initialTasks);
-    const [vles, setVles] = useState(initialVles);
+    const [tasks, setTasks] = useState<any[]>([]);
+    const [vles, setVles] = useState<any[]>([]);
 
-    const handleCreateTask = (newTask: any) => {
-        setTasks(prev => [newTask, ...prev].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+    useEffect(() => {
+        const q = query(collection(db, "tasks"), orderBy("date", "desc"));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const tasksData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setTasks(tasksData);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        const q = query(collection(db, "vles"));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const vlesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setVles(vlesData);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleCreateTask = async (newTask: any) => {
+        await addDoc(collection(db, "tasks"), newTask);
     }
 
-    const handleComplaintSubmit = (taskId: string, complaint: any) => {
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, complaint, status: 'Complaint Raised' } : t));
+    const handleComplaintSubmit = async (taskId: string, complaint: any) => {
+        const taskRef = doc(db, "tasks", taskId);
+        await updateDoc(taskRef, { complaint: complaint, status: 'Complaint Raised' });
     }
     
-    const handleFeedbackSubmit = (taskId: string, feedback: any) => {
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, feedback } : t));
+    const handleFeedbackSubmit = async (taskId: string, feedback: any) => {
+        const taskRef = doc(db, "tasks", taskId);
+        await updateDoc(taskRef, { feedback: feedback });
     }
 
-    const handleComplaintResponse = (taskId: string, response: any) => {
-        setTasks(prev => prev.map(t => {
-            if (t.id === taskId) {
-                return { ...t, complaint: { ...t.complaint, response, status: 'Responded' } }
-            }
-            return t;
-        }));
+    const handleComplaintResponse = async (taskId: string, response: any) => {
+        const taskRef = doc(db, "tasks", taskId);
+        const taskSnap = await getDoc(taskRef);
+        if (taskSnap.exists()) {
+            const taskData = taskSnap.data();
+            const updatedComplaint = { ...taskData.complaint, response, status: 'Responded' };
+            await updateDoc(taskRef, { complaint: updatedComplaint });
+        }
     }
     
-    const handleVleApprove = (vleId: string) => {
-        setVles(prev => prev.map(v => v.id === vleId ? { ...v, status: 'Approved'} : v));
+    const handleVleApprove = async (vleId: string) => {
+        const vleRef = doc(db, "vles", vleId);
+        await updateDoc(vleRef, { status: 'Approved' });
         toast({ title: 'VLE Approved', description: 'The VLE has been approved and can now take tasks.'});
     }
 
-    const handleVleAvailabilityChange = (vleId: string, available: boolean) => {
-        setVles(prev => prev.map(v => v.id === vleId ? { ...v, available } : v));
+    const handleVleAvailabilityChange = async (vleId: string, available: boolean) => {
+        const vleRef = doc(db, "vles", vleId);
+        await updateDoc(vleRef, { available: available });
         toast({ title: 'Availability Updated', description: `You are now ${available ? 'available' : 'unavailable'} for tasks.`});
     }
 
-    const handleAssignVle = (taskId: string, vleId: string) => {
-        const vle = vles.find(v => v.id === vleId);
-        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'Assigned', assignedVle: vle?.name || 'Unknown' } : t));
+    const handleAssignVle = async (taskId: string, vleId: string, vleName: string) => {
+        const taskRef = doc(db, "tasks", taskId);
+        await updateDoc(taskRef, { status: 'Assigned', assignedVleId: vleId, assignedVleName: vleName });
     }
-
-    const customerTasks = tasks.filter(t => t.type === 'Customer Request');
-    const customerComplaints = tasks.filter(t => t.type === 'Customer Request' && t.complaint).map(t => ({ taskId: t.id, service: t.service, ...t.complaint}));
-
-    const vleTasks = tasks.filter(t => t.assignedVle === 'Suresh Kumar'); // Demo: Show tasks for Suresh
-    const allComplaints = tasks.filter(t => t.complaint).map(t => ({ taskId: t.id, customer: t.customer, date: t.date, ...t.complaint })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const allFeedback = tasks.filter(t => t.feedback).map(t => ({ taskId: t.id, customer: t.customer, date: t.date, ...t.feedback })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    // Filter data for different views
+    const customerTasks = tasks.filter(t => t.creatorId === DEMO_CUSTOMER_ID);
+    const vleTasks = tasks.filter(t => t.assignedVleId === DEMO_VLE_ID);
 
   return (
       <Tabs defaultValue="customer">
@@ -1226,9 +1283,9 @@ export default function DashboardPage() {
           </TabsList>
         </div>
         <div className="mt-4">
-            <CustomerDashboard tasks={customerTasks} customerComplaints={customerComplaints} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />
+            <CustomerDashboard tasks={customerTasks} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />
             <VLEDashboard tasks={vleTasks} vles={vles} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />
-            <AdminDashboard allTasks={tasks} vles={vles} complaints={allComplaints} feedback={allFeedback} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} />
+            <AdminDashboard allTasks={tasks} vles={vles} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} />
         </div>
       </Tabs>
   );
