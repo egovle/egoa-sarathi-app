@@ -11,9 +11,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useState, type FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { createUserWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db, googleProvider } from '@/lib/firebase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,10 @@ type PostOffice = {
   District: string;
   State: string;
 };
+
+const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24px" height="24px" {...props}><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.222,0-9.657-3.356-11.303-7.918l-6.571,4.819C9.656,39.663,16.318,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571l6.19,5.238C42.02,35.826,44,30.138,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
+);
 
 export default function RegisterPage() {
   const { toast } = useToast();
@@ -42,6 +46,7 @@ export default function RegisterPage() {
 
   // UI State
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [isPincodeLoading, setIsPincodeLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
 
@@ -117,10 +122,9 @@ export default function RegisterPage() {
   };
 
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     
-    // Validation Checks
     if (!email || !validateEmail(email)) {
       if (!email) {
         setEmailError('Email is required.');
@@ -151,11 +155,9 @@ export default function RegisterPage() {
     const fullLocation = `${address}, ${city}, ${district}, ${pincode}`;
 
     try {
-      // 1. Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Create user profile in Firestore
       const userProfile = {
         name: fullName,
         email: email,
@@ -188,6 +190,53 @@ export default function RegisterPage() {
     }
   };
 
+  const handleGoogleSignUp = async () => {
+    setGoogleLoading(true);
+    try {
+        const result = await signInWithPopup(auth, googleProvider);
+        const user = result.user;
+
+        const userDocRef = doc(db, 'users', user.uid);
+        const vleDocRef = doc(db, 'vles', user.uid);
+        
+        const userDocSnap = await getDoc(userDocRef);
+        const vleDocSnap = await getDoc(vleDocRef);
+
+        if (!userDocSnap.exists() && !vleDocSnap.exists()) {
+            const userProfile = {
+                name: user.displayName,
+                email: user.email,
+                mobile: user.phoneNumber || '',
+                location: '',
+                role: 'customer',
+                walletBalance: 0,
+                bankAccounts: [],
+                isAdmin: false,
+            };
+            await setDoc(doc(db, 'users', user.uid), userProfile);
+            toast({
+                title: 'Registration Successful!',
+                description: 'Your account has been created. Redirecting...',
+            });
+        } else {
+            toast({
+                title: 'Welcome Back!',
+                description: 'You are already registered. Redirecting to dashboard...',
+            });
+        }
+        router.push('/dashboard');
+    } catch (error: any) {
+        console.error("Google Sign-Up failed:", error);
+        toast({
+            title: 'Sign-Up Failed',
+            description: error.message || 'Could not create account with Google. Please try again.',
+            variant: 'destructive',
+        });
+    } finally {
+        setGoogleLoading(false);
+    }
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-700 to-indigo-900 text-white p-4">
        <Card className="mx-auto max-w-sm w-full bg-blue-500/20 backdrop-blur-lg rounded-2xl p-2 md:p-4 shadow-2xl border border-white/10 text-white">
@@ -201,7 +250,7 @@ export default function RegisterPage() {
           <CardDescription className="text-center text-blue-200">Enter your details below to create an account</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="grid gap-4">
+          <form onSubmit={handleFormSubmit} className="grid gap-4">
             <div className="grid gap-2 text-left">
               <Label className="text-blue-100">Register as</Label>
               <RadioGroup defaultValue="customer" value={role} onValueChange={setRole} className="flex gap-4 pt-1">
@@ -300,7 +349,7 @@ export default function RegisterPage() {
               <Label htmlFor="address" className="text-blue-100">Address (House No, Street)</Label>
               <Input id="address" name="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123, Main Street" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
             </div>
-            <Button type="submit" disabled={loading || isPincodeLoading} className="w-full bg-white text-blue-800 font-bold hover:bg-gray-200 h-12 text-base rounded-lg mt-2">
+            <Button type="submit" disabled={loading || isPincodeLoading || googleLoading} className="w-full bg-white text-blue-800 font-bold hover:bg-gray-200 h-12 text-base rounded-lg mt-2">
               {loading ? <Loader2 className="animate-spin" /> : 'Create an account'}
             </Button>
             {role === 'vle' && (
@@ -309,6 +358,18 @@ export default function RegisterPage() {
               </p>
             )}
           </form>
+           <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-white/20" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-blue-800 px-2 text-blue-200">Or</span>
+              </div>
+            </div>
+
+            <Button variant="outline" type="button" onClick={handleGoogleSignUp} disabled={loading || googleLoading} className="w-full bg-white/90 text-blue-800 font-bold hover:bg-white h-12 text-base rounded-lg">
+                {googleLoading ? <Loader2 className="animate-spin" /> : <><GoogleIcon className="mr-2 h-5 w-5" /> Sign up with Google</>}
+            </Button>
           <div className="mt-4 text-center text-sm">
             <span className="text-blue-200">Already have an account?{' '}</span>
             <Link href="/" className="underline font-semibold" prefetch={false}>
