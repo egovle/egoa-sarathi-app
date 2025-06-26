@@ -27,6 +27,7 @@ export default function RegisterPage() {
   const [mobile, setMobile] = useState('');
   const [pincode, setPincode] = useState('');
   const [city, setCity] = useState('');
+  const [district, setDistrict] = useState('');
   const [address, setAddress] = useState('');
 
   // UI State
@@ -38,18 +39,21 @@ export default function RegisterPage() {
       const fetchLocation = async () => {
         setIsPincodeLoading(true);
         setCity('');
+        setDistrict('');
         try {
           const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
           const data = await response.json();
           if (data && data[0] && data[0].Status === 'Success') {
             const postOffice = data[0].PostOffice[0];
-            setCity(postOffice.District);
+            setCity(postOffice.Name);
+            setDistrict(postOffice.District);
             toast({
               title: 'Location Found',
-              description: `${postOffice.District}, ${postOffice.State}`,
+              description: `${postOffice.Name}, ${postOffice.District}, ${postOffice.State}`,
             });
           } else {
             setCity('');
+            setDistrict('');
             toast({
               title: 'Invalid Pincode',
               description: 'Could not find a location for this pincode.',
@@ -59,6 +63,7 @@ export default function RegisterPage() {
         } catch (error) {
           console.error('Failed to fetch pincode data:', error);
           setCity('');
+          setDistrict('');
           toast({
             title: 'API Error',
             description: 'Could not fetch location data. Please enter manually.',
@@ -71,6 +76,7 @@ export default function RegisterPage() {
       fetchLocation();
     } else {
         setCity('');
+        setDistrict('');
     }
   }, [pincode, toast]);
 
@@ -79,17 +85,17 @@ export default function RegisterPage() {
     event.preventDefault();
     setLoading(true);
 
-    if (!city) {
+    if (!city || !district) {
         toast({
             title: 'Invalid Location',
-            description: 'Please provide a valid pincode to determine the city.',
+            description: 'Please provide a valid pincode to determine the city and district.',
             variant: 'destructive',
         });
         setLoading(false);
         return;
     }
     
-    const fullLocation = `${address}, ${city}, ${pincode}`;
+    const fullLocation = `${address}, ${city}, ${district}, ${pincode}`;
 
     try {
       // 1. Create user in Firebase Auth
@@ -172,17 +178,21 @@ export default function RegisterPage() {
               <Label htmlFor="mobile" className="text-blue-100">Mobile Number</Label>
               <Input id="mobile" name="mobile" type="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="9876543210" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2 text-left">
-                    <Label htmlFor="pincode" className="text-blue-100">Pincode</Label>
-                    <div className="relative">
-                        <Input id="pincode" name="pincode" type="text" maxLength={6} value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))} placeholder="e.g., 403001" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11"/>
-                        {isPincodeLoading && <Loader2 className="absolute right-3 top-3 h-5 w-5 animate-spin" />}
-                    </div>
+            <div className="grid gap-2 text-left">
+                <Label htmlFor="pincode" className="text-blue-100">Pincode</Label>
+                <div className="relative">
+                    <Input id="pincode" name="pincode" type="text" maxLength={6} value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))} placeholder="e.g., 403001" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11"/>
+                    {isPincodeLoading && <Loader2 className="absolute right-3 top-3 h-5 w-5 animate-spin" />}
                 </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2 text-left">
                     <Label htmlFor="city" className="text-blue-100">City</Label>
                     <Input id="city" name="city" value={city} placeholder="Auto-populated" readOnly required className="bg-black/10 border-white/20 text-white placeholder:text-gray-400 h-11 cursor-not-allowed" />
+                </div>
+                <div className="grid gap-2 text-left">
+                    <Label htmlFor="district" className="text-blue-100">District</Label>
+                    <Input id="district" name="district" value={district} placeholder="Auto-populated" readOnly required className="bg-black/10 border-white/20 text-white placeholder:text-gray-400 h-11 cursor-not-allowed" />
                 </div>
             </div>
             <div className="grid gap-2 text-left">
@@ -209,4 +219,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
