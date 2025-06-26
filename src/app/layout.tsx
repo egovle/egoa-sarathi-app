@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
-  title: 'SevaSetu',
-  description: 'Streamlining government to citizen services in India.',
+  title: 'eGoa Sarathi',
+  description: 'Streamlined Citizen Services.',
 };
 
 export default function RootLayout({
