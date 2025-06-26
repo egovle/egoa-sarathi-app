@@ -7,8 +7,8 @@ import { getAuth } from "firebase/auth";
 // Stripped down to essentials to avoid configuration errors.
 const firebaseConfig = {
   apiKey: "AIzaSyAVWezupcCQhE6FhdxSgsD1SVPxtjDK72w",
-  authDomain: "egoasarthi.firebaseapp.com",
-  projectId: "egoasarthi",
+  authDomain: "sevasetu.firebaseapp.com",
+  projectId: "sevasetu",
 };
 
 // Initialize Firebase
