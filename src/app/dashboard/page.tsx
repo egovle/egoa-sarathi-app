@@ -362,7 +362,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const handleCreateTask = (e: FormEvent) => {
     e.preventDefault();
     if(selectedFiles.length === 0) {
         toast({
@@ -379,13 +379,13 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
         id: newTaskId,
         customer: form.name.value,
         service: finalService,
-        status: type === 'Customer Request' ? 'Unassigned' : 'Assigned',
+        status: 'Unassigned',
         date: new Date().toISOString().split('T')[0],
         complaint: null,
         feedback: null,
         type: type,
         documents: selectedFiles.map(f => f.name),
-        assignedVle: type === 'VLE Lead' ? 'Suresh Kumar' : null,
+        assignedVle: null,
     };
 
     onTaskCreated(newTask);
@@ -397,7 +397,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
     setDialogOpen(false);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setSelectedFiles(prev => [...prev, ...Array.from(e.target.files as FileList)]);
     }
@@ -631,8 +631,8 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
-                             <h3 className="text-lg font-semibold leading-none tracking-tight">Bank Details</h3>
-                             <CardDescription>Securely manage your bank accounts for transactions.</CardDescription>
+                            <h3 className="text-lg font-semibold leading-none tracking-tight">Bank Details</h3>
+                            <CardDescription>Securely manage your bank accounts for transactions.</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -705,14 +705,15 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
 )};
 
 
-const CustomerDashboard = ({ tasks, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], onTaskCreated: (task: any) => void, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => (
+const CustomerDashboard = ({ tasks, customerComplaints, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], customerComplaints: any[], onTaskCreated: (task: any) => void, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => (
   <TabsContent value="customer">
-    <Tabs defaultValue="requests">
+    <Tabs defaultValue="tasks">
         <TabsList>
-            <TabsTrigger value="requests">My Service Requests</TabsTrigger>
+            <TabsTrigger value="tasks">My Tasks</TabsTrigger>
+            <TabsTrigger value="complaints">My Complaints</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
         </TabsList>
-        <TabsContent value="requests" className="mt-4">
+        <TabsContent value="tasks" className="mt-4">
             <Card>
                 <CardHeader className="flex flex-row items-center">
                     <div className="grid gap-2">
@@ -765,6 +766,48 @@ const CustomerDashboard = ({ tasks, onTaskCreated, onComplaintSubmit, onFeedback
                     ))}
                     </TableBody>
                 </Table>
+                </CardContent>
+            </Card>
+        </TabsContent>
+        <TabsContent value="complaints" className="mt-4">
+            <Card>
+                <CardHeader>
+                    <CardTitle>My Complaints</CardTitle>
+                    <CardDescription>View and track all your complaints.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Task ID</TableHead>
+                                <TableHead>Service</TableHead>
+                                <TableHead>Complaint</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Admin Response</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {customerComplaints.length > 0 ? (
+                                customerComplaints.map(c => (
+                                <TableRow key={c.id}>
+                                    <TableCell className="font-medium">{c.taskId}</TableCell>
+                                    <TableCell>{c.service}</TableCell>
+                                    <TableCell className="max-w-xs break-words">{c.text}</TableCell>
+                                    <TableCell><Badge variant={c.status === 'Open' ? 'destructive' : 'default'}>{c.status}</Badge></TableCell>
+                                    <TableCell className="max-w-xs break-words">
+                                        {c.response ? c.response.text : 'No response yet.'}
+                                    </TableCell>
+                                </TableRow>
+                                ))
+                            ) : (
+                                <TableRow>
+                                    <TableCell colSpan={5} className="h-24 text-center">
+                                        You have not raised any complaints.
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
                 </CardContent>
             </Card>
         </TabsContent>
@@ -1167,6 +1210,8 @@ export default function DashboardPage() {
     }
 
     const customerTasks = tasks.filter(t => t.type === 'Customer Request');
+    const customerComplaints = tasks.filter(t => t.type === 'Customer Request' && t.complaint).map(t => ({ taskId: t.id, service: t.service, ...t.complaint}));
+
     const vleTasks = tasks.filter(t => t.assignedVle === 'Suresh Kumar'); // Demo: Show tasks for Suresh
     const allComplaints = tasks.filter(t => t.complaint).map(t => ({ taskId: t.id, customer: t.customer, date: t.date, ...t.complaint })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const allFeedback = tasks.filter(t => t.feedback).map(t => ({ taskId: t.id, customer: t.customer, date: t.date, ...t.feedback })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -1181,7 +1226,7 @@ export default function DashboardPage() {
           </TabsList>
         </div>
         <div className="mt-4">
-            <CustomerDashboard tasks={customerTasks} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />
+            <CustomerDashboard tasks={customerTasks} customerComplaints={customerComplaints} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />
             <VLEDashboard tasks={vleTasks} vles={vles} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />
             <AdminDashboard allTasks={tasks} vles={vles} complaints={allComplaints} feedback={allFeedback} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} />
         </div>
