@@ -2,13 +2,14 @@
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
-import { File, MoreHorizontal, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, UserCircle, Edit, Banknote, Camera, FileUp, AtSign } from 'lucide-react';
+import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -381,20 +382,23 @@ const TaskCreatorDialog = ({ buttonTrigger }: { buttonTrigger: React.ReactNode }
 
 const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
     const { toast } = useToast();
-    const [bankDetails, setBankDetails] = useState<{
+
+    type BankAccount = {
+        id: string;
         bankName: string;
         accountNumber: string;
         ifscCode: string;
         upiId: string;
-    } | null>(null);
-
-    const [isEditingBank, setIsEditingBank] = useState(false);
+    };
     
-    const [formState, setFormState] = useState({
-        bankName: '',
-        accountNumber: '',
-        ifscCode: '',
-        upiId: ''
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
+
+    const [formState, setFormState] = useState<BankAccount>({
+        id: '', bankName: '', accountNumber: '', ifscCode: '', upiId: ''
     });
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -402,28 +406,68 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
         setFormState(prevState => ({ ...prevState, [id]: value }));
     };
 
-    const handleEditBankDetails = () => {
-        if (bankDetails) {
-            setFormState(bankDetails);
-        } else {
-             setFormState({ bankName: '', accountNumber: '', ifscCode: '', upiId: ''});
-        }
-        setIsEditingBank(true);
+    const handleAddClick = () => {
+        setEditingAccount(null);
+        setFormState({ id: '', bankName: '', accountNumber: '', ifscCode: '', upiId: '' });
+        setIsEditing(true);
     };
 
-    const handleSaveBankDetails = (e: React.FormEvent) => {
-        e.preventDefault();
-        setBankDetails(formState);
-        setIsEditingBank(false);
-        toast({ title: "Bank Details Saved", description: "Your bank details have been updated successfully."});
+    const handleEditClick = (account: BankAccount) => {
+        setEditingAccount(account);
+        setFormState(account);
+        setIsEditing(true);
     };
+
+    const handleSave = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (editingAccount) {
+            setBankAccounts(accounts => accounts.map(acc => acc.id === editingAccount.id ? formState : acc));
+            toast({ title: "Bank Details Updated", description: "Your bank account has been updated."});
+        } else {
+            const newAccount = { ...formState, id: Date.now().toString() };
+            setBankAccounts(accounts => [...accounts, newAccount]);
+            toast({ title: "Bank Account Added", description: "Your new bank account has been added."});
+        }
+        setIsEditing(false);
+        setEditingAccount(null);
+    };
+
+    const handleDeleteClick = (accountId: string) => {
+        setAccountToDelete(accountId);
+        setIsDeleteDialogOpen(true);
+    }
     
+    const confirmDelete = () => {
+        if (accountToDelete) {
+            setBankAccounts(accounts => accounts.filter(acc => acc.id !== accountToDelete));
+            toast({ title: "Bank Account Removed", description: "The bank account has been removed."});
+        }
+        setIsDeleteDialogOpen(false);
+        setAccountToDelete(null);
+    }
+
     const handleCancelEdit = () => {
-        setIsEditingBank(false);
+        setIsEditing(false);
+        setEditingAccount(null);
     }
     
     return (
     <div className="space-y-4">
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete this bank account from your profile.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -461,20 +505,14 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
             </Card>
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                        <span>Bank Details</span>
-                         {bankDetails && !isEditingBank && (
-                            <Button variant="ghost" size="icon" onClick={handleEditBankDetails}>
-                                <Edit className="h-4 w-4" />
-                            </Button>
-                        )}
-                    </CardTitle>
-                    <CardDescription>Securely manage your bank account for transactions.</CardDescription>
+                    <CardTitle>Bank Details</CardTitle>
+                    <CardDescription>Securely manage your bank accounts for transactions.</CardDescription>
                 </CardHeader>
-                 {isEditingBank ? (
-                     <form onSubmit={handleSaveBankDetails}>
+                {isEditing ? (
+                     <form onSubmit={handleSave}>
                         <CardContent className="space-y-4">
-                            <div className="space-y-2">
+                             <DialogTitle>{editingAccount ? 'Edit' : 'Add'} Bank Account</DialogTitle>
+                            <div className="space-y-2 pt-2">
                                 <Label htmlFor="bankName">Bank Name</Label>
                                 <Input id="bankName" placeholder="e.g., State Bank of India" value={formState.bankName} onChange={handleInputChange} required />
                             </div>
@@ -499,35 +537,39 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
                             <Button type="submit">Save Changes</Button>
                         </CardFooter>
                      </form>
-                 ) : bankDetails ? (
-                     <>
-                        <CardContent className="space-y-4 text-sm">
-                             <div className="space-y-1">
-                                <p className="text-muted-foreground">Bank Name</p>
-                                <p className="font-medium">{bankDetails.bankName}</p>
-                             </div>
-                             <div className="space-y-1">
-                                <p className="text-muted-foreground">Account Number</p>
-                                <p className="font-medium">{bankDetails.accountNumber}</p>
-                             </div>
-                             <div className="space-y-1">
-                                <p className="text-muted-foreground">IFSC Code</p>
-                                <p className="font-medium">{bankDetails.ifscCode}</p>
-                             </div>
-                             <div className="space-y-1">
-                                <p className="text-muted-foreground">UPI ID</p>
-                                <p className="font-medium">{bankDetails.upiId || 'N/A'}</p>
-                             </div>
-                        </CardContent>
-                     </>
                  ) : (
-                    <CardContent>
-                        <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50">
-                            <Banknote className="h-8 w-8 text-muted-foreground mb-2" />
-                            <p className="mb-4 text-muted-foreground">No bank account added yet.</p>
-                            <Button onClick={handleEditBankDetails}>Add Bank Details</Button>
-                        </div>
-                    </CardContent>
+                     <>
+                        <CardContent className="space-y-4">
+                            {bankAccounts.length > 0 ? (
+                                <div className="space-y-4">
+                                {bankAccounts.map((account) => (
+                                    <div key={account.id} className="p-4 border rounded-lg relative bg-muted/20">
+                                         <div className="absolute top-2 right-2 flex gap-1">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditClick(account)}><Edit className="h-4 w-4" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteClick(account.id)}><Trash className="h-4 w-4" /></Button>
+                                        </div>
+                                        <div className="space-y-2 text-sm">
+                                            <p className="font-semibold">{account.bankName}</p>
+                                            <p className="text-muted-foreground">A/C: {account.accountNumber}</p>
+                                            <p className="text-muted-foreground">IFSC: {account.ifscCode}</p>
+                                            {account.upiId && <p className="text-muted-foreground">UPI: {account.upiId}</p>}
+                                        </div>
+                                    </div>
+                                ))}
+                                </div>
+                             ) : (
+                                <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50">
+                                    <Banknote className="h-8 w-8 text-muted-foreground mb-2" />
+                                    <p className="mb-4 text-muted-foreground">No bank account added yet.</p>
+                                </div>
+                             )}
+                        </CardContent>
+                        <CardFooter>
+                            <Button onClick={handleAddClick} variant={bankAccounts.length > 0 ? 'default' : 'default'}>
+                               <PlusCircle className="mr-2 h-4 w-4"/> {bankAccounts.length > 0 ? 'Add Another Account' : 'Add Bank Account'}
+                            </Button>
+                        </CardFooter>
+                     </>
                  )}
             </Card>
         </div>
@@ -865,4 +907,3 @@ export default function DashboardPage() {
       </Tabs>
   );
 }
-
