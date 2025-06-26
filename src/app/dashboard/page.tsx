@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where } from 'firebase/firestore';
-import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2 } from 'lucide-react';
+import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,12 +21,8 @@ import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-
-
-// --- DEMO USER IDs ---
-// These are the specific IDs that will be created by the seed script.
-const DEMO_CUSTOMER_ID = 'customer-ravi-sharma';
-const DEMO_VLE_ID = 'vle-suresh-kumar';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 
 // --- HELPER COMPONENTS ---
@@ -344,7 +340,7 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
     );
 };
 
-const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, vleCreatorId }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any) => void, type: 'Customer Request' | 'VLE Lead', vleCreatorId?: string }) => {
+const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any) => void, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any }) => {
   const { toast } = useToast();
   const [service, setService] = useState('');
   const [otherService, setOtherService] = useState('');
@@ -380,7 +376,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, vleCreatorId }:
         documents: selectedFiles.map(f => ({ name: f.name, url: '' })), // Placeholder for storage URL
         assignedVleId: null,
         assignedVleName: null,
-        creatorId: type === 'VLE Lead' ? vleCreatorId : DEMO_CUSTOMER_ID,
+        creatorId: creatorId,
     };
 
     await onTaskCreated(newTask);
@@ -427,19 +423,19 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, vleCreatorId }:
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">Name</Label>
-                <Input id="name" name="name" defaultValue="Ravi Sharma" className="col-span-3" required />
+                <Input id="name" name="name" defaultValue={creatorProfile?.name} className="col-span-3" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="address" className="text-right">Address</Label>
-                <Input id="address" defaultValue="Panjim, Goa" className="col-span-3" required />
+                <Input id="address" name="address" defaultValue={creatorProfile?.location} className="col-span-3" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="mobile" className="text-right">Mobile</Label>
-                <Input id="mobile" defaultValue="9876543210" className="col-span-3" required />
+                <Input id="mobile" name="mobile" defaultValue={creatorProfile?.mobile} className="col-span-3" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="email" className="text-right">Email</Label>
-                <Input id="email" type="email" defaultValue="ravi.sharma@example.com" className="col-span-3" />
+                <Input id="email" name="email" type="email" defaultValue={creatorProfile?.email} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label className="text-right">Service</Label>
@@ -499,7 +495,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, vleCreatorId }:
 };
 
 
-const ProfileView = ({ userType, userId }: {userType: 'Customer' | 'VLE', userId: string}) => {
+const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 'VLE', userId: string, profileData: any}) => {
     const { toast } = useToast();
 
     type BankAccount = {
@@ -510,8 +506,8 @@ const ProfileView = ({ userType, userId }: {userType: 'Customer' | 'VLE', userId
         upiId: string;
     };
     
-    const [userProfile, setUserProfile] = useState<any>(null);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+    const [userProfile, setUserProfile] = useState<any>(profileData);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(profileData?.bankAccounts || []);
     const [isEditing, setIsEditing] = useState(false);
     const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -523,22 +519,9 @@ const ProfileView = ({ userType, userId }: {userType: 'Customer' | 'VLE', userId
 
     useEffect(() => {
         if (!userId) return;
-
-        const collectionName = userType === 'Customer' ? 'users' : 'vles';
-        const docRef = doc(db, collectionName, userId);
-
-        const unsubscribe = onSnapshot(docRef, (doc) => {
-            if (doc.exists()) {
-                const data = doc.data();
-                setUserProfile(data);
-                setBankAccounts(data.bankAccounts || []);
-            } else {
-                console.log("No such document!");
-            }
-        });
-
-        return () => unsubscribe();
-    }, [userId, userType]);
+        setUserProfile(profileData);
+        setBankAccounts(profileData?.bankAccounts || []);
+    }, [userId, profileData]);
 
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -735,7 +718,7 @@ const ProfileView = ({ userType, userId }: {userType: 'Customer' | 'VLE', userId
 )};
 
 
-const CustomerDashboard = ({ tasks, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], onTaskCreated: (task: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, onTaskCreated: (task: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     
     return (
@@ -756,7 +739,7 @@ const CustomerDashboard = ({ tasks, onTaskCreated, onComplaintSubmit, onFeedback
                             </CardDescription>
                         </div>
                         <div className="ml-auto flex items-center gap-2">
-                            <TaskCreatorDialog type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
+                            <TaskCreatorDialog creatorId={userId} creatorProfile={userProfile} type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -845,15 +828,15 @@ const CustomerDashboard = ({ tasks, onTaskCreated, onComplaintSubmit, onFeedback
                 </Card>
             </TabsContent>
             <TabsContent value="profile" className="mt-4">
-                <ProfileView userType="Customer" userId={DEMO_CUSTOMER_ID}/>
+                <ProfileView userType="Customer" userId={userId} profileData={userProfile} />
             </TabsContent>
         </Tabs>
       </TabsContent>
     );
 }
 
-const VLEDashboard = ({ tasks, vles, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], vles: any[], onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
-    const currentVle = vles.find(v => v.id === DEMO_VLE_ID);
+const VLEDashboard = ({ tasks, vles, userId, userProfile, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], vles: any[], userId: string, userProfile: any, onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+    const currentVle = vles.find(v => v.id === userId);
     
     return (
     <TabsContent value="vle">
@@ -894,7 +877,7 @@ const VLEDashboard = ({ tasks, vles, onTaskCreated, onVleAvailabilityChange }: {
                                 <CardDescription>Tasks assigned to you for fulfillment.</CardDescription>
                             </div>
                             <div className="ml-auto flex items-center gap-2">
-                                <TaskCreatorDialog type="VLE Lead" onTaskCreated={onTaskCreated} vleCreatorId={DEMO_VLE_ID} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
+                                <TaskCreatorDialog type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={userId} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
                                 <Button asChild variant="outline" size="sm" className="h-8 gap-1"><Link href="/dashboard/extract"><BrainCircuit className="h-3.5 w-3.5" />Special Request</Link></Button>
                             </div>
                         </CardHeader>
@@ -926,7 +909,7 @@ const VLEDashboard = ({ tasks, vles, onTaskCreated, onVleAvailabilityChange }: {
                 </div>
             </TabsContent>
             <TabsContent value="profile" className="mt-4">
-                <ProfileView userType="VLE" userId={DEMO_VLE_ID} />
+                <ProfileView userType="VLE" userId={userId} profileData={userProfile} />
             </TabsContent>
         </Tabs>
     </TabsContent>
@@ -1207,8 +1190,18 @@ const AdminDashboard = ({ allTasks, vles, onComplaintResponse, onVleApprove, onV
 
 export default function DashboardPage() {
     const { toast } = useToast();
+    const { user, userProfile, loading } = useAuth();
+    const router = useRouter();
+
     const [tasks, setTasks] = useState<any[]>([]);
     const [vles, setVles] = useState<any[]>([]);
+    
+    useEffect(() => {
+        if (!loading && !user) {
+            router.push('/');
+        }
+    }, [user, loading, router]);
+
 
     useEffect(() => {
         const q = query(collection(db, "tasks"), orderBy("date", "desc"));
@@ -1269,23 +1262,33 @@ export default function DashboardPage() {
         await updateDoc(taskRef, { status: 'Assigned', assignedVleId: vleId, assignedVleName: vleName });
     }
     
+    if (loading || !user || !userProfile) {
+        return (
+            <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            </div>
+        )
+    }
+
     // Filter data for different views
-    const customerTasks = tasks.filter(t => t.creatorId === DEMO_CUSTOMER_ID);
-    const vleTasks = tasks.filter(t => t.assignedVleId === DEMO_VLE_ID);
+    const customerTasks = tasks.filter(t => t.creatorId === user.uid);
+    const vleTasks = tasks.filter(t => t.assignedVleId === user.uid);
+
+    const defaultTab = userProfile.role === 'vle' ? 'vle' : 'customer';
 
   return (
-      <Tabs defaultValue="customer">
+      <Tabs defaultValue={defaultTab}>
         <div className="flex items-center">
           <TabsList>
-            <TabsTrigger value="customer">Customer View</TabsTrigger>
-            <TabsTrigger value="vle">VLE View</TabsTrigger>
-            <TabsTrigger value="admin">Admin View</TabsTrigger>
+            {userProfile.role === 'customer' && <TabsTrigger value="customer">Customer View</TabsTrigger>}
+            {userProfile.role === 'vle' && <TabsTrigger value="vle">VLE View</TabsTrigger>}
+            {userProfile.isAdmin && <TabsTrigger value="admin">Admin View</TabsTrigger>}
           </TabsList>
         </div>
         <div className="mt-4">
-            <CustomerDashboard tasks={customerTasks} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />
-            <VLEDashboard tasks={vleTasks} vles={vles} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />
-            <AdminDashboard allTasks={tasks} vles={vles} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} />
+            {userProfile.role === 'customer' && <CustomerDashboard tasks={customerTasks} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />}
+            {userProfile.role === 'vle' && <VLEDashboard tasks={vleTasks} vles={vles} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />}
+            {userProfile.isAdmin && <AdminDashboard allTasks={tasks} vles={vles} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} />}
         </div>
       </Tabs>
   );

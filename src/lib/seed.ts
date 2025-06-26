@@ -13,7 +13,9 @@ const vles = [
             email: "suresh.k@example.com",
             mobile: "9988776655",
             walletBalance: 1000,
-            bankAccounts: []
+            bankAccounts: [],
+            role: "vle",
+            isAdmin: true,
         }
     },
     {
@@ -26,7 +28,9 @@ const vles = [
             email: "anjali.d@example.com",
             mobile: "9898989898",
             walletBalance: 0,
-            bankAccounts: []
+            bankAccounts: [],
+            role: "vle",
+            isAdmin: false,
         }
     }
 ];
@@ -40,7 +44,8 @@ const users = [
             email: "ravi.sharma@example.com",
             mobile: "9876543210",
             walletBalance: 1000,
-            bankAccounts: []
+            bankAccounts: [],
+            role: "customer",
         }
     },
      {
@@ -51,11 +56,15 @@ const users = [
             email: "priya.n@example.com",
             mobile: "9123456789",
             walletBalance: 500,
-            bankAccounts: []
+            bankAccounts: [],
+            role: "customer",
         }
     }
 ];
 
+// NOTE: This seed function does NOT create users in Firebase Auth.
+// These are just profile documents. The corresponding users must be created via the registration form.
+// This script is useful for setting up initial VLEs or admin users.
 export async function seedDatabase() {
     console.log('Starting to seed database...');
 

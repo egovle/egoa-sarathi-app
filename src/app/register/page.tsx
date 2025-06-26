@@ -7,22 +7,66 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck } from 'lucide-react';
+import { Loader2, ShieldCheck } from 'lucide-react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
 
 export default function RegisterPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [role, setRole] = useState('customer');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    toast({
-      title: 'Registration Submitted',
-      description: `Your registration as a ${role} is successful. ${role === 'vle' ? 'It is now pending admin approval.' : 'Redirecting...'}`,
-    });
-    setTimeout(() => router.push('/'), 2000);
+    setLoading(true);
+
+    const form = event.currentTarget;
+    const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+    const password = (form.elements.namedItem('password') as HTMLInputElement).value;
+    const fullName = (form.elements.namedItem('full-name') as HTMLInputElement).value;
+    const mobile = (form.elements.namedItem('mobile') as HTMLInputElement).value;
+    const address = (form.elements.namedItem('address') as HTMLInputElement).value;
+
+    try {
+      // 1. Create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // 2. Create user profile in Firestore
+      const userProfile = {
+        name: fullName,
+        email: email,
+        mobile: mobile,
+        location: address,
+        role: role,
+        walletBalance: 0,
+        bankAccounts: [],
+        ...(role === 'vle' && { status: 'Pending', available: false, isAdmin: false }),
+      };
+
+      const collectionName = role === 'vle' ? 'vles' : 'users';
+      await setDoc(doc(db, collectionName, user.uid), userProfile);
+
+      toast({
+        title: 'Registration Successful!',
+        description: `Your account has been created. ${role === 'vle' ? 'It is now pending admin approval.' : 'Redirecting to login...'}`,
+      });
+      router.push('/');
+
+    } catch (error: any) {
+      console.error("Registration failed:", error);
+      toast({
+        title: 'Registration Failed',
+        description: error.message || 'Could not create account. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,22 +98,26 @@ export default function RegisterPage() {
             </div>
             <div className="grid gap-2 text-left">
               <Label htmlFor="full-name" className="text-blue-100">Full Name</Label>
-              <Input id="full-name" placeholder="John Doe" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+              <Input id="full-name" name="full-name" placeholder="John Doe" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
             </div>
             <div className="grid gap-2 text-left">
               <Label htmlFor="email" className="text-blue-100">Email</Label>
-              <Input id="email" type="email" placeholder="m@example.com" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+              <Input id="email" name="email" type="email" placeholder="m@example.com" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+            </div>
+             <div className="grid gap-2 text-left">
+              <Label htmlFor="password"  className="text-blue-100">Password</Label>
+              <Input id="password" name="password" type="password" placeholder="••••••••" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
             </div>
             <div className="grid gap-2 text-left">
               <Label htmlFor="mobile" className="text-blue-100">Mobile Number</Label>
-              <Input id="mobile" type="tel" placeholder="9876543210" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+              <Input id="mobile" name="mobile" type="tel" placeholder="9876543210" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
             </div>
             <div className="grid gap-2 text-left">
               <Label htmlFor="address" className="text-blue-100">Location (Address)</Label>
-              <Input id="address" placeholder="123, Main Street, Goa" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+              <Input id="address" name="address" placeholder="123, Main Street, Goa" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
             </div>
-            <Button type="submit" className="w-full bg-white text-blue-800 font-bold hover:bg-gray-200 h-12 text-base rounded-lg mt-2">
-              Create an account
+            <Button type="submit" disabled={loading} className="w-full bg-white text-blue-800 font-bold hover:bg-gray-200 h-12 text-base rounded-lg mt-2">
+              {loading ? <Loader2 className="animate-spin" /> : 'Create an account'}
             </Button>
             {role === 'vle' && (
               <p className="text-xs text-center text-blue-200 mt-2">
