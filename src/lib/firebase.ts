@@ -4,11 +4,10 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
 // Your web app's Firebase configuration
-// Stripped down to essentials to avoid configuration errors.
 const firebaseConfig = {
   apiKey: "AIzaSyAVWezupcCQhE6FhdxSgsD1SVPxtjDK72w",
-  authDomain: "sevasetu.firebaseapp.com",
-  projectId: "sevasetu",
+  authDomain: "egoasarthi.firebaseapp.com",
+  projectId: "egoasarthi",
 };
 
 // Initialize Firebase
