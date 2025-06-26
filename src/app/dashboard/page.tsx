@@ -15,15 +15,22 @@ import { useToast } from '@/hooks/use-toast';
 import { Switch } from '@/components/ui/switch';
 import Link from 'next/link';
 
-// Mock data
+// --- DEMO USERS & DATA ---
+// Since there's no real authentication, we're using mock data to simulate different user roles.
+// You can switch between views using the tabs on the dashboard.
+//
+// - Customers: Ravi Sharma, Priya Naik
+// - VLEs: Suresh Kumar (Approved), Anjali Desai (Pending)
+// - Admin: The "Admin View" tab shows the admin perspective.
+
 const customerTasks = [
-  { id: `SS-${Math.floor(Math.random() * 90000) + 10000}`, service: 'Birth Certificate', status: 'In Progress', date: '2023-10-25' },
-  { id: `SS-${Math.floor(Math.random() * 90000) + 10000}`, service: 'Property Tax Payment', status: 'Completed', date: '2023-10-20' },
+  { id: 'SS-84621', customer: 'Ravi Sharma', service: 'Birth Certificate', status: 'In Progress', date: '2023-10-25' },
+  { id: 'SS-93715', customer: 'Priya Naik', service: 'Property Tax Payment', status: 'Completed', date: '2023-10-20' },
 ];
 
 const vleTasks = [
-  { id: `SS-${Math.floor(Math.random() * 90000) + 10000}`, service: 'Aadhar Card Update', status: 'Assigned', customer: 'Riya Sharma', date: '2023-10-26' },
-  { id: `SS-${Math.floor(Math.random() * 90000) + 10000}`, service: 'Driving License', status: 'Pending Docs', customer: 'Amit Patel', date: '2023-10-24' },
+  { id: 'SS-38192', service: 'Aadhar Card Update', status: 'Assigned', customer: 'Riya Sharma', date: '2023-10-26' },
+  { id: 'SS-49271', service: 'Driving License', status: 'Pending Docs', customer: 'Amit Patel', date: '2023-10-24' },
 ];
 
 const allTasks = [

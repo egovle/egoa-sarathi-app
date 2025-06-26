@@ -21,7 +21,7 @@ export default function LoginPage() {
             <LogIn className="h-6 w-6 text-blue-200" />
             <h2 className="text-2xl font-semibold">Login to Your Portal</h2>
           </div>
-          <p className="text-blue-200 mb-8">Access services with your credentials.</p>
+          <p className="text-blue-200 mb-8">Access services with your credentials</p>
 
           <div className="space-y-6">
             <div className="space-y-2 text-left">
@@ -68,7 +68,7 @@ export default function LoginPage() {
 
       <footer className="mt-10 flex items-center gap-2 z-10 text-blue-200">
         <Phone className="h-5 w-5" />
-        <span>Helpdesk: 1800-123-4567</span>
+        <span>Helpdesk: 1800-233-3963</span>
       </footer>
     </div>
   );
