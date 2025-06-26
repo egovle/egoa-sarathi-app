@@ -96,10 +96,10 @@ const ComplaintResponseDialog = ({ trigger, complaint, taskId, onResponseSubmit 
                         <DialogTitle>Respond to Complaint</DialogTitle>
                         <DialogDescription>
                             Provide a response to the customer's complaint for Task ID: {taskId}.
-                            <p className="mt-2 text-sm bg-muted/80 p-2 rounded-md"><b>Customer's complaint:</b> "{complaint.text}"</p>
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 grid gap-4">
+                        <div className="mt-2 text-sm bg-muted/80 p-2 rounded-md"><b>Customer's complaint:</b> "{complaint.text}"</div>
                         <Textarea id="response" value={responseText} onChange={(e) => setResponseText(e.target.value)} placeholder="Type your response here..." rows={4} required />
                         <div>
                              <Label>Attach Documents (Optional)</Label>
@@ -1083,5 +1083,3 @@ export default function DashboardPage() {
       </Tabs>
   );
 }
-
-    
