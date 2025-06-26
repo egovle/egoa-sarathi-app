@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
-import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText } from 'lucide-react';
+import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,18 +23,19 @@ import { cn } from '@/lib/utils';
 
 // --- DEMO DATA ---
 const initialTasks = [
-  { id: 'SS-84621', customer: 'Ravi Sharma', service: 'Birth Certificate', status: 'In Progress', date: '2023-10-25', complaint: { id: 'C-001', text: 'The VLE has not contacted me yet after 3 days.', status: 'Open', response: null, documents: [] }, feedback: null, type: 'Customer Request' },
-  { id: 'SS-93715', customer: 'Priya Naik', service: 'Property Tax Payment', status: 'Completed', date: '2023-10-20', complaint: null, feedback: { id: 'F-001', rating: 5, comment: 'Very fast and efficient service.' }, type: 'Customer Request' },
-  { id: 'SS-28374', customer: 'Priya Naik', service: 'Passport Renewal', status: 'Completed', date: '2023-09-15', complaint: null, feedback: { id: 'F-002', rating: 4, comment: 'Good service.' }, type: 'Customer Request' },
-  { id: 'SS-38192', customer: 'Riya Sharma', service: 'Aadhar Card Update', status: 'Assigned', date: '2023-10-26', complaint: null, feedback: null, type: 'VLE Lead' },
-  { id: 'SS-49271', customer: 'Amit Patel', service: 'Driving License', status: 'Pending Docs', date: '2023-10-24', complaint: null, feedback: null, type: 'VLE Lead' },
-  { id: 'SS-83472', customer: 'Neha Singh', service: 'Passport Application', status: 'Unassigned', date: '2023-10-27', complaint: null, feedback: null, type: 'VLE Lead' },
+  { id: 'SS-84621', customer: 'Ravi Sharma', service: 'Birth Certificate', status: 'In Progress', date: '2023-10-25', complaint: { id: 'C-001', text: 'The VLE has not contacted me yet after 3 days.', status: 'Open', response: null, documents: [] }, feedback: null, type: 'Customer Request', assignedVle: 'Suresh Kumar' },
+  { id: 'SS-93715', customer: 'Priya Naik', service: 'Property Tax Payment', status: 'Completed', date: '2023-10-20', complaint: null, feedback: { id: 'F-001', rating: 5, comment: 'Very fast and efficient service.' }, type: 'Customer Request', assignedVle: 'Suresh Kumar' },
+  { id: 'SS-28374', customer: 'Priya Naik', service: 'Passport Renewal', status: 'Completed', date: '2023-09-15', complaint: null, feedback: { id: 'F-002', rating: 4, comment: 'Good service.' }, type: 'Customer Request', assignedVle: 'Suresh Kumar' },
+  { id: 'SS-38192', customer: 'Riya Sharma', service: 'Aadhar Card Update', status: 'Assigned', date: '2023-10-26', complaint: null, feedback: null, type: 'VLE Lead', assignedVle: 'Suresh Kumar' },
+  { id: 'SS-49271', customer: 'Amit Patel', service: 'Driving License', status: 'Pending Docs', date: '2023-10-24', complaint: null, feedback: null, type: 'VLE Lead', assignedVle: 'Suresh Kumar' },
+  { id: 'SS-83472', customer: 'Neha Singh', service: 'Passport Application', status: 'Unassigned', date: '2023-10-27', complaint: null, feedback: null, type: 'Customer Request', assignedVle: null },
 ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
 
 const initialVles = [
-    { id: 'VLE7362', name: 'Suresh Kumar', location: 'Panjim, Goa', status: 'Approved'},
-    { id: 'VLE9451', name: 'Anjali Desai', location: 'Margao, Goa', status: 'Pending'},
+    { id: 'VLE7362', name: 'Suresh Kumar', location: 'Panjim, Goa', status: 'Approved', available: true},
+    { id: 'VLE9451', name: 'Anjali Desai', location: 'Margao, Goa', status: 'Pending', available: false},
+    { id: 'VLE8214', name: 'Rajesh Gupta', location: 'Vasco, Goa', status: 'Approved', available: false},
 ]
 
 // --- HELPER COMPONENTS ---
@@ -99,7 +100,7 @@ const ComplaintResponseDialog = ({ trigger, complaint, taskId, onResponseSubmit 
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4 grid gap-4">
-                        <div className="mt-2 text-sm bg-muted/80 p-2 rounded-md"><b>Customer's complaint:</b> "{complaint.text}"</div>
+                        <div className="mt-2 text-sm bg-muted/80 p-3 rounded-md"><b>Customer's complaint:</b> "{complaint.text}"</div>
                         <Textarea id="response" value={responseText} onChange={(e) => setResponseText(e.target.value)} placeholder="Type your response here..." rows={4} required />
                         <div>
                              <Label>Attach Documents (Optional)</Label>
@@ -164,6 +165,7 @@ const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: Reac
         if (!isOpen) {
             setComplaintText('');
             setSelectedFiles([]);
+            setIsCameraOpen(false);
         }
     }
 
@@ -182,7 +184,7 @@ const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: Reac
                              <div>
                                 <Label>Attach Documents</Label>
                                 <div className="flex gap-2 mt-2">
-                                    <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="outline">
+                                    <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="secondary">
                                         <FileUp className="mr-2 h-4 w-4"/> Choose Files
                                     </Button>
                                     <Button type="button" variant="outline" onClick={() => setIsCameraOpen(true)} size="sm">
@@ -193,7 +195,7 @@ const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: Reac
                                 {selectedFiles.length > 0 && (
                                     <div className="text-xs text-muted-foreground space-y-1 mt-2">
                                         <p className='font-medium'>Selected files:</p>
-                                        {selectedFiles.map((file, i) => <p key={i}>{file.name}</p>)}
+                                        {selectedFiles.map((file, i) => <div key={i} className="flex items-center gap-2"><FileText className="h-3 w-3" /><span>{file.name}</span></div>)}
                                     </div>
                                 )}
                             </div>
@@ -209,7 +211,7 @@ const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: Reac
     );
 };
 
-const FeedbackDialog = ({ trigger, onFeedbackSubmit }: { trigger: React.ReactNode, onFeedbackSubmit: (feedback: any) => void }) => {
+const FeedbackDialog = ({ trigger, taskId, onFeedbackSubmit }: { trigger: React.ReactNode, taskId: string, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const { toast } = useToast();
     const [rating, setRating] = useState(0);
     const [comment, setComment] = useState('');
@@ -222,7 +224,7 @@ const FeedbackDialog = ({ trigger, onFeedbackSubmit }: { trigger: React.ReactNod
             rating,
             comment,
         }
-        onFeedbackSubmit(newFeedback);
+        onFeedbackSubmit(taskId, newFeedback);
         toast({ title: 'Feedback Submitted', description: 'Thank you for your valuable feedback!' });
         setOpen(false);
     };
@@ -383,6 +385,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
         feedback: null,
         type: type,
         documents: selectedFiles.map(f => f.name),
+        assignedVle: type === 'VLE Lead' ? 'Suresh Kumar' : null,
     };
 
     onTaskCreated(newTask);
@@ -410,6 +413,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
           setService('');
           setOtherService('');
           setSelectedFiles([]);
+          setIsCameraOpen(false);
       }
   }
 
@@ -471,7 +475,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
                 </Label>
                 <div className="col-span-3 grid gap-2">
                   <div className="flex gap-2">
-                    <Button type="button" onClick={() => fileInputRef.current?.click()}>
+                    <Button type="button" onClick={() => fileInputRef.current?.click()} variant="secondary">
                         <FileUp className="mr-2 h-4 w-4"/> Choose Files
                     </Button>
                     <Button type="button" variant="outline" onClick={() => setIsCameraOpen(true)}>
@@ -482,7 +486,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type }: { buttonTrigg
                   {selectedFiles.length > 0 && (
                       <div className="text-xs text-muted-foreground space-y-1 mt-2">
                           <p className='font-medium'>Selected files:</p>
-                          {selectedFiles.map((file, i) => <p key={i}>{file.name}</p>)}
+                          {selectedFiles.map((file, i) => <div key={i} className="flex items-center gap-2"><FileText className="h-3 w-3" /><span>{file.name}</span></div>)}
                       </div>
                   )}
                 </div>
@@ -625,13 +629,17 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
             </Card>
             <Card>
                 <CardHeader>
-                     <h3 className="text-lg font-semibold leading-none tracking-tight">Bank Details</h3>
-                     <CardDescription>Securely manage your bank accounts for transactions.</CardDescription>
+                    <div className="flex justify-between items-start">
+                        <div>
+                             <h3 className="text-lg font-semibold leading-none tracking-tight">Bank Details</h3>
+                             <CardDescription>Securely manage your bank accounts for transactions.</CardDescription>
+                        </div>
+                    </div>
                 </CardHeader>
                 {isEditing ? (
                      <form onSubmit={handleSave}>
                         <CardContent className="space-y-4">
-                             <h4 className="text-lg font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h4>
+                             <h4 className="text-base font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h4>
                             <div className="space-y-2 pt-2">
                                 <Label htmlFor="bankName">Bank Name</Label>
                                 <Input id="bankName" placeholder="e.g., State Bank of India" value={formState.bankName} onChange={handleInputChange} required />
@@ -742,11 +750,11 @@ const CustomerDashboard = ({ tasks, onTaskCreated, onComplaintSubmit, onFeedback
                             )}
                              {task.complaint && (
                                 <div className="flex items-center gap-2 text-sm">
-                                    <Badge variant="destructive">Complaint: {task.complaint.status}</Badge>
+                                    <Badge variant={task.complaint.status === 'Open' ? 'destructive' : 'default'}>Complaint: {task.complaint.status}</Badge>
                                 </div>
                              )}
                             {task.status === 'Completed' && !task.feedback && (
-                                <FeedbackDialog onFeedbackSubmit={(feedback) => onFeedbackSubmit(task.id, feedback)} trigger={<Button variant="outline" size="sm">Give Feedback</Button>} />
+                                <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={<Button variant="outline" size="sm">Give Feedback</Button>} />
                             )}
                              {task.feedback && (
                                 <StarRating rating={task.feedback.rating} readOnly />
@@ -767,7 +775,10 @@ const CustomerDashboard = ({ tasks, onTaskCreated, onComplaintSubmit, onFeedback
   </TabsContent>
 );
 
-const VLEDashboard = ({ tasks, onTaskCreated }: { tasks: any[], onTaskCreated: (task: any) => void }) => (
+const VLEDashboard = ({ tasks, vles, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], vles: any[], onTaskCreated: (task: any) => void, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+    const currentVle = vles.find(v => v.id === 'VLE7362'); // Demo: Using Suresh Kumar's ID
+    
+    return (
     <TabsContent value="vle">
          <Tabs defaultValue="tasks">
             <TabsList>
@@ -783,10 +794,18 @@ const VLEDashboard = ({ tasks, onTaskCreated }: { tasks: any[], onTaskCreated: (
                             <ToggleRight className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
-                                <div className="flex items-center space-x-2 pt-2">
-                                    <Switch id="availability-mode" defaultChecked />
-                                    <Label htmlFor="availability-mode">Available for Tasks</Label>
-                                </div>
+                                {currentVle && currentVle.status === 'Approved' ? (
+                                    <div className="flex items-center space-x-2 pt-2">
+                                        <Switch 
+                                            id="availability-mode" 
+                                            checked={currentVle.available} 
+                                            onCheckedChange={(checked) => onVleAvailabilityChange(currentVle.id, checked)}
+                                        />
+                                        <Label htmlFor="availability-mode">Available for Tasks</Label>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>
+                                )}
                             </CardContent>
                         </Card>
                     </div>
@@ -834,201 +853,277 @@ const VLEDashboard = ({ tasks, onTaskCreated }: { tasks: any[], onTaskCreated: (
             </TabsContent>
         </Tabs>
     </TabsContent>
-);
+)};
 
-const AdminDashboard = ({ allTasks, vles, complaints, feedback, onComplaintResponse, onVleApprove }: { allTasks: any[], vles: any[], complaints: any[], feedback: any[], onComplaintResponse: (taskId: string, response: any) => void, onVleApprove: (vleId: string) => void }) => (
-  <TabsContent value="admin">
-    <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="vle-management">VLE Management</TabsTrigger>
-            <TabsTrigger value="all-tasks">All Tasks</TabsTrigger>
-            <TabsTrigger value="complaints">Complaints</TabsTrigger>
-            <TabsTrigger value="feedback">Feedback</TabsTrigger>
-        </TabsList>
+const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger: React.ReactNode, taskId: string, availableVles: any[], onAssign: (taskId: string, vleId: string) => void }) => {
+    const { toast } = useToast();
+    const [open, setOpen] = useState(false);
+    const [selectedVle, setSelectedVle] = useState('');
 
-        <TabsContent value="overview" className="mt-4 space-y-4">
-             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-                        <File className="h-4 w-4 text-muted-foreground" />
+    const handleAssign = () => {
+        if (!selectedVle) {
+            toast({ title: 'Select a VLE', description: 'Please select a VLE to assign the task.', variant: 'destructive' });
+            return;
+        }
+        onAssign(taskId, selectedVle);
+        toast({ title: 'Task Assigned', description: `Task ${taskId} has been assigned.`});
+        setOpen(false);
+    }
+
+    const handleOpenChange = (isOpen: boolean) => {
+        setOpen(isOpen);
+        if (!isOpen) {
+            setSelectedVle('');
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>{trigger}</DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Assign Task {taskId}</DialogTitle>
+                    <DialogDescription>Select an available VLE to assign this task to.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Select onValueChange={setSelectedVle} value={selectedVle}>
+                        <SelectTrigger><SelectValue placeholder="Select an available VLE" /></SelectTrigger>
+                        <SelectContent>
+                            {availableVles.map(vle => (
+                                <SelectItem key={vle.id} value={vle.id}>{vle.name} - {vle.location}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleAssign}>Assign VLE</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+const AdminDashboard = ({ allTasks, vles, complaints, feedback, onComplaintResponse, onVleApprove, onVleAssign }: { allTasks: any[], vles: any[], complaints: any[], feedback: any[], onComplaintResponse: (taskId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string) => void }) => {
+    const availableVles = vles.filter(v => v.status === 'Approved' && v.available);
+
+    return (
+        <TabsContent value="admin">
+            <Tabs defaultValue="overview" className="w-full">
+                <TabsList className="grid w-full grid-cols-5">
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="vle-management">VLE Management</TabsTrigger>
+                    <TabsTrigger value="all-tasks">All Tasks</TabsTrigger>
+                    <TabsTrigger value="complaints">Complaints</TabsTrigger>
+                    <TabsTrigger value="feedback">Feedback</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="mt-4 space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+                                <File className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{allTasks.length}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">VLEs Pending Approval</CardTitle>
+                                <UserCheck className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{vles.filter(v => v.status === 'Pending').length}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Open Complaints</CardTitle>
+                                <MessageSquareWarning className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{complaints.filter(c => c.status === 'Open').length}</div>
+                            </CardContent>
+                        </Card>
+                         <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Available VLEs</CardTitle>
+                                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{availableVles.length}</div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="vle-management" className="mt-4">
+                    <Card>
+                    <CardHeader>
+                        <CardTitle>VLE Management</CardTitle>
+                        <CardDescription>Approve or manage VLE accounts and see their availability.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{allTasks.length}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">VLEs Pending Approval</CardTitle>
-                        <UserCheck className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{vles.filter(v => v.status === 'Pending').length}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Open Complaints</CardTitle>
-                        <MessageSquareWarning className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{complaints.length}</div>
-                    </CardContent>
-                </Card>
-            </div>
-        </TabsContent>
-
-        <TabsContent value="vle-management" className="mt-4">
-            <Card>
-              <CardHeader>
-                  <CardTitle>VLE Management</CardTitle>
-                  <CardDescription>Approve or manage VLE accounts.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                  <Table>
-                  <TableHeader>
-                      <TableRow>
-                          <TableHead>VLE ID</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Action</TableHead>
-                      </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                      {vles.map(vle => (
-                      <TableRow key={vle.id}>
-                          <TableCell className="font-medium">{vle.id}</TableCell>
-                          <TableCell>{vle.name}</TableCell>
-                          <TableCell><Badge variant={vle.status === 'Approved' ? 'default' : 'secondary'}>{vle.status}</Badge></TableCell>
-                          <TableCell>
-                              {vle.status === 'Pending' && <Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}>Approve</Button>}
-                          </TableCell>
-                      </TableRow>
-                      ))}
-                  </TableBody>
-                  </Table>
-              </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="all-tasks" className="mt-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle>All Service Requests</CardTitle>
-                    <CardDescription>View and manage all tasks in the system.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
+                        <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Task ID</TableHead>
-                                <TableHead>Customer</TableHead>
-                                <TableHead>Service</TableHead>
+                                <TableHead>VLE ID</TableHead>
+                                <TableHead>Name</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Date</TableHead>
+                                <TableHead>Availability</TableHead>
                                 <TableHead>Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {allTasks.map(task => (
-                                <TableRow key={task.id}>
-                                    <TableCell className="font-medium">{task.id}</TableCell>
-                                    <TableCell>{task.customer}</TableCell>
-                                    <TableCell>{task.service}</TableCell>
-                                    <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                                    <TableCell>{task.date}</TableCell>
-                                    <TableCell>
-                                        {task.status === 'Unassigned' && <Button variant="outline" size="sm">Assign</Button>}
-                                    </TableCell>
-                                </TableRow>
+                            {vles.map(vle => (
+                            <TableRow key={vle.id}>
+                                <TableCell className="font-medium">{vle.id}</TableCell>
+                                <TableCell>{vle.name}</TableCell>
+                                <TableCell><Badge variant={vle.status === 'Approved' ? 'default' : 'secondary'}>{vle.status}</Badge></TableCell>
+                                <TableCell>
+                                    {vle.status === 'Approved' ? (
+                                         <Badge variant={vle.available ? 'outline' : 'destructive'} className={cn(vle.available && 'border-green-500 text-green-600')}>{vle.available ? 'Available' : 'Unavailable'}</Badge>
+                                    ) : 'N/A'}
+                                </TableCell>
+                                <TableCell>
+                                    {vle.status === 'Pending' && <Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}>Approve</Button>}
+                                </TableCell>
+                            </TableRow>
                             ))}
                         </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-        </TabsContent>
+                        </Table>
+                    </CardContent>
+                </Card>
+                </TabsContent>
 
-        <TabsContent value="complaints" className="mt-4">
-             <Card>
-              <CardHeader>
-                  <CardTitle>Customer Complaints</CardTitle>
-                  <CardDescription>Review and resolve all customer complaints.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                  <Table>
-                  <TableHeader>
-                      <TableRow>
-                          <TableHead>Task ID</TableHead>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Complaint</TableHead>
-                          <TableHead>Docs</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Action</TableHead>
-                      </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                      {complaints.map(c => (
-                      <TableRow key={c.id}>
-                          <TableCell className="font-medium">{c.taskId}</TableCell>
-                          <TableCell>{c.customer}</TableCell>
-                          <TableCell className="max-w-xs break-words">{c.text}</TableCell>
-                          <TableCell>{c.documents?.length > 0 ? <FileText className="h-4 w-4" /> : 'N/A'}</TableCell>
-                          <TableCell><Badge variant={c.status === 'Open' ? 'destructive' : 'default'}>{c.status}</Badge></TableCell>
-                          <TableCell>
-                            {c.status === 'Open' && (
-                                <ComplaintResponseDialog
-                                    trigger={<Button size="sm">Respond</Button>}
-                                    complaint={c}
-                                    taskId={c.taskId}
-                                    onResponseSubmit={onComplaintResponse}
-                                />
-                            )}
-                          </TableCell>
-                      </TableRow>
-                      ))}
-                  </TableBody>
-                  </Table>
-              </CardContent>
-          </Card>
-        </TabsContent>
+                <TabsContent value="all-tasks" className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>All Service Requests</CardTitle>
+                            <CardDescription>View and manage all tasks in the system.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Task ID</TableHead>
+                                        <TableHead>Customer</TableHead>
+                                        <TableHead>Service</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Assigned VLE</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Action</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {allTasks.map(task => (
+                                        <TableRow key={task.id}>
+                                            <TableCell className="font-medium">{task.id}</TableCell>
+                                            <TableCell>{task.customer}</TableCell>
+                                            <TableCell>{task.service}</TableCell>
+                                            <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
+                                            <TableCell>{task.assignedVle || 'N/A'}</TableCell>
+                                            <TableCell>{task.date}</TableCell>
+                                            <TableCell>
+                                                {task.status === 'Unassigned' && (
+                                                    <AssignVleDialog 
+                                                        trigger={<Button variant="outline" size="sm">Assign</Button>}
+                                                        taskId={task.id}
+                                                        availableVles={availableVles}
+                                                        onAssign={onVleAssign}
+                                                    />
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
-        <TabsContent value="feedback" className="mt-4">
-             <Card>
-              <CardHeader>
-                  <CardTitle>Customer Feedback</CardTitle>
-                  <CardDescription>Review customer feedback for completed tasks.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                  <Table>
-                  <TableHeader>
-                      <TableRow>
-                          <TableHead>Task ID</TableHead>
-                          <TableHead>Customer</TableHead>
-                          <TableHead className="text-center">Rating</TableHead>
-                          <TableHead>Comment</TableHead>
-                          <TableHead>Date</TableHead>
-                      </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                      {feedback.map(fb => (
-                      <TableRow key={fb.id}>
-                          <TableCell className="font-medium">{fb.taskId}</TableCell>
-                          <TableCell>{fb.customer}</TableCell>
-                          <TableCell><StarRating rating={fb.rating} readOnly={true} /></TableCell>
-                          <TableCell>{fb.comment}</TableCell>
-                          <TableCell>{fb.date}</TableCell>
-                      </TableRow>
-                      ))}
-                  </TableBody>
-                  </Table>
-              </CardContent>
-          </Card>
-        </TabsContent>
+                <TabsContent value="complaints" className="mt-4">
+                    <Card>
+                    <CardHeader>
+                        <CardTitle>Customer Complaints</CardTitle>
+                        <CardDescription>Review and resolve all customer complaints.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Task ID</TableHead>
+                                <TableHead>Customer</TableHead>
+                                <TableHead>Complaint</TableHead>
+                                <TableHead>Docs</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Action</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {complaints.map(c => (
+                            <TableRow key={c.id}>
+                                <TableCell className="font-medium">{c.taskId}</TableCell>
+                                <TableCell>{c.customer}</TableCell>
+                                <TableCell className="max-w-xs break-words">{c.text}</TableCell>
+                                <TableCell>{c.documents?.length > 0 ? <FileText className="h-4 w-4" /> : 'N/A'}</TableCell>
+                                <TableCell><Badge variant={c.status === 'Open' ? 'destructive' : 'default'}>{c.status}</Badge></TableCell>
+                                <TableCell>
+                                    {c.status === 'Open' && (
+                                        <ComplaintResponseDialog
+                                            trigger={<Button size="sm">Respond</Button>}
+                                            complaint={c}
+                                            taskId={c.taskId}
+                                            onResponseSubmit={onComplaintResponse}
+                                        />
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+                </TabsContent>
 
-    </Tabs>
-  </TabsContent>
-);
+                <TabsContent value="feedback" className="mt-4">
+                    <Card>
+                    <CardHeader>
+                        <CardTitle>Customer Feedback</CardTitle>
+                        <CardDescription>Review customer feedback for completed tasks.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Task ID</TableHead>
+                                <TableHead>Customer</TableHead>
+                                <TableHead className="text-center">Rating</TableHead>
+                                <TableHead>Comment</TableHead>
+                                <TableHead>Date</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {feedback.map(fb => (
+                            <TableRow key={fb.id}>
+                                <TableCell className="font-medium">{fb.taskId}</TableCell>
+                                <TableCell>{fb.customer}</TableCell>
+                                <TableCell><StarRating rating={fb.rating} readOnly={true} /></TableCell>
+                                <TableCell>{fb.comment}</TableCell>
+                                <TableCell>{fb.date}</TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+                </TabsContent>
+
+            </Tabs>
+        </TabsContent>
+    )
+};
 
 export default function DashboardPage() {
     const { toast } = useToast();
@@ -1061,10 +1156,20 @@ export default function DashboardPage() {
         toast({ title: 'VLE Approved', description: 'The VLE has been approved and can now take tasks.'});
     }
 
+    const handleVleAvailabilityChange = (vleId: string, available: boolean) => {
+        setVles(prev => prev.map(v => v.id === vleId ? { ...v, available } : v));
+        toast({ title: 'Availability Updated', description: `You are now ${available ? 'available' : 'unavailable'} for tasks.`});
+    }
+
+    const handleAssignVle = (taskId: string, vleId: string) => {
+        const vle = vles.find(v => v.id === vleId);
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'Assigned', assignedVle: vle?.name || 'Unknown' } : t));
+    }
+
     const customerTasks = tasks.filter(t => t.type === 'Customer Request');
-    const vleTasks = tasks.filter(t => t.type === 'VLE Lead');
-    const allComplaints = tasks.filter(t => t.complaint).map(t => ({ taskId: t.id, customer: t.customer, date: t.date, ...t.complaint }));
-    const allFeedback = tasks.filter(t => t.feedback).map(t => ({ taskId: t.id, customer: t.customer, date: t.date, ...t.feedback }));
+    const vleTasks = tasks.filter(t => t.assignedVle === 'Suresh Kumar'); // Demo: Show tasks for Suresh
+    const allComplaints = tasks.filter(t => t.complaint).map(t => ({ taskId: t.id, customer: t.customer, date: t.date, ...t.complaint })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const allFeedback = tasks.filter(t => t.feedback).map(t => ({ taskId: t.id, customer: t.customer, date: t.date, ...t.feedback })).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
       <Tabs defaultValue="customer">
@@ -1077,8 +1182,8 @@ export default function DashboardPage() {
         </div>
         <div className="mt-4">
             <CustomerDashboard tasks={customerTasks} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />
-            <VLEDashboard tasks={vleTasks} onTaskCreated={handleCreateTask} />
-            <AdminDashboard allTasks={tasks} vles={vles} complaints={allComplaints} feedback={allFeedback} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} />
+            <VLEDashboard tasks={vleTasks} vles={vles} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />
+            <AdminDashboard allTasks={tasks} vles={vles} complaints={allComplaints} feedback={allFeedback} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} />
         </div>
       </Tabs>
   );
