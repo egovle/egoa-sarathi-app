@@ -240,7 +240,6 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
 
 const TaskCreatorDialog = ({ buttonTrigger }: { buttonTrigger: React.ReactNode }) => {
   const { toast } = useToast();
-  const [taskId, setTaskId] = useState('');
   const [service, setService] = useState('');
   const [otherService, setOtherService] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -259,12 +258,11 @@ const TaskCreatorDialog = ({ buttonTrigger }: { buttonTrigger: React.ReactNode }
         return;
     }
     const newTaskId = `SS-${Date.now().toString().slice(-6)}`;
-    setTaskId(newTaskId);
     toast({
       title: 'Task Created!',
       description: `Your new task ID is ${newTaskId}.`,
     });
-    // Do not close dialog here, show the Task ID instead.
+    setDialogOpen(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,7 +278,6 @@ const TaskCreatorDialog = ({ buttonTrigger }: { buttonTrigger: React.ReactNode }
   const handleOpenChange = (isOpen: boolean) => {
       setDialogOpen(isOpen);
       if (!isOpen) {
-          setTaskId('');
           setService('');
           setOtherService('');
           setSelectedFiles([]);
@@ -361,15 +358,9 @@ const TaskCreatorDialog = ({ buttonTrigger }: { buttonTrigger: React.ReactNode }
                   )}
                 </div>
               </div>
-              {taskId && (
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">Task ID</Label>
-                  <div className="col-span-3 font-mono text-sm bg-muted p-2 rounded-md">{taskId}</div>
-                </div>
-              )}
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={!!taskId}>Create Task</Button>
+              <Button type="submit">Create Task</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -505,13 +496,13 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
             </Card>
             <Card>
                 <CardHeader>
-                    <CardTitle>Bank Details</CardTitle>
-                    <CardDescription>Securely manage your bank accounts for transactions.</CardDescription>
+                     <h3 className="text-lg font-semibold leading-none tracking-tight">Bank Details</h3>
+                     <CardDescription>Securely manage your bank accounts for transactions.</CardDescription>
                 </CardHeader>
                 {isEditing ? (
                      <form onSubmit={handleSave}>
                         <CardContent className="space-y-4">
-                             <h3 className="text-lg font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h3>
+                             <h4 className="text-lg font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h4>
                             <div className="space-y-2 pt-2">
                                 <Label htmlFor="bankName">Bank Name</Label>
                                 <Input id="bankName" placeholder="e.g., State Bank of India" value={formState.bankName} onChange={handleInputChange} required />
