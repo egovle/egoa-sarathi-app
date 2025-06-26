@@ -24,7 +24,7 @@ import { cn } from '@/lib/utils';
 
 
 // --- DEMO USER IDs ---
-// Since we don't have auth, we'll hardcode the document IDs for our demo users.
+// These are the specific IDs that will be created by the seed script.
 const DEMO_CUSTOMER_ID = 'customer-ravi-sharma';
 const DEMO_VLE_ID = 'vle-suresh-kumar';
 
@@ -669,7 +669,7 @@ const ProfileView = ({ userType, userId }: {userType: 'Customer' | 'VLE', userId
                 {isEditing ? (
                      <form onSubmit={handleSave}>
                         <CardContent className="space-y-4">
-                             <h4 className="text-base font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h4>
+                            <h4 className="text-base font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h4>
                             <div className="space-y-2 pt-2">
                                 <Label htmlFor="bankName">Bank Name</Label>
                                 <Input id="bankName" placeholder="e.g., State Bank of India" value={formState.bankName} onChange={handleInputChange} required />
@@ -1290,3 +1290,5 @@ export default function DashboardPage() {
       </Tabs>
   );
 }
+
+    

@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, LogIn, Mail, Lock, User, UserPlus, Phone } from 'lucide-react';
+import { ShieldCheck, LogIn, Mail, Lock, User, UserPlus, Phone, Database } from 'lucide-react';
+import { handleSeedDatabase } from '@/app/actions';
 
 export default function LoginPage() {
   return (
@@ -66,10 +67,17 @@ export default function LoginPage() {
         </div>
       </main>
 
-      <footer className="mt-10 flex items-center gap-2 z-10 text-blue-200">
+      <footer className="mt-10 flex items-center gap-4 z-10 text-blue-200">
         <Phone className="h-5 w-5" />
         <span>Helpdesk: 1800-233-3963</span>
+         <form action={handleSeedDatabase}>
+            <Button variant="outline" size="sm" className="bg-white/10 text-white hover:bg-white/20">
+                <Database className="mr-2 h-4 w-4" /> Seed Demo Data
+            </Button>
+        </form>
       </footer>
     </div>
   );
 }
+
+    
