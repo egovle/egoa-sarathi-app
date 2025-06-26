@@ -511,7 +511,7 @@ const ProfileView = ({ userType }: {userType: 'Customer' | 'VLE'}) => {
                 {isEditing ? (
                      <form onSubmit={handleSave}>
                         <CardContent className="space-y-4">
-                             <DialogTitle>{editingAccount ? 'Edit' : 'Add'} Bank Account</DialogTitle>
+                             <h3 className="text-lg font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h3>
                             <div className="space-y-2 pt-2">
                                 <Label htmlFor="bankName">Bank Name</Label>
                                 <Input id="bankName" placeholder="e.g., State Bank of India" value={formState.bankName} onChange={handleInputChange} required />
