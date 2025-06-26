@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where } from 'firebase/firestore';
-import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2 } from 'lucide-react';
+import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -964,17 +964,20 @@ const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger
     )
 }
 
-const AdminDashboard = ({ allTasks, vles, onComplaintResponse, onVleApprove, onVleAssign }: { allTasks: any[], vles: any[], onComplaintResponse: (taskId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
-    const availableVles = vles.filter(v => v.status === 'Approved' && v.available);
+const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleApprove, onVleAssign }: { allTasks: any[], vles: any[], allUsers: any[], onComplaintResponse: (taskId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
+    const vlesForManagement = vles.filter(v => !v.isAdmin);
+    const availableVles = vlesForManagement.filter(v => v.status === 'Approved' && v.available);
+    const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date}));
     const feedback = allTasks.filter(t => t.feedback).map(t => ({...t.feedback, taskId: t.id, customer: t.customer, date: t.date, service: t.service}));
 
     return (
         <TabsContent value="admin">
             <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-6">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="vle-management">VLE Management</TabsTrigger>
+                    <TabsTrigger value="customer-management">Customer Management</TabsTrigger>
                     <TabsTrigger value="all-tasks">All Tasks</TabsTrigger>
                     <TabsTrigger value="complaints">Complaints</TabsTrigger>
                     <TabsTrigger value="feedback">Feedback</TabsTrigger>
@@ -997,7 +1000,7 @@ const AdminDashboard = ({ allTasks, vles, onComplaintResponse, onVleApprove, onV
                                 <UserCheck className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
-                                <div className="text-2xl font-bold">{vles.filter(v => v.status === 'Pending').length}</div>
+                                <div className="text-2xl font-bold">{pendingVles.length}</div>
                             </CardContent>
                         </Card>
                         <Card>
@@ -1031,18 +1034,18 @@ const AdminDashboard = ({ allTasks, vles, onComplaintResponse, onVleApprove, onV
                         <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>VLE ID</TableHead>
                                 <TableHead>Name</TableHead>
+                                <TableHead>Location</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Availability</TableHead>
                                 <TableHead>Action</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {vles.map(vle => (
+                            {vlesForManagement.map(vle => (
                             <TableRow key={vle.id}>
-                                <TableCell className="font-medium">{vle.id.slice(0,10)}...</TableCell>
                                 <TableCell>{vle.name}</TableCell>
+                                <TableCell>{vle.location}</TableCell>
                                 <TableCell><Badge variant={vle.status === 'Approved' ? 'default' : 'secondary'}>{vle.status}</Badge></TableCell>
                                 <TableCell>
                                     {vle.status === 'Approved' ? (
@@ -1052,6 +1055,37 @@ const AdminDashboard = ({ allTasks, vles, onComplaintResponse, onVleApprove, onV
                                 <TableCell>
                                     {vle.status === 'Pending' && <Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}>Approve</Button>}
                                 </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+                </TabsContent>
+                
+                <TabsContent value="customer-management" className="mt-4">
+                    <Card>
+                    <CardHeader>
+                        <CardTitle>Customer Management</CardTitle>
+                        <CardDescription>View all registered customers in the system.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Mobile</TableHead>
+                                <TableHead>Location</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {allUsers.map(user => (
+                            <TableRow key={user.id}>
+                                <TableCell>{user.name}</TableCell>
+                                <TableCell>{user.email}</TableCell>
+                                <TableCell>{user.mobile}</TableCell>
+                                <TableCell>{user.location}</TableCell>
                             </TableRow>
                             ))}
                         </TableBody>
@@ -1195,6 +1229,7 @@ export default function DashboardPage() {
 
     const [tasks, setTasks] = useState<any[]>([]);
     const [vles, setVles] = useState<any[]>([]);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
     
     useEffect(() => {
         if (!loading && !user) {
@@ -1217,6 +1252,15 @@ export default function DashboardPage() {
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const vlesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setVles(vlesData);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        const q = query(collection(db, "users"));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const usersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setAllUsers(usersData);
         });
         return () => unsubscribe();
     }, []);
@@ -1274,7 +1318,7 @@ export default function DashboardPage() {
     const customerTasks = tasks.filter(t => t.creatorId === user.uid);
     const vleTasks = tasks.filter(t => t.assignedVleId === user.uid);
 
-    const defaultTab = userProfile.role === 'vle' ? 'vle' : 'customer';
+    const defaultTab = userProfile.isAdmin ? 'admin' : (userProfile.role === 'vle' ? 'vle' : 'customer');
 
   return (
       <Tabs defaultValue={defaultTab}>
@@ -1288,7 +1332,7 @@ export default function DashboardPage() {
         <div className="mt-4">
             {userProfile.role === 'customer' && <CustomerDashboard tasks={customerTasks} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />}
             {userProfile.role === 'vle' && <VLEDashboard tasks={vleTasks} vles={vles} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />}
-            {userProfile.isAdmin && <AdminDashboard allTasks={tasks} vles={vles} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} />}
+            {userProfile.isAdmin && <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} />}
         </div>
       </Tabs>
   );
