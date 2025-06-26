@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -13,27 +13,25 @@ interface AuthContextType {
   loading: boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, userProfile: null, loading: true });
+const AuthContext = React.createContext<AuthContextType>({ user: null, userProfile: null, loading: true });
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => React.useContext(AuthContext);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = React.useState<User | null>(null);
+  const [userProfile, setUserProfile] = React.useState<any | null>(null);
+  const [loading, setLoading] = React.useState(true);
   const router = useRouter();
 
-  useEffect(() => {
+  React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true);
       if (user) {
         // User is signed in, fetch profile
         let profileDoc = await getDoc(doc(db, 'users', user.uid));
-        let role = 'customer';
 
         if (!profileDoc.exists()) {
           profileDoc = await getDoc(doc(db, 'vles', user.uid));
-          role = 'vle';
         }
 
         if (profileDoc.exists()) {
