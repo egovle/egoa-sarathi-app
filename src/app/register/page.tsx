@@ -101,7 +101,26 @@ export default function RegisterPage() {
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setLoading(true);
+    
+    // Validation Checks
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        toast({
+            title: 'Invalid Email Format',
+            description: 'Please enter a valid email address (e.g., user@example.com).',
+            variant: 'destructive',
+        });
+        return;
+    }
+
+    if (mobile.length !== 10) {
+        toast({
+            title: 'Invalid Mobile Number',
+            description: 'Mobile number must be exactly 10 digits.',
+            variant: 'destructive',
+        });
+        return;
+    }
 
     if (!city || !district) {
         toast({
@@ -109,9 +128,10 @@ export default function RegisterPage() {
             description: 'Please provide a valid pincode and select a city.',
             variant: 'destructive',
         });
-        setLoading(false);
         return;
     }
+
+    setLoading(true);
     
     const fullLocation = `${address}, ${city}, ${district}, ${pincode}`;
 
@@ -215,7 +235,7 @@ export default function RegisterPage() {
             </div>
             <div className="grid gap-2 text-left">
               <Label htmlFor="mobile" className="text-blue-100">Mobile Number</Label>
-              <Input id="mobile" name="mobile" type="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="9876543210" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+              <Input id="mobile" name="mobile" type="tel" maxLength={10} value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))} placeholder="9876543210" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
             </div>
             <div className="grid gap-2 text-left">
                 <Label htmlFor="pincode" className="text-blue-100">Pincode</Label>
