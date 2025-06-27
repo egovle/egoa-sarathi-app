@@ -1,14 +1,18 @@
 'use client';
 
 import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation";
 import {
   User,
   ShieldCheck,
   Bell,
   LogOut,
   Check,
+  PanelLeft,
+  Home,
+  BrainCircuit,
+  LifeBuoy
 } from "lucide-react"
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch } from "firebase/firestore";
 
@@ -23,11 +27,20 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Badge } from "@/components/ui/badge"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { auth, db } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { formatDistanceToNow } from 'date-fns';
+import { cn } from "@/lib/utils";
+
+const NAV_ITEMS = [
+    { href: "/dashboard", icon: Home, label: "Dashboard" },
+    { href: "/dashboard/extract", icon: BrainCircuit, label: "Smart Extractor" },
+];
+
 
 export default function DashboardLayout({
   children,
@@ -35,6 +48,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { toast } = useToast();
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -44,8 +58,6 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!user) return;
 
-    // The orderBy('date') clause was removed to avoid a composite index requirement in Firestore.
-    // Sorting is now handled on the client-side, which is efficient for a typical number of notifications.
     const q = query(
       collection(db, "notifications"),
       where("userId", "==", user.uid)
@@ -53,13 +65,24 @@ export default function DashboardLayout({
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort notifications by date in descending order (newest first)
       notifs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setNotifications(notifs);
     });
 
     return () => unsubscribe();
   }, [user]);
+  
+  const pageTitles: { [key: string]: string } = {
+    '/dashboard': 'Dashboard',
+    '/dashboard/extract': 'Smart Information Extractor',
+  };
+
+  const getPageTitle = (path: string) => {
+    if (path.startsWith('/dashboard/task/')) {
+        return 'Task Details';
+    }
+    return pageTitles[path] || 'Dashboard';
+  }
 
   const handleMarkAllRead = async () => {
     if (!user || unreadNotifications === 0) return;
@@ -92,27 +115,99 @@ export default function DashboardLayout({
     }
   };
 
+  const NavLink = ({ href, icon: Icon, label, isActive }: { href: string; icon: React.ElementType; label: string; isActive: boolean; }) => (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Link
+            href={href}
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8",
+              isActive && "bg-accent text-accent-foreground"
+            )}
+          >
+            <Icon className="h-5 w-5" />
+            <span className="sr-only">{label}</span>
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent side="right">{label}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+
+  const MobileNavLink = ({ href, icon: Icon, label, isActive }: { href: string; icon: React.ElementType; label: string; isActive: boolean; }) => (
+     <Link
+        href={href}
+        className={cn(
+            "mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground",
+            isActive && "bg-muted text-foreground"
+        )}
+        >
+        <Icon className="h-5 w-5" />
+        {label}
+    </Link>
+  );
+
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
-      <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 z-40">
-        <nav className="hidden flex-col gap-6 text-lg font-medium md:flex md:flex-row md:items-center md:gap-5 md:text-sm lg:gap-6">
+      <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
+        <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
           <Link
             href="/"
-            className="flex items-center gap-2 text-lg font-semibold md:text-base"
+            className="group flex h-9 w-9 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:h-8 md:w-8 md:text-base"
           >
-            <ShieldCheck className="h-6 w-6 text-primary" />
-            <span>eGoa Sarathi</span>
+            <ShieldCheck className="h-4 w-4 transition-all group-hover:scale-110" />
+            <span className="sr-only">eGoa Sarathi</span>
           </Link>
-          <Link
-            href="/dashboard"
-            className="text-foreground transition-colors hover:text-foreground"
-          >
-            Dashboard
-          </Link>
+          {NAV_ITEMS.map(item => (
+            <NavLink key={item.href} {...item} isActive={pathname === item.href} />
+          ))}
         </nav>
-        <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
-          <div className="ml-auto flex-1 sm:flex-initial" />
-           <Popover>
+        <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
+           <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link
+                    href="#"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8"
+                  >
+                    <LifeBuoy className="h-5 w-5" />
+                    <span className="sr-only">Support</span>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right">Support</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+        </nav>
+      </aside>
+      <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button size="icon" variant="outline" className="sm:hidden">
+                <PanelLeft className="h-5 w-5" />
+                <span className="sr-only">Toggle Menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="sm:max-w-xs">
+              <nav className="grid gap-6 text-lg font-medium">
+                <Link
+                  href="/"
+                  className="group flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground md:text-base"
+                >
+                  <ShieldCheck className="h-5 w-5 transition-all group-hover:scale-110" />
+                  <span className="sr-only">eGoa Sarathi</span>
+                </Link>
+                {NAV_ITEMS.map(item => (
+                    <MobileNavLink key={item.href} {...item} isActive={pathname === item.href} />
+                ))}
+              </nav>
+            </SheetContent>
+          </Sheet>
+          <div className="relative ml-auto flex-1 md:grow-0">
+             <h1 className="font-semibold text-xl">{getPageTitle(pathname)}</h1>
+          </div>
+          <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="icon" className="relative rounded-full">
                   <Bell className="h-5 w-5" />
@@ -142,7 +237,7 @@ export default function DashboardLayout({
                   <div className="space-y-1 p-2 max-h-80 overflow-y-auto">
                       {notifications.length > 0 ? (
                         notifications.map((notif) => (
-                          <div key={notif.id} className={`p-3 rounded-md transition-colors hover:bg-muted ${!notif.read ? 'bg-accent/50' : 'bg-transparent'}`}>
+                          <div key={notif.id} className={`p-3 rounded-md transition-colors hover:bg-muted ${!notif.read ? 'bg-primary/10' : 'bg-transparent'}`}>
                               <Link href={notif.link || '/dashboard'} className="block">
                                 <p className="font-semibold text-sm">{notif.title}</p>
                                 <p className="text-sm text-muted-foreground">{notif.description}</p>
@@ -177,11 +272,11 @@ export default function DashboardLayout({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      </header>
-      <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-        {children}
-      </main>
+        </header>
+        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+            {children}
+        </main>
+      </div>
     </div>
   )
 }

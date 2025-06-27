@@ -68,11 +68,6 @@ export default function RegisterPage() {
             if (fetchedPostOffices.length === 1) {
               setCity(fetchedPostOffices[0].Name);
             }
-            
-            toast({
-              title: 'Location Found',
-              description: `${fetchedPostOffices[0].District}, ${fetchedPostOffices[0].State}`,
-            });
           } else {
             setPostOffices([]);
             setDistrict('');
@@ -185,38 +180,38 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-700 to-indigo-900 text-white p-4">
-       <Card className="mx-auto max-w-sm w-full bg-blue-500/20 backdrop-blur-lg rounded-2xl p-2 md:p-4 shadow-2xl border border-white/10 text-white">
+    <div className="flex items-center justify-center min-h-screen bg-background text-foreground p-4">
+       <Card className="mx-auto max-w-sm w-full">
         <CardHeader>
           <div className="flex justify-center mb-4">
-            <Link href="/" className="inline-block p-3 bg-white/20 rounded-full" prefetch={false}>
-                <ShieldCheck className="h-8 w-8 text-white" />
+            <Link href="/" className="inline-block p-3 bg-primary/20 rounded-full" prefetch={false}>
+                <ShieldCheck className="h-8 w-8 text-primary" />
             </Link>
           </div>
           <CardTitle className="text-2xl text-center tracking-tight">Register for eGoa Sarathi</CardTitle>
-          <CardDescription className="text-center text-blue-200">Enter your details below to create an account</CardDescription>
+          <CardDescription className="text-center">Enter your details below to create an account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleFormSubmit} className="grid gap-4">
             <div className="grid gap-2 text-left">
-              <Label className="text-blue-100">Register as</Label>
+              <Label>Register as</Label>
               <RadioGroup defaultValue="customer" value={role} onValueChange={setRole} className="flex gap-4 pt-1">
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="customer" id="r1" className="border-white/50 data-[state=checked]:bg-white data-[state=checked]:text-blue-700" />
+                  <RadioGroupItem value="customer" id="r1" />
                   <Label htmlFor="r1">Customer</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="vle" id="r2" className="border-white/50 data-[state=checked]:bg-white data-[state=checked]:text-blue-700" />
+                  <RadioGroupItem value="vle" id="r2" />
                   <Label htmlFor="r2">VLE</Label>
                 </div>
               </RadioGroup>
             </div>
             <div className="grid gap-2 text-left">
-              <Label htmlFor="full-name" className="text-blue-100">Full Name</Label>
-              <Input id="full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} name="full-name" placeholder="John Doe" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+              <Label htmlFor="full-name">Full Name</Label>
+              <Input id="full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} name="full-name" placeholder="John Doe" required />
             </div>
             <div className="grid gap-2 text-left">
-              <Label htmlFor="email" className="text-blue-100">Email</Label>
+              <Label htmlFor="email">Email</Label>
               <Input 
                 id="email" 
                 name="email" 
@@ -226,15 +221,12 @@ export default function RegisterPage() {
                 onBlur={handleEmailBlur}
                 placeholder="m@example.com" 
                 required 
-                className={cn(
-                  "bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11",
-                  emailError && "border-destructive focus-visible:ring-destructive"
-                )}
+                className={cn(emailError && "border-destructive focus-visible:ring-destructive")}
               />
               {emailError && <p className="text-sm text-destructive mt-1">{emailError}</p>}
             </div>
              <div className="grid gap-2 text-left">
-              <Label htmlFor="password"  className="text-blue-100">Password</Label>
+              <Label htmlFor="password">Password</Label>
                 <div className="relative">
                     <Input 
                         id="password" 
@@ -244,14 +236,14 @@ export default function RegisterPage() {
                         onChange={(e) => setPassword(e.target.value)} 
                         placeholder="••••••••" 
                         required 
-                        className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11 pr-10"
+                        className="pr-10"
                     />
                     <Button
                         type="button"
                         variant="ghost"
                         size="icon"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-0 top-0 h-11 w-11 text-gray-400 hover:text-white hover:bg-transparent"
+                        className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:bg-transparent"
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -259,24 +251,22 @@ export default function RegisterPage() {
                 </div>
             </div>
             <div className="grid gap-2 text-left">
-              <Label htmlFor="mobile" className="text-blue-100">Mobile Number</Label>
-              <Input id="mobile" name="mobile" type="tel" maxLength={10} value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))} placeholder="9876543210" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+              <Label htmlFor="mobile">Mobile Number</Label>
+              <Input id="mobile" name="mobile" type="tel" maxLength={10} value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))} placeholder="9876543210" required />
             </div>
             <div className="grid gap-2 text-left">
-                <Label htmlFor="pincode" className="text-blue-100">Pincode</Label>
+                <Label htmlFor="pincode">Pincode</Label>
                 <div className="relative">
-                    <Input id="pincode" name="pincode" type="text" maxLength={6} value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))} placeholder="e.g., 403001" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11"/>
-                    {isPincodeLoading && <Loader2 className="absolute right-3 top-3 h-5 w-5 animate-spin" />}
+                    <Input id="pincode" name="pincode" type="text" maxLength={6} value={pincode} onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))} placeholder="e.g., 403001" required />
+                    {isPincodeLoading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 animate-spin" />}
                 </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2 text-left">
-                    <Label htmlFor="city" className="text-blue-100">City</Label>
+                    <Label htmlFor="city">City</Label>
                      {postOffices.length > 1 ? (
                         <Select onValueChange={setCity} value={city} required>
-                            <SelectTrigger id="city" className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11">
-                                <SelectValue placeholder="Select your city" />
-                            </SelectTrigger>
+                            <SelectTrigger id="city"><SelectValue placeholder="Select your city" /></SelectTrigger>
                             <SelectContent>
                                 {postOffices.map((po) => (
                                     <SelectItem key={po.Name} value={po.Name}>{po.Name}</SelectItem>
@@ -284,30 +274,30 @@ export default function RegisterPage() {
                             </SelectContent>
                         </Select>
                     ) : (
-                        <Input id="city" name="city" value={city} placeholder="Auto-populated" readOnly required className="bg-black/10 border-white/20 text-white placeholder:text-gray-400 h-11 cursor-not-allowed" />
+                        <Input id="city" name="city" value={city} placeholder="Auto-populated" readOnly required className="bg-muted/50 cursor-not-allowed" />
                     )}
                 </div>
                 <div className="grid gap-2 text-left">
-                    <Label htmlFor="district" className="text-blue-100">District</Label>
-                    <Input id="district" name="district" value={district} placeholder="Auto-populated" readOnly required className="bg-black/10 border-white/20 text-white placeholder:text-gray-400 h-11 cursor-not-allowed" />
+                    <Label htmlFor="district">District</Label>
+                    <Input id="district" name="district" value={district} placeholder="Auto-populated" readOnly required className="bg-muted/50 cursor-not-allowed" />
                 </div>
             </div>
             <div className="grid gap-2 text-left">
-              <Label htmlFor="address" className="text-blue-100">Address (House No, Street)</Label>
-              <Input id="address" name="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123, Main Street" required className="bg-black/20 border-white/20 text-white placeholder:text-gray-400 focus:ring-white/50 h-11" />
+              <Label htmlFor="address">Address (House No, Street)</Label>
+              <Input id="address" name="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123, Main Street" required />
             </div>
-            <Button type="submit" disabled={loading || isPincodeLoading} className="w-full bg-white text-blue-800 font-bold hover:bg-gray-200 h-12 text-base rounded-lg mt-2">
+            <Button type="submit" disabled={loading || isPincodeLoading} className="w-full mt-2">
               {loading ? <Loader2 className="animate-spin" /> : 'Create an account'}
             </Button>
             {role === 'vle' && (
-              <p className="text-xs text-center text-blue-200 mt-2">
+              <p className="text-xs text-center text-muted-foreground mt-2">
                 VLE accounts require admin approval after registration.
               </p>
             )}
           </form>
           <div className="mt-4 text-center text-sm">
-            <span className="text-blue-200">Already have an account?{' '}</span>
-            <Link href="/" className="underline font-semibold" prefetch={false}>
+            <span className="text-muted-foreground">Already have an account?{' '}</span>
+            <Link href="/" className="underline font-semibold text-primary" prefetch={false}>
               Log in
             </Link>
           </div>

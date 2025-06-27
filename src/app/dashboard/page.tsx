@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion } from 'firebase/firestore';
-import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, EyeIcon, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare } from 'lucide-react';
+import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -631,7 +631,7 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
     }
 
     return (
-    <div className="space-y-4">
+    <div className="space-y-6">
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -647,19 +647,20 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
             </AlertDialogContent>
         </AlertDialog>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
-                <Wallet className="h-4 w-4 text-muted-foreground" />
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <Wallet className="h-5 w-5 text-muted-foreground" />
+                    <span>Wallet Balance</span>
+                </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="text-2xl font-bold">₹{userProfile.walletBalance || 0}</div>
+                <div className="text-3xl font-bold">₹{userProfile.walletBalance || 0}</div>
                 <p className="text-xs text-muted-foreground">Available balance</p>
             </CardContent>
-            </Card>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2">
+        </Card>
+
+        <div className="grid gap-6 md:grid-cols-2">
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center justify-between">
@@ -670,15 +671,15 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
                 <CardContent className="space-y-4">
                      <div className="space-y-2">
                         <Label htmlFor="profile-name">Full Name</Label>
-                        <Input id="profile-name" defaultValue={userProfile.name} readOnly />
+                        <Input id="profile-name" defaultValue={userProfile.name} readOnly className="bg-muted/50" />
                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="profile-email">Email Address</Label>
-                        <Input id="profile-email" type="email" defaultValue={userProfile.email} readOnly />
+                        <Input id="profile-email" type="email" defaultValue={userProfile.email} readOnly className="bg-muted/50" />
                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="profile-mobile">Mobile Number</Label>
-                        <Input id="profile-mobile" defaultValue={userProfile.mobile} readOnly />
+                        <Input id="profile-mobile" defaultValue={userProfile.mobile} readOnly className="bg-muted/50" />
                      </div>
                 </CardContent>
             </Card>
@@ -686,7 +687,7 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
                 <CardHeader>
                     <div className="flex justify-between items-start">
                         <div>
-                            <h3 className="text-lg font-semibold leading-none tracking-tight">Bank Details</h3>
+                            <CardTitle>Bank Details</CardTitle>
                             <CardDescription>Manage your bank accounts for transactions.</CardDescription>
                         </div>
                     </div>
@@ -726,7 +727,7 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
                             {bankAccounts.length > 0 ? (
                                 <div className="space-y-4">
                                 {bankAccounts.map((account) => (
-                                    <div key={account.id} className="p-4 border rounded-lg relative bg-muted/20">
+                                    <div key={account.id} className="p-4 border rounded-lg relative bg-muted/50">
                                          <div className="absolute top-2 right-2 flex gap-1">
                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditClick(account)}><Edit className="h-4 w-4" /></Button>
                                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteClick(account.id)}><Trash className="h-4 w-4" /></Button>
@@ -764,25 +765,22 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     
     return (
-      <div>
-        <Tabs defaultValue="tasks">
+      <Tabs defaultValue="tasks">
+          <div className='flex items-center justify-between'>
             <TabsList>
                 <TabsTrigger value="tasks">My Tasks</TabsTrigger>
                 <TabsTrigger value="complaints">My Complaints</TabsTrigger>
                 <TabsTrigger value="profile">Profile</TabsTrigger>
             </TabsList>
+             <TaskCreatorDialog creatorId={userId} creatorProfile={userProfile} type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
+          </div>
             <TabsContent value="tasks" className="mt-4">
                 <Card>
-                    <CardHeader className="flex flex-row items-center">
-                        <div className="grid gap-2">
-                            <CardTitle>My Service Requests</CardTitle>
-                            <CardDescription>
-                            Track your ongoing and completed service requests.
-                            </CardDescription>
-                        </div>
-                        <div className="ml-auto flex items-center gap-2">
-                            <TaskCreatorDialog creatorId={userId} creatorProfile={userProfile} type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
-                        </div>
+                    <CardHeader>
+                        <CardTitle>My Service Requests</CardTitle>
+                        <CardDescription>
+                        Track your ongoing and completed service requests.
+                        </CardDescription>
                     </CardHeader>
                     <CardContent>
                     <Table>
@@ -808,15 +806,15 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
                                         <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`}><EyeIcon className="mr-2"/>View Details</Link></DropdownMenuItem>
+                                        <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
                                         {task.status !== 'Completed' && !task.complaint && (
                                             <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={
-                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}><ShieldAlert className="mr-2"/>Raise Complaint</DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center"><ShieldAlert className="mr-2 h-4 w-4"/>Raise Complaint</DropdownMenuItem>
                                             } />
                                         )}
                                         {task.status === 'Completed' && !task.feedback && (
                                              <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={
-                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}><StarIcon className="mr-2"/>Give Feedback</DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center"><StarIcon className="mr-2 h-4 w-4"/>Give Feedback</DropdownMenuItem>
                                             } />
                                         )}
                                     </DropdownMenuContent>
@@ -875,92 +873,84 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
                 <ProfileView userType="Customer" userId={userId} profileData={userProfile} />
             </TabsContent>
         </Tabs>
-      </div>
     );
 }
 
 const VLEDashboard = ({ tasks, userId, userProfile, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
     return (
-    <div>
-        <Tabs defaultValue="tasks" className="w-full">
-            <div className="flex items-center">
-                <TabsList>
-                    <TabsTrigger value="tasks">Assigned Tasks</TabsTrigger>
-                    <TabsTrigger value="profile">Profile</TabsTrigger>
-                </TabsList>
+    <Tabs defaultValue="tasks" className="w-full">
+        <div className="flex items-center">
+            <TabsList>
+                <TabsTrigger value="tasks">Assigned Tasks</TabsTrigger>
+                <TabsTrigger value="profile">Profile</TabsTrigger>
+            </TabsList>
+            <div className="ml-auto flex items-center gap-2">
+                <TaskCreatorDialog type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={userId} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
             </div>
-            <TabsContent value="tasks" className="mt-4">
-                <div className="space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Availability</CardTitle>
-                            <ToggleRight className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                {userProfile && userProfile.status === 'Approved' ? (
-                                    <div className="flex items-center space-x-2 pt-2">
-                                        <Switch 
-                                            id="availability-mode" 
-                                            checked={userProfile.available} 
-                                            onCheckedChange={(checked) => onVleAvailabilityChange(userId, checked)}
-                                        />
-                                        <Label htmlFor="availability-mode">Available for Tasks</Label>
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-                    
-                    <Card>
-                        <CardHeader className="flex flex-row items-center">
-                            <div className="grid gap-2">
-                                <CardTitle>Assigned Tasks</CardTitle>
-                                <CardDescription>Tasks assigned to you for fulfillment.</CardDescription>
+        </div>
+        <TabsContent value="tasks" className="mt-4">
+            <div className="space-y-6">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-base font-medium">Availability</CardTitle>
+                        <ToggleRight className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent className="pt-2">
+                        {userProfile && userProfile.status === 'Approved' ? (
+                            <div className="flex items-center space-x-2 pt-2">
+                                <Switch 
+                                    id="availability-mode" 
+                                    checked={userProfile.available} 
+                                    onCheckedChange={(checked) => onVleAvailabilityChange(userId, checked)}
+                                />
+                                <Label htmlFor="availability-mode">{userProfile.available ? 'Available' : 'Unavailable'} for Tasks</Label>
                             </div>
-                            <div className="ml-auto flex items-center gap-2">
-                                <TaskCreatorDialog type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={userId} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
-                                <Button asChild variant="outline" size="sm" className="h-8 gap-1"><Link href="/dashboard/extract"><BrainCircuit className="h-3.5 w-3.5" />Special Request</Link></Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                            <TableHeader>
-                                <TableRow>
-                                <TableHead>Task ID</TableHead>
-                                <TableHead>Service</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Customer</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {tasks.map(task => (
-                                <TableRow key={task.id}>
-                                    <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
-                                    <TableCell>{task.service}</TableCell>
-                                    <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                                    <TableCell>{task.customer}</TableCell>
-                                    <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
-                                    <TableCell className="text-right">
-                                        <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
-                                    </TableCell>
-                                </TableRow>
-                                ))}
-                            </TableBody>
-                            </Table>
-                        </CardContent>
-                    </Card>
-                </div>
-            </TabsContent>
-            <TabsContent value="profile" className="mt-4">
-                <ProfileView userType="VLE" userId={userId} profileData={userProfile} />
-            </TabsContent>
-        </Tabs>
-    </div>
+                        ) : (
+                            <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>
+                        )}
+                    </CardContent>
+                </Card>
+                
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Assigned Tasks</CardTitle>
+                        <CardDescription>Tasks assigned to you for fulfillment.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead>Task ID</TableHead>
+                            <TableHead>Service</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {tasks.map(task => (
+                            <TableRow key={task.id}>
+                                <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
+                                <TableCell>{task.service}</TableCell>
+                                <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
+                                <TableCell>{task.customer}</TableCell>
+                                <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </div>
+        </TabsContent>
+        <TabsContent value="profile" className="mt-4">
+            <ProfileView userType="VLE" userId={userId} profileData={userProfile} />
+        </TabsContent>
+    </Tabs>
 )};
 
 const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger: React.ReactNode, taskId: string, availableVles: any[], onAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
@@ -1019,270 +1009,275 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
     const feedback = allTasks.filter(t => t.feedback).map(t => ({...t.feedback, taskId: t.id, customer: t.customer, date: t.date, service: t.service}));
 
+    const StatCard = ({ title, value, icon: Icon, description }: {title: string, value: string, icon: React.ElementType, description: string}) => (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{value}</div>
+                <p className="text-xs text-muted-foreground">{description}</p>
+            </CardContent>
+        </Card>
+    );
+
     return (
-        <div>
-            <Tabs defaultValue="overview" className="w-full">
-                <div className="flex items-center">
-                    <h2 className="text-2xl font-bold tracking-tight">Admin Dashboard</h2>
+        <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="vle-management">VLEs</TabsTrigger>
+                <TabsTrigger value="customer-management">Customers</TabsTrigger>
+                <TabsTrigger value="all-tasks">Tasks</TabsTrigger>
+                <TabsTrigger value="complaints">Complaints</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="mt-4 space-y-4">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <StatCard title="Total Tasks" value={allTasks.length.toString()} icon={Briefcase} description="All tasks in the system" />
+                    <StatCard title="Total VLEs" value={vlesForManagement.length.toString()} icon={Users} description="Registered VLEs" />
+                    <StatCard title="Total Customers" value={allUsers.length.toString()} icon={Users2} description="Registered customers" />
+                    <StatCard title="Open Complaints" value={complaints.filter(c => c.status === 'Open').length.toString()} icon={AlertTriangle} description="Awaiting admin response" />
                 </div>
-                <TabsList className="grid w-full grid-cols-6 mt-4">
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="vle-management">VLE Management</TabsTrigger>
-                    <TabsTrigger value="customer-management">Customer Management</TabsTrigger>
-                    <TabsTrigger value="all-tasks">All Tasks</TabsTrigger>
-                    <TabsTrigger value="complaints">Complaints</TabsTrigger>
-                    <TabsTrigger value="feedback">Feedback</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="overview" className="mt-4 space-y-4">
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
-                                <File className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{allTasks.length}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">VLEs Pending Approval</CardTitle>
-                                <UserCheck className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{pendingVles.length}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Open Complaints</CardTitle>
-                                <MessageSquareWarning className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{complaints.filter(c => c.status === 'Open').length}</div>
-                            </CardContent>
-                        </Card>
-                         <Card>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">Available VLEs</CardTitle>
-                                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{availableVles.length}</div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </TabsContent>
-
-                <TabsContent value="vle-management" className="mt-4">
-                    <Card>
-                    <CardHeader>
-                        <CardTitle>VLE Management</CardTitle>
-                        <CardDescription>Approve or manage VLE accounts and see their availability.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Location</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Availability</TableHead>
-                                <TableHead className="text-right">Action</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {vlesForManagement.map(vle => (
-                            <TableRow key={vle.id}>
-                                <TableCell>{vle.name}</TableCell>
-                                <TableCell>{vle.location}</TableCell>
-                                <TableCell><Badge variant={vle.status === 'Approved' ? 'default' : 'secondary'}>{vle.status}</Badge></TableCell>
-                                <TableCell>
-                                    {vle.status === 'Approved' ? (
-                                         <Badge variant={vle.available ? 'outline' : 'destructive'} className={cn(vle.available && 'border-green-500 text-green-600')}>{vle.available ? 'Available' : 'Unavailable'}</Badge>
-                                    ) : 'N/A'}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {vle.status === 'Pending' && 
-                                    <Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}>
-                                        <UserPlus className="mr-2 h-4 w-4" /> Approve
-                                    </Button>
-                                    }
-                                </TableCell>
-                            </TableRow>
-                            ))}
-                        </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-                </TabsContent>
-                
-                <TabsContent value="customer-management" className="mt-4">
-                    <Card>
-                    <CardHeader>
-                        <CardTitle>Customer Management</CardTitle>
-                        <CardDescription>View all registered customers in the system.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Mobile</TableHead>
-                                <TableHead>Location</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {allUsers.map(user => (
-                            <TableRow key={user.id}>
-                                <TableCell>{user.name}</TableCell>
-                                <TableCell>{user.email}</TableCell>
-                                <TableCell>{user.mobile}</TableCell>
-                                <TableCell>{user.location}</TableCell>
-                            </TableRow>
-                            ))}
-                        </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-                </TabsContent>
-
-                <TabsContent value="all-tasks" className="mt-4">
+                <div className="grid gap-4 md:grid-cols-2">
                     <Card>
                         <CardHeader>
-                            <CardTitle>All Service Requests</CardTitle>
-                            <CardDescription>View and manage all tasks in the system.</CardDescription>
+                            <CardTitle>VLEs Pending Approval</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <Table>
+                            {pendingVles.length > 0 ? (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead>Location</TableHead>
+                                            <TableHead className="text-right">Action</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {pendingVles.map(vle => (
+                                            <TableRow key={vle.id}>
+                                                <TableCell>{vle.name}</TableCell>
+                                                <TableCell>{vle.location}</TableCell>
+                                                <TableCell className="text-right">
+                                                     <Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}>
+                                                        <UserPlus className="mr-2 h-4 w-4" /> Approve
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No VLEs are currently pending approval.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                         <CardHeader>
+                            <CardTitle>Customer Feedback</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Task ID</TableHead>
                                         <TableHead>Customer</TableHead>
-                                        <TableHead>Service</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Assigned VLE</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead className="text-right">Action</TableHead>
+                                        <TableHead className="text-center">Rating</TableHead>
+                                        <TableHead>Comment</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {allTasks.map(task => (
-                                        <TableRow key={task.id}>
-                                            <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
-                                            <TableCell>{task.customer}</TableCell>
-                                            <TableCell>{task.service}</TableCell>
-                                            <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                                            <TableCell>{task.assignedVleName || 'N/A'}</TableCell>
-                                            <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
-                                            <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`}><EyeIcon className="mr-2"/>View Details</Link></DropdownMenuItem>
-                                                        {task.status === 'Unassigned' && (
-                                                            <AssignVleDialog 
-                                                                trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><GitFork className="mr-2"/>Assign VLE</DropdownMenuItem>}
-                                                                taskId={task.id}
-                                                                availableVles={availableVles}
-                                                                onAssign={onVleAssign}
-                                                            />
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
+                                    {feedback.length > 0 ? feedback.slice(0, 5).map(fb => (
+                                        <TableRow key={fb.date}>
+                                            <TableCell>{fb.customer}</TableCell>
+                                            <TableCell><StarRating rating={fb.rating} readOnly={true} /></TableCell>
+                                            <TableCell className='truncate max-w-xs'>{fb.comment}</TableCell>
                                         </TableRow>
-                                    ))}
+                                    )) : (
+                                        <TableRow>
+                                            <TableCell colSpan={3} className="h-24 text-center">No feedback yet.</TableCell>
+                                        </TableRow>
+                                    )}
                                 </TableBody>
                             </Table>
                         </CardContent>
                     </Card>
-                </TabsContent>
+                </div>
+            </TabsContent>
 
-                <TabsContent value="complaints" className="mt-4">
-                    <Card>
+            <TabsContent value="vle-management" className="mt-4">
+                <Card>
+                <CardHeader>
+                    <CardTitle>VLE Management</CardTitle>
+                    <CardDescription>Approve or manage VLE accounts and see their availability.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Location</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Availability</TableHead>
+                            <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {vlesForManagement.map(vle => (
+                        <TableRow key={vle.id}>
+                            <TableCell>{vle.name}</TableCell>
+                            <TableCell>{vle.location}</TableCell>
+                            <TableCell><Badge variant={vle.status === 'Approved' ? 'default' : 'secondary'}>{vle.status}</Badge></TableCell>
+                            <TableCell>
+                                {vle.status === 'Approved' ? (
+                                     <Badge variant={vle.available ? 'outline' : 'destructive'} className={cn(vle.available && 'border-green-500 text-green-600')}>{vle.available ? 'Available' : 'Unavailable'}</Badge>
+                                ) : 'N/A'}
+                            </TableCell>
+                            <TableCell className="text-right">
+                                {vle.status === 'Pending' && 
+                                <Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}>
+                                    <UserPlus className="mr-2 h-4 w-4" /> Approve
+                                </Button>
+                                }
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+            </TabsContent>
+            
+            <TabsContent value="customer-management" className="mt-4">
+                <Card>
+                <CardHeader>
+                    <CardTitle>Customer Management</CardTitle>
+                    <CardDescription>View all registered customers in the system.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Mobile</TableHead>
+                            <TableHead>Location</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {allUsers.map(user => (
+                        <TableRow key={user.id}>
+                            <TableCell>{user.name}</TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>{user.mobile}</TableCell>
+                            <TableCell>{user.location}</TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+            </TabsContent>
+
+            <TabsContent value="all-tasks" className="mt-4">
+                <Card>
                     <CardHeader>
-                        <CardTitle>Customer Complaints</CardTitle>
-                        <CardDescription>Review and resolve all customer complaints.</CardDescription>
+                        <CardTitle>All Service Requests</CardTitle>
+                        <CardDescription>View and manage all tasks in the system.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Task ID</TableHead>
-                                <TableHead>Customer</TableHead>
-                                <TableHead>Complaint</TableHead>
-                                <TableHead>Docs</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Action</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {complaints.map(c => (
-                            <TableRow key={c.date}>
-                                <TableCell className="font-medium">{c.taskId.slice(-6).toUpperCase()}</TableCell>
-                                <TableCell>{c.customer}</TableCell>
-                                <TableCell className="max-w-xs break-words">{c.text}</TableCell>
-                                <TableCell>{c.documents?.length > 0 ? <FileText className="h-4 w-4" /> : 'N/A'}</TableCell>
-                                <TableCell><Badge variant={c.status === 'Open' ? 'destructive' : 'default'}>{c.status}</Badge></TableCell>
-                                <TableCell className="text-right">
-                                    {c.status === 'Open' && (
-                                        <ComplaintResponseDialog
-                                            trigger={<Button size="sm"><MessageCircleMore className="mr-2 h-4 w-4" />Respond</Button>}
-                                            complaint={c}
-                                            taskId={c.taskId}
-                                            customerId={c.customerId}
-                                            onResponseSubmit={onComplaintResponse}
-                                        />
-                                    )}
-                                </TableCell>
-                            </TableRow>
-                            ))}
-                        </TableBody>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Task ID</TableHead>
+                                    <TableHead>Customer</TableHead>
+                                    <TableHead>Service</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Assigned VLE</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {allTasks.map(task => (
+                                    <TableRow key={task.id}>
+                                        <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
+                                        <TableCell>{task.customer}</TableCell>
+                                        <TableCell>{task.service}</TableCell>
+                                        <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
+                                        <TableCell>{task.assignedVleName || 'N/A'}</TableCell>
+                                        <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
+                                                    {task.status === 'Unassigned' && (
+                                                        <AssignVleDialog 
+                                                            trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center"><GitFork className="mr-2 h-4 w-4"/>Assign VLE</DropdownMenuItem>}
+                                                            taskId={task.id}
+                                                            availableVles={availableVles}
+                                                            onAssign={onVleAssign}
+                                                        />
+                                                    )}
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
                         </Table>
                     </CardContent>
                 </Card>
-                </TabsContent>
+            </TabsContent>
 
-                <TabsContent value="feedback" className="mt-4">
-                    <Card>
-                    <CardHeader>
-                        <CardTitle>Customer Feedback</CardTitle>
-                        <CardDescription>Review customer feedback for completed tasks.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Task ID</TableHead>
-                                <TableHead>Customer</TableHead>
-                                <TableHead className="text-center">Rating</TableHead>
-                                <TableHead>Comment</TableHead>
-                                <TableHead>Date</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {feedback.map(fb => (
-                            <TableRow key={fb.date}>
-                                <TableCell className="font-medium">{fb.taskId.slice(-6).toUpperCase()}</TableCell>
-                                <TableCell>{fb.customer}</TableCell>
-                                <TableCell><StarRating rating={fb.rating} readOnly={true} /></TableCell>
-                                <TableCell>{fb.comment}</TableCell>
-                                <TableCell>{new Date(fb.date).toLocaleDateString()}</TableCell>
-                            </TableRow>
-                            ))}
-                        </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-                </TabsContent>
-
-            </Tabs>
-        </div>
+            <TabsContent value="complaints" className="mt-4">
+                <Card>
+                <CardHeader>
+                    <CardTitle>Customer Complaints</CardTitle>
+                    <CardDescription>Review and resolve all customer complaints.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Task ID</TableHead>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Complaint</TableHead>
+                            <TableHead>Docs</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {complaints.map(c => (
+                        <TableRow key={c.date}>
+                            <TableCell className="font-medium">{c.taskId.slice(-6).toUpperCase()}</TableCell>
+                            <TableCell>{c.customer}</TableCell>
+                            <TableCell className="max-w-xs break-words">{c.text}</TableCell>
+                            <TableCell>{c.documents?.length > 0 ? <FileText className="h-4 w-4" /> : 'N/A'}</TableCell>
+                            <TableCell><Badge variant={c.status === 'Open' ? 'destructive' : 'default'}>{c.status}</Badge></TableCell>
+                            <TableCell className="text-right">
+                                {c.status === 'Open' && (
+                                    <ComplaintResponseDialog
+                                        trigger={<Button size="sm"><MessageCircleMore className="mr-2 h-4 w-4" />Respond</Button>}
+                                        complaint={c}
+                                        taskId={c.taskId}
+                                        customerId={c.customerId}
+                                        onResponseSubmit={onComplaintResponse}
+                                    />
+                                )}
+                            </TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+            </TabsContent>
+        </Tabs>
     )
 };
 
@@ -1302,25 +1297,24 @@ export default function DashboardPage() {
         }
     }, [user, loading, router]);
 
-    // Set up a real-time listener for the user's own profile for live updates (e.g., availability)
     useEffect(() => {
         if (!user) return;
         
-        // Determine the collection based on an initial guess or stored role, before the full profile is loaded
-        const probableRole = userProfile?.role || 'customer'; // default to customer if profile is not yet loaded
+        const probableRole = userProfile?.role || 'customer';
         const collectionName = probableRole === 'vle' ? 'vles' : 'users';
         const docRef = doc(db, collectionName, user.uid);
         
         const unsubscribe = onSnapshot(docRef, (doc) => {
             if (doc.exists()) {
                 setRealtimeProfile({ id: doc.id, ...doc.data() });
-            } else if (collectionName === 'users') { // If not found in users, check vles
+            } else if (collectionName === 'users') {
                  const vleDocRef = doc(db, 'vles', user.uid);
-                 onSnapshot(vleDocRef, (vleDoc) => {
+                 const unsubVle = onSnapshot(vleDocRef, (vleDoc) => {
                      if (vleDoc.exists()) {
                          setRealtimeProfile({ id: vleDoc.id, ...vleDoc.data() });
                      }
                  });
+                 return () => unsubVle();
             }
         }, (error) => {
             console.error("Error listening to profile updates:", error);
@@ -1361,7 +1355,6 @@ export default function DashboardPage() {
             const tasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
             unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
                 const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Client-side sorting
                 fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                 setTasks(fetchedTasks);
             });
@@ -1369,7 +1362,6 @@ export default function DashboardPage() {
             const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
             unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
                  const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Client-side sorting
                 fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                 setTasks(fetchedTasks);
             });

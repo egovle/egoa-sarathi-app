@@ -364,19 +364,9 @@ export default function TaskDetailPage() {
 
     return (
         <div className="w-full space-y-6">
-            <div className="flex items-center gap-4">
-                <Button variant="outline" size="icon" className="h-7 w-7" asChild>
-                    <Link href="/dashboard">
-                        <ArrowLeft className="h-4 w-4" />
-                        <span className="sr-only">Back</span>
-                    </Link>
-                </Button>
-                <div>
-                    <h1 className="font-semibold text-lg md:text-2xl">Task Details</h1>
-                    <p className="text-sm text-muted-foreground">Task ID: {task.id.slice(-6).toUpperCase()}</p>
-                </div>
+             <div className="flex items-center gap-4">
+                <p className="text-sm text-muted-foreground">Task ID: {task.id.slice(-6).toUpperCase()}</p>
             </div>
-
             <div className="grid md:grid-cols-3 gap-6">
                 <div className="md:col-span-2 space-y-6">
                     <Card>
