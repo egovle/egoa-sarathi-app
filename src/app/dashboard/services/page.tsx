@@ -4,7 +4,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { services as seedServices } from '@/lib/seed';
@@ -98,23 +98,25 @@ const ServiceFormDialog = ({ service, onFinished }: { service?: any, onFinished:
                 </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-                <div className="space-y-2">
-                    <Label htmlFor="name">Service Name</Label>
-                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., PAN Card Application" required />
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="name" className="text-right">Service Name</Label>
+                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., PAN Card Application" required className="col-span-3"/>
                 </div>
-                <div className="space-y-2">
-                    <Label htmlFor="rate">Rate (₹)</Label>
-                    <Input id="rate" type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="e.g., 150" required />
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="rate" className="text-right">Rate (₹)</Label>
+                    <Input id="rate" type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="e.g., 150" required className="col-span-3"/>
                 </div>
-                <div className="space-y-2">
-                    <Label htmlFor="documents">Required Documents</Label>
-                    <Textarea
-                        id="documents"
-                        value={documents}
-                        onChange={(e) => setDocuments(e.target.value)}
-                        placeholder="Aadhar Card, PAN Card, Photo"
-                    />
-                    <p className="text-xs text-muted-foreground">Enter document names separated by a comma.</p>
+                 <div className="grid grid-cols-4 items-start gap-4">
+                    <Label htmlFor="documents" className="text-right pt-2">Required Documents</Label>
+                    <div className="col-span-3">
+                         <Textarea
+                            id="documents"
+                            value={documents}
+                            onChange={(e) => setDocuments(e.target.value)}
+                            placeholder="Aadhar Card, PAN Card, Photo"
+                        />
+                        <p className="text-xs text-muted-foreground pt-1">Enter document names separated by a comma.</p>
+                    </div>
                 </div>
             </div>
             <DialogFooter>
@@ -134,6 +136,7 @@ export default function ServiceManagementPage() {
     
     const [services, setServices] = useState<any[]>([]);
     const [loadingServices, setLoadingServices] = useState(true);
+    const [isSeeding, setIsSeeding] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedService, setSelectedService] = useState<any | null>(null);
@@ -148,10 +151,8 @@ export default function ServiceManagementPage() {
 
     // Effect for fetching data only if user is an admin
     useEffect(() => {
-        if (authLoading || !userProfile) return;
-        
-        if (!userProfile.isAdmin) {
-            setLoadingServices(false);
+        if (authLoading || !userProfile?.isAdmin) {
+            if(!authLoading) setLoadingServices(false);
             return;
         }
 
@@ -171,25 +172,28 @@ export default function ServiceManagementPage() {
     }, [userProfile, authLoading, toast]);
     
     const handleSeedClick = async () => {
-        setLoadingServices(true);
+        setIsSeeding(true);
         try {
             const servicesCollectionRef = collection(db, 'services');
             const existingServicesSnapshot = await getDocs(query(servicesCollectionRef));
     
             if (existingServicesSnapshot.empty) {
-                const servicePromises = seedServices.map(service => {
-                    return addDoc(servicesCollectionRef, service);
+                const batch = writeBatch(db);
+                seedServices.forEach(service => {
+                    const docRef = doc(collection(db, "services"));
+                    batch.set(docRef, service);
                 });
-                await Promise.all(servicePromises);
+                await batch.commit();
+
                 toast({ title: "Database Seeded", description: "Common services have been added." });
             } else {
                 toast({ title: "Database Not Empty", description: "Services already exist. Seeding skipped." });
-                setLoadingServices(false); // Manually set loading to false if skipping
             }
         } catch (error) {
             console.error("Error seeding database:", error);
             toast({ title: "Error", description: "Could not seed the database. Check console for details.", variant: "destructive" });
-            setLoadingServices(false);
+        } finally {
+            setIsSeeding(false);
         }
     };
 
@@ -251,7 +255,7 @@ export default function ServiceManagementPage() {
                 }
                 setIsFormOpen(open);
             }}>
-                 <DialogContent>
+                 <DialogContent className="sm:max-w-md">
                     <ServiceFormDialog service={selectedService} onFinished={handleFormFinished} />
                 </DialogContent>
             </Dialog>
@@ -270,6 +274,7 @@ export default function ServiceManagementPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[50px]">Sr. No.</TableHead>
                                 <TableHead>Service Name</TableHead>
                                 <TableHead>Rate</TableHead>
                                 <TableHead>Required Documents</TableHead>
@@ -279,13 +284,14 @@ export default function ServiceManagementPage() {
                         <TableBody>
                             {loadingServices ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
+                                    <TableCell colSpan={5} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
                             ) : services.length > 0 ? (
-                                services.map(service => (
+                                services.map((service, index) => (
                                     <TableRow key={service.id}>
+                                        <TableCell className="font-medium">{index + 1}</TableCell>
                                         <TableCell className="font-medium">{service.name}</TableCell>
                                         <TableCell>₹{service.rate}</TableCell>
                                         <TableCell>
@@ -310,18 +316,18 @@ export default function ServiceManagementPage() {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={4}>
+                                    <TableCell colSpan={5}>
                                         <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50 my-4">
                                             <h3 className="text-lg font-semibold">No Services Found</h3>
                                             <p className="text-muted-foreground mt-2 mb-4 max-w-md">
-                                                You can add services manually or seed the database with a list of common services.
+                                                You can add services manually or seed the database with a list of common services to get started.
                                             </p>
                                             <div className="flex flex-wrap justify-center gap-4">
                                                 <Button size="sm" onClick={() => { setSelectedService(null); setIsFormOpen(true); }}>
                                                     <PlusCircle className="mr-2 h-4 w-4" /> Add Service Manually
                                                 </Button>
-                                                <Button size="sm" variant="outline" onClick={handleSeedClick} disabled={loadingServices}>
-                                                    {loadingServices ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+                                                <Button size="sm" variant="outline" onClick={handleSeedClick} disabled={isSeeding}>
+                                                    {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
                                                     Seed Common Services
                                                 </Button>
                                             </div>
