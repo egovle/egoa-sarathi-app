@@ -109,7 +109,7 @@ export default function ServiceManagementPage() {
 
     // Effect for handling authorization and redirection
     useEffect(() => {
-        if (!authLoading && !userProfile?.isAdmin) {
+        if (!authLoading && userProfile && !userProfile.isAdmin) {
             toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
             router.push('/dashboard');
         }
@@ -117,7 +117,10 @@ export default function ServiceManagementPage() {
 
     // Effect for fetching data only if user is an admin
     useEffect(() => {
+        if (authLoading) return;
+
         if (userProfile?.isAdmin) {
+            setLoadingServices(true);
             const q = query(collection(db, 'services'), orderBy('name'));
             const unsubscribe = onSnapshot(q, (querySnapshot) => {
                 const servicesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -130,8 +133,11 @@ export default function ServiceManagementPage() {
             });
 
             return () => unsubscribe();
+        } else if (userProfile) {
+            // If profile is loaded but user is not admin, stop loading.
+            setLoadingServices(false);
         }
-    }, [userProfile, toast]);
+    }, [userProfile, authLoading, toast]);
 
     const handleEdit = (service: any) => {
         setSelectedService(service);
@@ -160,9 +166,14 @@ export default function ServiceManagementPage() {
         setSelectedService(null);
     }
     
-    if (authLoading || !userProfile?.isAdmin) {
+    if (authLoading || (!userProfile && !authLoading)) {
         return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
+    
+    if (!userProfile?.isAdmin) {
+        return null; // Redirect logic handles this, this prevents flash of content
+    }
+
 
     return (
         <div className="space-y-4">
@@ -245,7 +256,17 @@ export default function ServiceManagementPage() {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">No services created yet.</TableCell>
+                                    <TableCell colSpan={4}>
+                                        <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50 my-4">
+                                            <h3 className="text-lg font-semibold">No Services Found</h3>
+                                            <p className="text-muted-foreground mt-2 mb-4 max-w-md">
+                                                The 'services' collection is created in your database the first time you add a service.
+                                            </p>
+                                            <Button size="sm" onClick={() => { setSelectedService(null); setIsFormOpen(true); }}>
+                                                <PlusCircle className="mr-2 h-4 w-4" /> Add Your First Service
+                                            </Button>
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
                             )}
                         </TableBody>
