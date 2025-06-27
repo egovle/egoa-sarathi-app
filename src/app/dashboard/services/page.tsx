@@ -107,29 +107,31 @@ export default function ServiceManagementPage() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedService, setSelectedService] = useState<any | null>(null);
 
+    // Effect for handling authorization and redirection
     useEffect(() => {
-        if (authLoading) return; // Wait until auth state is resolved.
-
-        if (!userProfile?.isAdmin) {
+        if (!authLoading && !userProfile?.isAdmin) {
             toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
             router.push('/dashboard');
-            return;
         }
-
-        // If we reach here, user is an admin. Fetch services.
-        const q = query(collection(db, 'services'), orderBy('name'));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const servicesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setServices(servicesData);
-            setLoadingServices(false);
-        }, (error) => {
-            console.error("Error fetching services: ", error);
-            toast({ title: "Error", description: "Could not fetch services.", variant: "destructive" });
-            setLoadingServices(false);
-        });
-
-        return () => unsubscribe();
     }, [userProfile, authLoading, router, toast]);
+
+    // Effect for fetching data only if user is an admin
+    useEffect(() => {
+        if (userProfile?.isAdmin) {
+            const q = query(collection(db, 'services'), orderBy('name'));
+            const unsubscribe = onSnapshot(q, (querySnapshot) => {
+                const servicesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setServices(servicesData);
+                setLoadingServices(false);
+            }, (error) => {
+                console.error("Error fetching services: ", error);
+                toast({ title: "Error", description: "Could not fetch services.", variant: "destructive" });
+                setLoadingServices(false);
+            });
+
+            return () => unsubscribe();
+        }
+    }, [userProfile, toast]);
 
     const handleEdit = (service: any) => {
         setSelectedService(service);
@@ -158,12 +160,8 @@ export default function ServiceManagementPage() {
         setSelectedService(null);
     }
     
-    if (authLoading || loadingServices) {
+    if (authLoading || !userProfile?.isAdmin) {
         return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-    }
-
-    if (!userProfile?.isAdmin) {
-        return null; // or a dedicated access denied component
     }
 
     return (
@@ -214,7 +212,13 @@ export default function ServiceManagementPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {services.length > 0 ? (
+                            {loadingServices ? (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="h-24 text-center">
+                                        <Loader2 className="mx-auto h-6 w-6 animate-spin" />
+                                    </TableCell>
+                                </TableRow>
+                            ) : services.length > 0 ? (
                                 services.map(service => (
                                     <TableRow key={service.id}>
                                         <TableCell className="font-medium">{service.name}</TableCell>

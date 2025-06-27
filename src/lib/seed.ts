@@ -2,18 +2,16 @@
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
-const vles: any[] = [
-    // Demo VLEs removed to prevent re-seeding.
-    // Please remove any existing demo users from your Firestore 'vles' collection manually.
-];
-
-const users: any[] = [
-    // Demo users removed to prevent re-seeding.
-];
-
+// This file is for seeding initial data into your Firestore database.
+// The arrays below are empty to prevent adding unwanted demo data.
 // NOTE: This seed function does NOT create users in Firebase Auth.
-// These are just profile documents. The corresponding users must be created via the registration form.
-// This script is useful for setting up initial VLEs or admin users.
+// It only creates profile documents. To remove existing demo users, you must do so
+// from your Firebase Console in the Firestore Database section.
+
+const vles: any[] = [];
+
+const users: any[] = [];
+
 export async function seedDatabase() {
     console.log('Starting to seed database...');
 
