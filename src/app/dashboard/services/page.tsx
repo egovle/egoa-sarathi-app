@@ -8,6 +8,7 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { addService, updateService, deleteService } from './actions';
+import { handleSeedDatabase } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -16,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Database } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 
@@ -117,27 +118,39 @@ export default function ServiceManagementPage() {
 
     // Effect for fetching data only if user is an admin
     useEffect(() => {
-        if (authLoading) return;
-
-        if (userProfile?.isAdmin) {
-            setLoadingServices(true);
-            const q = query(collection(db, 'services'), orderBy('name'));
-            const unsubscribe = onSnapshot(q, (querySnapshot) => {
-                const servicesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setServices(servicesData);
+        if (authLoading || !userProfile?.isAdmin) {
+            // If auth is loading, or if profile is loaded but user is not admin, do nothing.
+            if (userProfile && !userProfile.isAdmin) {
                 setLoadingServices(false);
-            }, (error) => {
-                console.error("Error fetching services: ", error);
-                toast({ title: "Error", description: "Could not fetch services.", variant: "destructive" });
-                setLoadingServices(false);
-            });
+            }
+            return;
+        }
 
-            return () => unsubscribe();
-        } else if (userProfile) {
-            // If profile is loaded but user is not admin, stop loading.
+        setLoadingServices(true);
+        const q = query(collection(db, 'services'), orderBy('name'));
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const servicesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setServices(servicesData);
+            setLoadingServices(false);
+        }, (error) => {
+            console.error("Error fetching services: ", error);
+            toast({ title: "Error", description: "Could not fetch services.", variant: "destructive" });
+            setLoadingServices(false);
+        });
+
+        return () => unsubscribe();
+    }, [userProfile, authLoading, toast]);
+
+    const handleSeedClick = async () => {
+        setLoadingServices(true);
+        try {
+            await handleSeedDatabase();
+            toast({ title: "Database Seeded", description: "Common services have been added." });
+        } catch (error) {
+            toast({ title: "Error", description: "Could not seed the database.", variant: "destructive" });
             setLoadingServices(false);
         }
-    }, [userProfile, authLoading, toast]);
+    };
 
     const handleEdit = (service: any) => {
         setSelectedService(service);
@@ -173,7 +186,6 @@ export default function ServiceManagementPage() {
     if (!userProfile?.isAdmin) {
         return null; // Redirect logic handles this, this prevents flash of content
     }
-
 
     return (
         <div className="space-y-4">
@@ -260,11 +272,17 @@ export default function ServiceManagementPage() {
                                         <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50 my-4">
                                             <h3 className="text-lg font-semibold">No Services Found</h3>
                                             <p className="text-muted-foreground mt-2 mb-4 max-w-md">
-                                                The 'services' collection is created in your database the first time you add a service.
+                                                You can add services manually or seed the database with a list of common services.
                                             </p>
-                                            <Button size="sm" onClick={() => { setSelectedService(null); setIsFormOpen(true); }}>
-                                                <PlusCircle className="mr-2 h-4 w-4" /> Add Your First Service
-                                            </Button>
+                                            <div className="flex flex-wrap justify-center gap-4">
+                                                <Button size="sm" onClick={() => { setSelectedService(null); setIsFormOpen(true); }}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Service Manually
+                                                </Button>
+                                                <Button size="sm" variant="outline" onClick={handleSeedClick} disabled={loadingServices}>
+                                                    {loadingServices ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+                                                    Seed Common Services
+                                                </Button>
+                                            </div>
                                         </div>
                                     </TableCell>
                                 </TableRow>

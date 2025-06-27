@@ -6,7 +6,7 @@ import { seedDatabase } from '@/lib/seed';
 export async function handleSeedDatabase() {
   try {
     await seedDatabase();
-    revalidatePath('/');
+    revalidatePath('/dashboard/services');
   } catch (error) {
     console.error('Error seeding database:', error);
     // This will be caught by the form's error handling
