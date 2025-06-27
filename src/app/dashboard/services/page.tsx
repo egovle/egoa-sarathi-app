@@ -58,10 +58,10 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
     const [name, setName] = useState(service?.name || '');
     const [rate, setRate] = useState(service?.rate || '');
     const [documents, setDocuments] = useState(service?.documents?.join(', ') || '');
-    const [parentId, setParentId] = useState(service?.parentId || '');
+    const [parentId, setParentId] = useState(service?.parentId || 'none');
     const [loading, setLoading] = useState(false);
     
-    const isSubCategory = parentId !== '';
+    const isSubCategory = parentId !== 'none';
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -71,7 +71,7 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
             name,
             rate: parseFloat(rate) || 0,
             documents: documents.split(',').map(d => d.trim()).filter(d => d),
-            parentId: parentId || null
+            parentId: parentId === 'none' ? null : parentId
         };
 
         const result = service
@@ -111,7 +111,7 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
                                 <SelectValue placeholder="Main Category (leave empty)" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">None (This is a Main Category)</SelectItem>
+                                <SelectItem value="none">None (This is a Main Category)</SelectItem>
                                 {parentServices.map(p => (
                                     <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                                 ))}
@@ -401,11 +401,11 @@ export default function ServiceManagementPage() {
                                         <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50 my-4">
                                             <h3 className="text-lg font-semibold">No Services Found</h3>
                                             <p className="text-muted-foreground mt-2 mb-4 max-w-md">
-                                                You can add services manually or seed the database with a list of common services to get started.
+                                                It looks like you don't have any services configured yet. You can add them manually or seed the database with a list of common services to get started.
                                             </p>
                                             <div className="flex flex-wrap justify-center gap-4">
                                                 <Button size="sm" onClick={() => { setSelectedService(null); setIsFormOpen(true); }}>
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Service Manually
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Your First Service
                                                 </Button>
                                                 <Button size="sm" variant="outline" onClick={handleSeedClick} disabled={isSeeding}>
                                                     {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
