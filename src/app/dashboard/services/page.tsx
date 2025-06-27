@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { addService, updateService, deleteService } from './actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -67,25 +67,24 @@ const ServiceFormDialog = ({ service, onFinished }: { service?: any, onFinished:
                 </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="name" className="text-right">Name</Label>
-                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required />
+                <div className="space-y-2">
+                    <Label htmlFor="name">Service Name</Label>
+                    <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., PAN Card Application" required />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="rate" className="text-right">Rate (₹)</Label>
-                    <Input id="rate" type="number" value={rate} onChange={(e) => setRate(e.target.value)} className="col-span-3" required />
+                <div className="space-y-2">
+                    <Label htmlFor="rate">Rate (₹)</Label>
+                    <Input id="rate" type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="e.g., 150" required />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="documents" className="text-right">Required Documents</Label>
+                <div className="space-y-2">
+                    <Label htmlFor="documents">Required Documents</Label>
                     <Textarea
                         id="documents"
                         value={documents}
                         onChange={(e) => setDocuments(e.target.value)}
-                        className="col-span-3"
-                        placeholder="e.g., Aadhar Card, PAN Card, Photo"
+                        placeholder="Aadhar Card, PAN Card, Photo"
                     />
+                    <p className="text-xs text-muted-foreground">Enter document names separated by a comma.</p>
                 </div>
-                 <p className="text-xs text-muted-foreground col-start-2 col-span-3">Enter document names separated by a comma.</p>
             </div>
             <DialogFooter>
                 <Button type="submit" disabled={loading}>
@@ -109,15 +108,15 @@ export default function ServiceManagementPage() {
     const [selectedService, setSelectedService] = useState<any | null>(null);
 
     useEffect(() => {
-        if (!authLoading && !userProfile?.isAdmin) {
+        if (authLoading) return; // Wait until auth state is resolved.
+
+        if (!userProfile?.isAdmin) {
             toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
             router.push('/dashboard');
+            return;
         }
-    }, [userProfile, authLoading, router, toast]);
 
-    useEffect(() => {
-        if (!userProfile?.isAdmin) return;
-
+        // If we reach here, user is an admin. Fetch services.
         const q = query(collection(db, 'services'), orderBy('name'));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const servicesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -130,7 +129,7 @@ export default function ServiceManagementPage() {
         });
 
         return () => unsubscribe();
-    }, [userProfile, toast]);
+    }, [userProfile, authLoading, router, toast]);
 
     const handleEdit = (service: any) => {
         setSelectedService(service);
@@ -183,7 +182,12 @@ export default function ServiceManagementPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+            <Dialog open={isFormOpen} onOpenChange={(open) => {
+                if (!open) {
+                    setSelectedService(null);
+                }
+                setIsFormOpen(open);
+            }}>
                  <DialogContent>
                     <ServiceFormDialog service={selectedService} onFinished={handleFormFinished} />
                 </DialogContent>
