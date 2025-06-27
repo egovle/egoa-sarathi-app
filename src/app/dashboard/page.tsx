@@ -1,10 +1,10 @@
 
 'use client';
 
-import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
+import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction } from 'firebase/firestore';
-import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone } from 'lucide-react';
+import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -382,12 +382,22 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
 
 const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any) => void, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
   const { toast } = useToast();
-  const [service, setService] = useState('');
-  const [otherService, setOtherService] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedSubCategory, setSelectedSubCategory] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  const parentServices = useMemo(() => services.filter(s => !s.parentId), [services]);
+  const subServices = useMemo(() => {
+    if (!selectedCategory) return [];
+    return services.filter(s => s.parentId === selectedCategory);
+  }, [services, selectedCategory]);
+
+  useEffect(() => {
+      setSelectedSubCategory('');
+  }, [selectedCategory])
 
   const handleCreateTask = async (e: FormEvent) => {
     e.preventDefault();
@@ -400,14 +410,19 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         return;
     }
     const form = e.target as HTMLFormElement;
-    const finalService = service === 'Other' ? otherService : service;
+    const finalService = services.find(s => s.id === selectedSubCategory);
+
+    if (!finalService) {
+        toast({ title: 'Service Required', description: 'Please select a valid service.', variant: 'destructive'});
+        return;
+    }
 
     const newTask = {
         customer: form.name.value,
         customerAddress: form.address.value,
         customerMobile: form.mobile.value,
         customerEmail: form.email.value,
-        service: finalService,
+        service: finalService.name,
         status: 'Unassigned',
         date: new Date().toISOString(),
         history: [{
@@ -415,7 +430,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             actorName: creatorProfile?.name || form.name.value,
             actorRole: type === 'VLE Lead' ? 'VLE' : 'Customer',
             action: 'Task Created',
-            details: `Task created for service: ${finalService}.`
+            details: `Task created for service: ${finalService.name}.`
         }],
         acknowledgementNumber: null,
         complaint: null,
@@ -449,8 +464,8 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
   const handleOpenChange = (isOpen: boolean) => {
       setDialogOpen(isOpen);
       if (!isOpen) {
-          setService('');
-          setOtherService('');
+          setSelectedCategory('');
+          setSelectedSubCategory('');
           setSelectedFiles([]);
           setIsCameraOpen(false);
       }
@@ -486,24 +501,34 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                 <Input id="email" name="email" type="email" defaultValue={creatorProfile?.email} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">Service</Label>
+                <Label className="text-right">Service Category</Label>
                   <div className="col-span-3">
-                      <Select onValueChange={setService} value={service}>
-                          <SelectTrigger><SelectValue placeholder="Select a service" /></SelectTrigger>
+                      <Select onValueChange={setSelectedCategory} value={selectedCategory} required>
+                          <SelectTrigger><SelectValue placeholder="Select a service category" /></SelectTrigger>
                           <SelectContent>
-                              {services?.map(s => (
-                                <SelectItem key={s.id} value={s.name}>{s.name} - ₹{s.rate}</SelectItem>
+                              {parentServices?.map(s => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                               ))}
-                              <SelectItem value="Other">Other</SelectItem>
                           </SelectContent>
                       </Select>
                   </div>
               </div>
-              {service === 'Other' && (
-                  <div className="grid grid-cols-4 items-center gap-4">
-                      <Label htmlFor="other-service" className="text-right">Other Service</Label>
-                      <Input id="other-service" value={otherService} onChange={e => setOtherService(e.target.value)} placeholder="Please specify" className="col-span-3" required/>
-                  </div>
+              {selectedCategory && (
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label className="text-right">Specific Service</Label>
+                    <div className="col-span-3">
+                        <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory} required>
+                            <SelectTrigger disabled={subServices.length === 0}>
+                                <SelectValue placeholder="Select a specific service" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {subServices?.map(s => (
+                                    <SelectItem key={s.id} value={s.id}>{s.name} - ₹{s.rate}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
               )}
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label className="text-right pt-2">
@@ -766,6 +791,15 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
 
 const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredTasks = useMemo(() => {
+        if (!searchQuery) return tasks;
+        return tasks.filter(task => 
+            task.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            task.service.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [tasks, searchQuery]);
     
     return (
       <Tabs defaultValue="tasks" className="w-full">
@@ -779,10 +813,21 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
             <TabsContent value="tasks" className="mt-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle>My Service Requests</CardTitle>
-                        <CardDescription>
-                        Track your ongoing and completed service requests.
-                        </CardDescription>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle>My Service Requests</CardTitle>
+                                <CardDescription>Track your ongoing and completed service requests.</CardDescription>
+                            </div>
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Search tasks by ID or service..." 
+                                    className="pl-8 w-64"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent>
                     <Table>
@@ -796,7 +841,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {tasks.map(task => (
+                        {filteredTasks.map(task => (
                             <TableRow key={task.id}>
                             <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
                             <TableCell>{task.service}</TableCell>
@@ -876,7 +921,17 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
 }
 
 const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+    const [searchQuery, setSearchQuery] = useState('');
     
+    const filteredTasks = useMemo(() => {
+        if (!searchQuery) return tasks;
+        return tasks.filter(task => 
+            task.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            task.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            task.customer.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [tasks, searchQuery]);
+
     return (
     <Tabs defaultValue="tasks" className="w-full">
         <div className="flex items-center">
@@ -912,8 +967,21 @@ const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onV
                 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Assigned Tasks</CardTitle>
-                        <CardDescription>Tasks assigned to you for fulfillment.</CardDescription>
+                        <div className="flex items-center justify-between">
+                            <div>
+                               <CardTitle>Assigned Tasks</CardTitle>
+                               <CardDescription>Tasks assigned to you for fulfillment.</CardDescription>
+                            </div>
+                             <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Search by ID, service, or customer..." 
+                                    className="pl-8 w-72"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -928,7 +996,7 @@ const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onV
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {tasks.map(task => (
+                            {filteredTasks.map(task => (
                             <TableRow key={task.id}>
                                 <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
                                 <TableCell>{task.service}</TableCell>
@@ -1060,6 +1128,50 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
     const feedback = allTasks.filter(t => t.feedback).map(t => ({...t.feedback, taskId: t.id, customer: t.customer, date: t.date, service: t.service}));
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
+    
+    // Search states
+    const [vleSearch, setVleSearch] = useState('');
+    const [customerSearch, setCustomerSearch] = useState('');
+    const [taskSearch, setTaskSearch] = useState('');
+    
+    const filteredVles = useMemo(() => {
+        if (!vleSearch) return vlesForManagement;
+        const query = vleSearch.toLowerCase();
+        return vlesForManagement.filter(vle => 
+            vle.name.toLowerCase().includes(query) ||
+            vle.location.toLowerCase().includes(query)
+        );
+    }, [vlesForManagement, vleSearch]);
+
+    const filteredCustomers = useMemo(() => {
+        if (!customerSearch) return allUsers;
+        const query = customerSearch.toLowerCase();
+        
+        const tasksByCustomer: {[key: string]: string[]} = {};
+        allTasks.forEach(task => {
+            if (!tasksByCustomer[task.creatorId]) {
+                tasksByCustomer[task.creatorId] = [];
+            }
+            tasksByCustomer[task.creatorId].push(task.id);
+        });
+
+        return allUsers.filter(user => 
+            user.name.toLowerCase().includes(query) ||
+            user.email.toLowerCase().includes(query) ||
+            user.mobile.includes(query) ||
+            (tasksByCustomer[user.id] || []).some(taskId => taskId.toLowerCase().includes(query))
+        );
+    }, [allUsers, allTasks, customerSearch]);
+
+    const filteredTasks = useMemo(() => {
+        if (!taskSearch) return allTasks;
+        const query = taskSearch.toLowerCase();
+        return allTasks.filter(task => 
+            task.id.toLowerCase().includes(query) ||
+            task.customer.toLowerCase().includes(query) ||
+            task.service.toLowerCase().includes(query)
+        );
+    }, [allTasks, taskSearch]);
 
 
     const StatCard = ({ title, value, icon: Icon, description }: {title: string, value: string, icon: React.ElementType, description: string}) => (
@@ -1161,8 +1273,21 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
             <TabsContent value="vle-management" className="mt-4">
                 <Card>
                 <CardHeader>
-                    <CardTitle>VLE Management</CardTitle>
-                    <CardDescription>Approve or manage VLE accounts and see their availability.</CardDescription>
+                    <div className="flex items-center justify-between">
+                        <div>
+                           <CardTitle>VLE Management</CardTitle>
+                           <CardDescription>Approve or manage VLE accounts and see their availability.</CardDescription>
+                        </div>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                                placeholder="Search VLE by name or location..." 
+                                className="pl-8 w-72"
+                                value={vleSearch}
+                                onChange={(e) => setVleSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -1177,7 +1302,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {vlesForManagement.map(vle => (
+                        {filteredVles.map(vle => (
                         <TableRow key={vle.id}>
                             <TableCell>{vle.name}</TableCell>
                             <TableCell>{vle.location}</TableCell>
@@ -1226,8 +1351,21 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
             <TabsContent value="customer-management" className="mt-4">
                 <Card>
                 <CardHeader>
-                    <CardTitle>Customer Management</CardTitle>
-                    <CardDescription>View all registered customers in the system.</CardDescription>
+                    <div className="flex items-center justify-between">
+                        <div>
+                           <CardTitle>Customer Management</CardTitle>
+                           <CardDescription>View all registered customers in the system.</CardDescription>
+                        </div>
+                        <div className="relative">
+                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input 
+                                placeholder="Search by name, email, mobile or Task ID..." 
+                                className="pl-8 w-80"
+                                value={customerSearch}
+                                onChange={(e) => setCustomerSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -1240,7 +1378,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {allUsers.map(user => (
+                        {filteredCustomers.map(user => (
                         <TableRow key={user.id}>
                             <TableCell>{user.name}</TableCell>
                             <TableCell>{user.email}</TableCell>
@@ -1257,8 +1395,21 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
             <TabsContent value="all-tasks" className="mt-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle>All Service Requests</CardTitle>
-                        <CardDescription>View and manage all tasks in the system.</CardDescription>
+                         <div className="flex items-center justify-between">
+                            <div>
+                               <CardTitle>All Service Requests</CardTitle>
+                               <CardDescription>View and manage all tasks in the system.</CardDescription>
+                            </div>
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Search by ID, customer, or service..." 
+                                    className="pl-8 w-80"
+                                    value={taskSearch}
+                                    onChange={(e) => setTaskSearch(e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -1274,7 +1425,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {allTasks.map(task => (
+                                {filteredTasks.map(task => (
                                     <TableRow key={task.id}>
                                         <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
                                         <TableCell>{task.customer}</TableCell>
@@ -1373,15 +1524,14 @@ export default function DashboardPage() {
     
     // This effect keeps the activeTab state in sync with the URL's search params.
     useEffect(() => {
-        const tab = searchParams.get('tab');
-        if (tab === 'profile') {
-            setActiveTab('profile');
-        } else {
-            // This ensures that navigating to /dashboard (with no tab) resets the view from the profile page.
+        const tabFromUrl = searchParams.get('tab');
+        if (tabFromUrl && tabFromUrl !== activeTab) {
+            setActiveTab(tabFromUrl);
+        } else if (!tabFromUrl && activeTab === 'profile') {
             const defaultTab = userProfile?.isAdmin ? 'overview' : 'tasks';
             setActiveTab(defaultTab);
         }
-    }, [searchParams, userProfile]);
+    }, [searchParams, userProfile, activeTab]);
 
 
     useEffect(() => {
@@ -1623,3 +1773,4 @@ export default function DashboardPage() {
 
     return renderContent();
 }
+
