@@ -1371,12 +1371,18 @@ export default function DashboardPage() {
     const [services, setServices] = useState<any[]>([]);
     const [realtimeProfile, setRealtimeProfile] = useState<any | null>(null);
     
+    // This effect keeps the activeTab state in sync with the URL's search params.
     useEffect(() => {
         const tab = searchParams.get('tab');
-        if (tab) {
-            setActiveTab(tab);
+        if (tab === 'profile') {
+            setActiveTab('profile');
+        } else {
+            // This ensures that navigating to /dashboard (with no tab) resets the view from the profile page.
+            const defaultTab = userProfile?.isAdmin ? 'overview' : 'tasks';
+            setActiveTab(defaultTab);
         }
-    }, [searchParams]);
+    }, [searchParams, userProfile]);
+
 
     useEffect(() => {
         if (!loading && !user) {
