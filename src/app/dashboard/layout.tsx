@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -294,16 +295,16 @@ export default function DashboardLayout({
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/dashboard?tab=profile">Settings</Link>
+                <Link href="/dashboard?tab=profile">Profile</Link>
               </DropdownMenuItem>
-              <Popover>
-                <PopoverTrigger asChild>
+              <Dialog>
+                <DialogTrigger asChild>
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>Support</DropdownMenuItem>
-                </PopoverTrigger>
-                <PopoverContent side="left" align="end" className="w-auto">
+                </DialogTrigger>
+                <DialogContent className="w-auto sm:max-w-xs">
                     <SupportContent />
-                </PopoverContent>
-              </Popover>
+                </DialogContent>
+              </Dialog>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />

@@ -772,7 +772,6 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
             <TabsList>
                 <TabsTrigger value="tasks">My Tasks</TabsTrigger>
                 <TabsTrigger value="complaints">My Complaints</TabsTrigger>
-                <TabsTrigger value="profile">Profile</TabsTrigger>
             </TabsList>
              <TaskCreatorDialog creatorId={userId} creatorProfile={userProfile} type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
           </div>
@@ -887,7 +886,6 @@ const VLEDashboard = ({ tasks, userId, userProfile, onTaskCreated, onVleAvailabi
         <div className="flex items-center">
             <TabsList>
                 <TabsTrigger value="tasks">Assigned Tasks</TabsTrigger>
-                <TabsTrigger value="profile">Profile</TabsTrigger>
             </TabsList>
             <div className="ml-auto flex items-center gap-2">
                 <TaskCreatorDialog type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={userId} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
@@ -1351,6 +1349,9 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                 </CardContent>
             </Card>
             </TabsContent>
+             <TabsContent value="profile" className="mt-4">
+                <ProfileView userType={realtimeProfile?.role === 'vle' ? 'VLE' : 'Customer'} userId={user.uid} profileData={realtimeProfile} />
+            </TabsContent>
         </Tabs>
     )
 };
@@ -1375,7 +1376,7 @@ export default function DashboardPage() {
         if (!user) return;
         
         const probableRole = userProfile?.role || 'customer';
-        const collectionName = probableRole === 'vle' ? 'vles' : 'users';
+        const collectionName = (userProfile?.isAdmin || probableRole === 'vle') ? 'vles' : 'users';
         const docRef = doc(db, collectionName, user.uid);
         
         const unsubscribe = onSnapshot(docRef, (doc) => {
@@ -1386,9 +1387,13 @@ export default function DashboardPage() {
                  const unsubVle = onSnapshot(vleDocRef, (vleDoc) => {
                      if (vleDoc.exists()) {
                          setRealtimeProfile({ id: vleDoc.id, ...vleDoc.data() });
+                     } else {
+                         console.error(`User ${user.uid} not found in users or vles collection.`);
                      }
                  });
                  return () => unsubVle();
+            } else {
+                console.error(`User ${user.uid} not found in ${collectionName} collection.`);
             }
         }, (error) => {
             console.error("Error listening to profile updates:", error);
@@ -1410,10 +1415,9 @@ export default function DashboardPage() {
         const primaryRole = realtimeProfile.isAdmin ? 'admin' : realtimeProfile.role;
 
         if (primaryRole === 'admin') {
-            const tasksQuery = query(collection(db, "tasks"));
+            const tasksQuery = query(collection(db, "tasks"), orderBy("date", "desc"));
             unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
                 const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                 setTasks(fetchedTasks);
             });
 
