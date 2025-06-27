@@ -4,11 +4,10 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { addService, updateService, deleteService } from './actions';
-import { handleSeedDatabase } from '@/app/actions';
+import { services as seedServices } from '@/lib/seed';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -20,6 +19,37 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Database } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
+
+// --- Client-side Service Functions ---
+
+async function addService(data: { name: string; rate: number; documents: string[] }) {
+    try {
+        await addDoc(collection(db, "services"), data);
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+async function updateService(id: string, data: { name: string; rate: number; documents: string[] }) {
+    try {
+        const serviceRef = doc(db, "services", id);
+        await updateDoc(serviceRef, data);
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+async function deleteService(id: string) {
+    try {
+        await deleteDoc(doc(db, "services", id));
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
 
 // --- Service Form Dialog ---
 const ServiceFormDialog = ({ service, onFinished }: { service?: any, onFinished: () => void }) => {
@@ -118,11 +148,10 @@ export default function ServiceManagementPage() {
 
     // Effect for fetching data only if user is an admin
     useEffect(() => {
-        if (authLoading || !userProfile?.isAdmin) {
-            // If auth is loading, or if profile is loaded but user is not admin, do nothing.
-            if (userProfile && !userProfile.isAdmin) {
-                setLoadingServices(false);
-            }
+        if (authLoading || !userProfile) return;
+        
+        if (!userProfile.isAdmin) {
+            setLoadingServices(false);
             return;
         }
 
@@ -140,17 +169,30 @@ export default function ServiceManagementPage() {
 
         return () => unsubscribe();
     }, [userProfile, authLoading, toast]);
-
+    
     const handleSeedClick = async () => {
         setLoadingServices(true);
         try {
-            await handleSeedDatabase();
-            toast({ title: "Database Seeded", description: "Common services have been added." });
+            const servicesCollectionRef = collection(db, 'services');
+            const existingServicesSnapshot = await getDocs(query(servicesCollectionRef));
+    
+            if (existingServicesSnapshot.empty) {
+                const servicePromises = seedServices.map(service => {
+                    return addDoc(servicesCollectionRef, service);
+                });
+                await Promise.all(servicePromises);
+                toast({ title: "Database Seeded", description: "Common services have been added." });
+            } else {
+                toast({ title: "Database Not Empty", description: "Services already exist. Seeding skipped." });
+                setLoadingServices(false); // Manually set loading to false if skipping
+            }
         } catch (error) {
-            toast({ title: "Error", description: "Could not seed the database.", variant: "destructive" });
+            console.error("Error seeding database:", error);
+            toast({ title: "Error", description: "Could not seed the database. Check console for details.", variant: "destructive" });
             setLoadingServices(false);
         }
     };
+
 
     const handleEdit = (service: any) => {
         setSelectedService(service);
