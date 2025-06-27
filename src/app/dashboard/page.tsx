@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion } from 'firebase/firestore';
 import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, EyeIcon, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -879,9 +879,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
     );
 }
 
-const VLEDashboard = ({ tasks, vles, userId, userProfile, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], vles: any[], userId: string, userProfile: any, onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
-    const currentVle = vles.find(v => v.id === userId);
-    
+const VLEDashboard = ({ tasks, userId, userProfile, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
     return (
     <div>
         <Tabs defaultValue="tasks" className="w-full">
@@ -900,12 +898,12 @@ const VLEDashboard = ({ tasks, vles, userId, userProfile, onTaskCreated, onVleAv
                             <ToggleRight className="h-4 w-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
-                                {currentVle && currentVle.status === 'Approved' ? (
+                                {userProfile && userProfile.status === 'Approved' ? (
                                     <div className="flex items-center space-x-2 pt-2">
                                         <Switch 
                                             id="availability-mode" 
-                                            checked={currentVle.available} 
-                                            onCheckedChange={(checked) => onVleAvailabilityChange(currentVle.id, checked)}
+                                            checked={userProfile.available} 
+                                            onCheckedChange={(checked) => onVleAvailabilityChange(userId, checked)}
                                         />
                                         <Label htmlFor="availability-mode">Available for Tasks</Label>
                                     </div>
@@ -1296,6 +1294,7 @@ export default function DashboardPage() {
     const [tasks, setTasks] = useState<any[]>([]);
     const [vles, setVles] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [realtimeProfile, setRealtimeProfile] = useState<any | null>(userProfile);
     
     useEffect(() => {
         if (!loading && !user) {
@@ -1303,33 +1302,71 @@ export default function DashboardPage() {
         }
     }, [user, loading, router]);
 
-
+    // Set up a real-time listener for the user's own profile for live updates (e.g., availability)
     useEffect(() => {
-        const q = query(collection(db, "tasks"), orderBy("date", "desc"));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const tasksData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setTasks(tasksData);
-        });
-        return () => unsubscribe();
-    }, []);
+        if (!user || !userProfile) return;
 
-    useEffect(() => {
-        const q = query(collection(db, "vles"));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const vlesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setVles(vlesData);
+        const collectionName = userProfile.role === 'vle' ? 'vles' : 'users';
+        const docRef = doc(db, collectionName, user.uid);
+        
+        const unsubscribe = onSnapshot(docRef, (doc) => {
+            if (doc.exists()) {
+                setRealtimeProfile({ id: doc.id, ...doc.data() });
+            }
+        }, (error) => {
+            console.error("Error listening to profile updates:", error);
         });
-        return () => unsubscribe();
-    }, []);
 
-    useEffect(() => {
-        const q = query(collection(db, "users"));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const usersData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setAllUsers(usersData);
-        });
         return () => unsubscribe();
-    }, []);
+    }, [user, userProfile]);
+
+    // Fetch data based on user role
+    useEffect(() => {
+        if (!user || !realtimeProfile) {
+            return;
+        }
+
+        let unsubscribeTasks: () => void = () => {};
+        let unsubscribeVles: () => void = () => {};
+        let unsubscribeUsers: () => void = () => {};
+
+        const primaryRole = realtimeProfile.isAdmin ? 'admin' : realtimeProfile.role;
+
+        if (primaryRole === 'admin') {
+            const tasksQuery = query(collection(db, "tasks"), orderBy("date", "desc"));
+            unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
+                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+
+            const vlesQuery = query(collection(db, "vles"));
+            unsubscribeVles = onSnapshot(vlesQuery, (snapshot) => {
+                setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+
+            const usersQuery = query(collection(db, "users"));
+            unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
+                setAllUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+
+        } else if (primaryRole === 'vle') {
+            const tasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid), orderBy("date", "desc"));
+            unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
+                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        } else { // Customer
+            const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
+            unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
+                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+        }
+        
+        return () => {
+            unsubscribeTasks();
+            unsubscribeVles();
+            unsubscribeUsers();
+        };
+    }, [user, realtimeProfile]);
+
 
     const handleCreateTask = async (newTask: any) => {
         const docRef = await addDoc(collection(db, "tasks"), newTask);
@@ -1394,7 +1431,7 @@ export default function DashboardPage() {
         const taskRef = doc(db, "tasks", taskId);
         const historyEntry = {
             timestamp: new Date().toISOString(),
-            actorName: userProfile?.name || 'Admin',
+            actorName: realtimeProfile?.name || 'Admin',
             actorRole: 'Admin',
             action: 'Task Assigned',
             details: `Task assigned to VLE: ${vleName}.`
@@ -1413,7 +1450,7 @@ export default function DashboardPage() {
         );
     }
     
-    if (loading || !user || !userProfile) {
+    if (loading || !user || !realtimeProfile) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -1421,19 +1458,15 @@ export default function DashboardPage() {
         )
     }
 
-    // Filter data for different views
-    const customerTasks = tasks.filter(t => t.creatorId === user.uid);
-    const vleTasks = tasks.filter(t => t.assignedVleId === user.uid);
-
-    const primaryRole = userProfile.isAdmin ? 'admin' : userProfile.role;
+    const primaryRole = realtimeProfile.isAdmin ? 'admin' : realtimeProfile.role;
 
     if (primaryRole === 'admin') {
       return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} loggedInAdminId={user.uid} />;
     }
 
     if (primaryRole === 'vle') {
-      return <VLEDashboard tasks={vleTasks} vles={vles} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
+      return <VLEDashboard tasks={tasks} userId={user.uid} userProfile={realtimeProfile} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
     }
 
-    return <CustomerDashboard tasks={customerTasks} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
+    return <CustomerDashboard tasks={tasks} userId={user.uid} userProfile={realtimeProfile} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
 }
