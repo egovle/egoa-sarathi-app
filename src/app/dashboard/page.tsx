@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction } from 'firebase/firestore';
 import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
@@ -655,7 +655,7 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="text-3xl font-bold">₹{userProfile.walletBalance || 0}</div>
+                <div className="text-3xl font-bold">₹{userProfile.walletBalance?.toFixed(2) || '0.00'}</div>
                 <p className="text-xs text-muted-foreground">Available balance</p>
             </CardContent>
         </Card>
@@ -763,9 +763,11 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
 
 const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, onTaskCreated: (task: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
+    const searchParams = useSearchParams();
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'tasks');
     
     return (
-      <Tabs defaultValue="tasks">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className='flex items-center justify-between'>
             <TabsList>
                 <TabsTrigger value="tasks">My Tasks</TabsTrigger>
@@ -806,15 +808,15 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
                                         <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
+                                        <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center w-full"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
                                         {task.status !== 'Completed' && !task.complaint && (
                                             <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={
-                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center"><ShieldAlert className="mr-2 h-4 w-4"/>Raise Complaint</DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><ShieldAlert className="mr-2 h-4 w-4"/>Raise Complaint</DropdownMenuItem>
                                             } />
                                         )}
                                         {task.status === 'Completed' && !task.feedback && (
                                              <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={
-                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center"><StarIcon className="mr-2 h-4 w-4"/>Give Feedback</DropdownMenuItem>
+                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><StarIcon className="mr-2 h-4 w-4"/>Give Feedback</DropdownMenuItem>
                                             } />
                                         )}
                                     </DropdownMenuContent>
@@ -877,8 +879,11 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
 }
 
 const VLEDashboard = ({ tasks, userId, userProfile, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+    const searchParams = useSearchParams();
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'tasks');
+
     return (
-    <Tabs defaultValue="tasks" className="w-full">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="flex items-center">
             <TabsList>
                 <TabsTrigger value="tasks">Assigned Tasks</TabsTrigger>
@@ -1002,12 +1007,69 @@ const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger
     )
 }
 
-const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleApprove, onVleAssign, loggedInAdminId }: { allTasks: any[], vles: any[], allUsers: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void, loggedInAdminId: string }) => {
+const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.ReactNode, vleName: string, onAddBalance: (amount: number) => void }) => {
+    const { toast } = useToast();
+    const [open, setOpen] = useState(false);
+    const [amount, setAmount] = useState('');
+
+    const handleSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        const amountToAdd = parseFloat(amount);
+        if (isNaN(amountToAdd) || amountToAdd <= 0) {
+            toast({ title: 'Invalid Amount', description: 'Please enter a valid positive number.', variant: 'destructive' });
+            return;
+        }
+        onAddBalance(amountToAdd);
+        toast({ title: 'Balance Added', description: `₹${amountToAdd.toFixed(2)} has been added to ${vleName}'s wallet.` });
+        setOpen(false);
+    };
+
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            setAmount('');
+        }
+        setOpen(isOpen);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>{trigger}</DialogTrigger>
+            <DialogContent>
+                <form onSubmit={handleSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>Add Balance to {vleName}'s Wallet</DialogTitle>
+                        <DialogDescription>Enter the amount you wish to add. This will be added to the VLE's current balance.</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 grid gap-4">
+                        <Label htmlFor="amount">Amount to Add (₹)</Label>
+                        <Input
+                            id="amount"
+                            type="number"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            placeholder="e.g., 500"
+                            required
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit">Add Balance</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
+const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance }: { allTasks: any[], vles: any[], allUsers: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void, onUpdateVleBalance: (vleId: string, amount: number) => void }) => {
     const vlesForManagement = vles.filter(v => !v.isAdmin);
     const availableVles = vlesForManagement.filter(v => v.status === 'Approved' && v.available);
     const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
     const feedback = allTasks.filter(t => t.feedback).map(t => ({...t.feedback, taskId: t.id, customer: t.customer, date: t.date, service: t.service}));
+    const searchParams = useSearchParams();
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
+
 
     const StatCard = ({ title, value, icon: Icon, description }: {title: string, value: string, icon: React.ElementType, description: string}) => (
         <Card>
@@ -1023,7 +1085,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
     );
 
     return (
-        <Tabs defaultValue="overview" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="vle-management">VLEs</TabsTrigger>
@@ -1117,6 +1179,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                         <TableRow>
                             <TableHead>Name</TableHead>
                             <TableHead>Location</TableHead>
+                             <TableHead>Balance</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Availability</TableHead>
                             <TableHead className="text-right">Action</TableHead>
@@ -1127,6 +1190,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                         <TableRow key={vle.id}>
                             <TableCell>{vle.name}</TableCell>
                             <TableCell>{vle.location}</TableCell>
+                            <TableCell>₹{vle.walletBalance?.toFixed(2) || '0.00'}</TableCell>
                             <TableCell><Badge variant={vle.status === 'Approved' ? 'default' : 'secondary'}>{vle.status}</Badge></TableCell>
                             <TableCell>
                                 {vle.status === 'Approved' ? (
@@ -1134,11 +1198,21 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                 ) : 'N/A'}
                             </TableCell>
                             <TableCell className="text-right">
-                                {vle.status === 'Pending' && 
-                                <Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}>
-                                    <UserPlus className="mr-2 h-4 w-4" /> Approve
-                                </Button>
-                                }
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        {vle.status === 'Pending' && <DropdownMenuItem onClick={() => onVleApprove(vle.id)}><UserPlus className="mr-2 h-4 w-4" />Approve VLE</DropdownMenuItem>}
+                                        {vle.status === 'Approved' && (
+                                            <AddBalanceDialog 
+                                                trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Wallet className="mr-2 h-4 w-4"/>Add Balance</DropdownMenuItem>}
+                                                vleName={vle.name}
+                                                onAddBalance={(amount) => onUpdateVleBalance(vle.id, amount)}
+                                            />
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </TableCell>
                         </TableRow>
                         ))}
@@ -1213,10 +1287,10 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
+                                                    <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center w-full"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
                                                     {task.status === 'Unassigned' && (
                                                         <AssignVleDialog 
-                                                            trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center"><GitFork className="mr-2 h-4 w-4"/>Assign VLE</DropdownMenuItem>}
+                                                            trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><GitFork className="mr-2 h-4 w-4"/>Assign VLE</DropdownMenuItem>}
                                                             taskId={task.id}
                                                             availableVles={availableVles}
                                                             onAssign={onVleAssign}
@@ -1336,9 +1410,11 @@ export default function DashboardPage() {
         const primaryRole = realtimeProfile.isAdmin ? 'admin' : realtimeProfile.role;
 
         if (primaryRole === 'admin') {
-            const tasksQuery = query(collection(db, "tasks"), orderBy("date", "desc"));
+            const tasksQuery = query(collection(db, "tasks"));
             unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
-                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setTasks(fetchedTasks);
             });
 
             const vlesQuery = query(collection(db, "vles"));
@@ -1457,6 +1533,30 @@ export default function DashboardPage() {
         );
     }
     
+    const handleUpdateVleBalance = async (vleId: string, amountToAdd: number) => {
+        const vleRef = doc(db, "vles", vleId);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const vleDoc = await transaction.get(vleRef);
+                if (!vleDoc.exists()) {
+                    throw "Document does not exist!";
+                }
+                const currentBalance = vleDoc.data().walletBalance || 0;
+                const newBalance = currentBalance + amountToAdd;
+                transaction.update(vleRef, { walletBalance: newBalance });
+            });
+
+            await createNotification(
+                vleId,
+                'Wallet Balance Updated',
+                `An admin has added ₹${amountToAdd.toFixed(2)} to your wallet.`
+            );
+        } catch (e) {
+            console.error("Transaction failed: ", e);
+            toast({ title: "Error", description: "Failed to update balance.", variant: "destructive" });
+        }
+    };
+    
     if (loading || !user || !realtimeProfile) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
@@ -1468,7 +1568,7 @@ export default function DashboardPage() {
     const primaryRole = realtimeProfile.isAdmin ? 'admin' : realtimeProfile.role;
 
     if (primaryRole === 'admin') {
-      return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} loggedInAdminId={user.uid} />;
+      return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} />;
     }
 
     if (primaryRole === 'vle') {
