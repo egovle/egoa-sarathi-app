@@ -20,10 +20,12 @@ import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Database, Search } fr
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
 // --- Client-side Service Functions ---
 
-async function addService(data: { name: string; rate: number; documents: string[], parentId: string | null }) {
+async function addService(data: { name: string; rate: number; documents: string[], parentId: string | null, isVariable: boolean }) {
     try {
         await addDoc(collection(db, "services"), data);
         return { success: true };
@@ -32,7 +34,7 @@ async function addService(data: { name: string; rate: number; documents: string[
     }
 }
 
-async function updateService(id: string, data: { name: string; rate: number; documents: string[], parentId: string | null }) {
+async function updateService(id: string, data: { name: string; rate: number; documents: string[], parentId: string | null, isVariable: boolean }) {
     try {
         const serviceRef = doc(db, "services", id);
         await updateDoc(serviceRef, data);
@@ -59,6 +61,7 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
     const [rate, setRate] = useState(service?.rate || '');
     const [documents, setDocuments] = useState(service?.documents?.join(', ') || '');
     const [parentId, setParentId] = useState(service?.parentId || 'none');
+    const [isVariable, setIsVariable] = useState(service?.isVariable || false);
     const [loading, setLoading] = useState(false);
     
     const isSubCategory = parentId !== 'none';
@@ -71,7 +74,8 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
             name,
             rate: parseFloat(rate) || 0,
             documents: documents.split(',').map(d => d.trim()).filter(d => d),
-            parentId: parentId === 'none' ? null : parentId
+            parentId: parentId === 'none' ? null : parentId,
+            isVariable: isVariable
         };
 
         const result = service
@@ -103,7 +107,7 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
                 </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
+                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="parent" className="text-right">Category</Label>
                     <div className="col-span-3">
                         <Select value={parentId} onValueChange={setParentId}>
@@ -125,8 +129,17 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="rate" className="text-right">Rate (₹)</Label>
-                    <Input id="rate" type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="e.g., 150 (0 for main category)" required className="col-span-3"/>
+                    <Input id="rate" type="text" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="e.g., 150 or 1000-2000" required className="col-span-3"/>
                 </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label className="text-right">Variable Rate</Label>
+                    <div className="col-span-3 flex items-center">
+                       <Switch id="isVariable" checked={isVariable} onCheckedChange={setIsVariable} />
+                        <Label htmlFor="isVariable" className="ml-2 text-sm text-muted-foreground">
+                            {isVariable ? 'Yes, price is determined by admin' : 'No, price is fixed'}
+                        </Label>
+                    </div>
+                 </div>
                  <div className="grid grid-cols-4 items-start gap-4">
                     <Label htmlFor="documents" className="text-right pt-2">Required Documents</Label>
                     <div className="col-span-3">
@@ -353,6 +366,7 @@ export default function ServiceManagementPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-[50px]">Sr.</TableHead>
                                 <TableHead>Service Name</TableHead>
                                 <TableHead>Rate</TableHead>
                                 <TableHead>Required Documents</TableHead>
@@ -362,18 +376,22 @@ export default function ServiceManagementPage() {
                         <TableBody>
                             {loadingServices ? (
                                 <TableRow>
-                                    <TableCell colSpan={4} className="h-24 text-center">
+                                    <TableCell colSpan={5} className="h-24 text-center">
                                         <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </TableCell>
                                 </TableRow>
                             ) : filteredServices.length > 0 ? (
-                                filteredServices.map((service) => (
+                                filteredServices.map((service, index) => (
                                     <TableRow key={service.id} className={!service.parentId ? 'bg-muted/50' : ''}>
-                                        <TableCell className={`font-medium ${service.parentId ? 'pl-8' : ''}`}>
+                                        <TableCell>{!service.parentId ? `${parentServices.findIndex(p => p.id === service.id) + 1}.` : ''}</TableCell>
+                                        <TableCell className={cn("font-medium", service.parentId && 'pl-8')}>
                                             {service.name}
                                         </TableCell>
                                         <TableCell>
-                                            {service.rate > 0 ? `₹${service.rate}` : <span className="text-muted-foreground">-</span>}
+                                            {service.isVariable ? 
+                                                <Badge variant="outline">Variable</Badge> : 
+                                                (service.rate > 0 ? `₹${service.rate}` : <span className="text-muted-foreground">-</span>)
+                                            }
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex flex-wrap gap-1 max-w-sm">
@@ -397,7 +415,7 @@ export default function ServiceManagementPage() {
                                 ))
                             ) : (
                                 <TableRow>
-                                    <TableCell colSpan={4}>
+                                    <TableCell colSpan={5}>
                                         <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50 my-4">
                                             <h3 className="text-lg font-semibold">No Services Found</h3>
                                             <p className="text-muted-foreground mt-2 mb-4 max-w-md">

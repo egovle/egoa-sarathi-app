@@ -3,7 +3,7 @@
 
 import { useEffect, useState, type FormEvent, useRef, type ChangeEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, updateDoc, arrayUnion, addDoc, collection } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, addDoc, collection, runTransaction, query, where, limit, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -15,10 +15,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, FileText, History, MessageSquarePlus, CheckCircle, Send, UploadCloud, Camera, FileUp } from 'lucide-react';
+import { ArrowLeft, Loader2, FileText, History, MessageSquarePlus, CheckCircle, Send, UploadCloud, Camera, FileUp, PenSquare, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // --- NOTIFICATION HELPER ---
 async function createNotification(userId: string, title: string, description: string, link?: string) {
@@ -34,7 +35,86 @@ async function createNotification(userId: string, title: string, description: st
 }
 
 
-// Dialog for VLE to request more info
+// --- TASK DETAIL PAGE DIALOGS ---
+
+const SetPriceDialog = ({ taskId, customerId, onPriceSet }: { taskId: string, customerId: string, onPriceSet: () => void }) => {
+    const [open, setOpen] = useState(false);
+    const [price, setPrice] = useState('');
+    const { toast } = useToast();
+    const { userProfile } = useAuth();
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        const finalRate = parseFloat(price);
+        if (isNaN(finalRate) || finalRate <= 0) {
+            toast({ title: "Invalid Price", description: "Please enter a valid positive number.", variant: "destructive" });
+            return;
+        }
+
+        const taskRef = doc(db, "tasks", taskId);
+        const historyEntry = {
+            timestamp: new Date().toISOString(),
+            actorName: userProfile.name,
+            actorRole: 'Admin',
+            action: 'Final Price Set',
+            details: `Final price set to ₹${finalRate.toFixed(2)}.`,
+        };
+
+        try {
+            await updateDoc(taskRef, {
+                status: 'Awaiting Payment',
+                finalRate: finalRate,
+                history: arrayUnion(historyEntry)
+            });
+            await createNotification(
+                customerId,
+                'Final Price Set for Your Task',
+                `The final price for task ${taskId.slice(-6).toUpperCase()} is ₹${finalRate.toFixed(2)}. Please complete the payment.`,
+                `/dashboard/task/${taskId}`
+            );
+            toast({ title: 'Price Set Successfully', description: 'The customer has been notified.' });
+            onPriceSet();
+            setPrice('');
+            setOpen(false);
+        } catch (error) {
+            console.error("Error setting price:", error);
+            toast({ title: "Error", description: "Failed to set price.", variant: "destructive" });
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button><PenSquare className="mr-2 h-4 w-4" />Set Final Price</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <form onSubmit={handleSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>Set Final Price</DialogTitle>
+                        <DialogDescription>
+                            Enter the final calculated price for this service. The customer will be notified to make the payment.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Label htmlFor="final-price">Final Price (₹)</Label>
+                        <Input
+                            id="final-price"
+                            type="number"
+                            value={price}
+                            onChange={(e) => setPrice(e.target.value)}
+                            placeholder="e.g., 2500"
+                            required
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit">Notify Customer</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 const RequestInfoDialog = ({ taskId, vleName, customerId }: { taskId:string, vleName: string, customerId: string }) => {
     const [open, setOpen] = useState(false);
     const [message, setMessage] = useState('');
@@ -109,7 +189,6 @@ const RequestInfoDialog = ({ taskId, vleName, customerId }: { taskId:string, vle
     );
 };
 
-// Dialog for VLE to complete a task
 const CompleteTaskDialog = ({ taskId, vleName, customerId }: { taskId: string, vleName: string, customerId: string }) => {
     const [open, setOpen] = useState(false);
     const [ackNumber, setAckNumber] = useState('');
@@ -193,6 +272,7 @@ export default function TaskDetailPage() {
 
     const [task, setTask] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isPaying, setIsPaying] = useState(false);
 
     // State for customer uploads
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -328,6 +408,60 @@ export default function TaskDetailPage() {
             setIsCertUploading(false);
         }
     };
+    
+    const handlePayment = async () => {
+        setIsPaying(true);
+
+        const adminQuery = query(collection(db, 'vles'), where('isAdmin', '==', true), limit(1));
+        const adminSnapshot = await getDocs(adminQuery);
+        if (adminSnapshot.empty) {
+            toast({ title: 'Error', description: 'Could not find an admin account to process payment.', variant: 'destructive' });
+            setIsPaying(false);
+            return;
+        }
+        const adminUser = { id: adminSnapshot.docs[0].id, ...adminSnapshot.docs[0].data() };
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                const customerRef = doc(db, userProfile.role === 'vle' ? 'vles' : 'users', user!.uid);
+                const adminRef = doc(db, 'vles', adminUser.id);
+                const taskRef = doc(db, 'tasks', taskId as string);
+
+                const [customerDoc, adminDoc] = await Promise.all([transaction.get(customerRef), transaction.get(adminRef)]);
+
+                if (!customerDoc.exists() || !adminDoc.exists()) throw new Error("User or admin not found.");
+
+                const customerBalance = customerDoc.data().walletBalance || 0;
+                if (customerBalance < task.finalRate) throw new Error("Insufficient wallet balance.");
+
+                const newCustomerBalance = customerBalance - task.finalRate;
+                const newAdminBalance = (adminDoc.data().walletBalance || 0) + task.finalRate;
+
+                transaction.update(customerRef, { walletBalance: newCustomerBalance });
+                transaction.update(adminRef, { walletBalance: newAdminBalance });
+
+                const historyEntry = {
+                    timestamp: new Date().toISOString(),
+                    actorName: userProfile.name,
+                    actorRole: userProfile.role,
+                    action: 'Payment Completed',
+                    details: `Paid ₹${task.finalRate.toFixed(2)}.`,
+                };
+                transaction.update(taskRef, {
+                    status: 'Unassigned',
+                    history: arrayUnion(historyEntry)
+                });
+            });
+
+            toast({ title: 'Payment Successful!', description: `₹${task.finalRate.toFixed(2)} has been deducted from your wallet.` });
+
+        } catch (error: any) {
+            console.error("Payment transaction failed: ", error);
+            toast({ title: 'Payment Failed', description: error.message || "An unknown error occurred.", variant: 'destructive' });
+        } finally {
+            setIsPaying(false);
+        }
+    };
 
     if (authLoading || loading) {
         return (
@@ -361,6 +495,9 @@ export default function TaskDetailPage() {
     }
 
     const canVleTakeAction = isAssignedVle && (task.status === 'Assigned');
+    const canAdminSetPrice = isAdmin && task.status === 'Pending Price Approval';
+    const canCustomerPay = isTaskCreator && task.status === 'Awaiting Payment';
+
 
     return (
         <div className="w-full space-y-6">
@@ -378,11 +515,27 @@ export default function TaskDetailPage() {
                             <div><Label>Status</Label><p><Badge variant="outline">{task.status}</Badge></p></div>
                             <div><Label>Customer</Label><p>{task.customer}</p></div>
                             <div><Label>Assigned VLE</Label><p>{task.assignedVleName || 'N/A'}</p></div>
+                             {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.finalRate?.toFixed(2) || task.rate?.toFixed(2)}</p></div>}
                             {task.acknowledgementNumber && (
                                 <div className="sm:col-span-2"><Label>Acknowledgement #</Label><p>{task.acknowledgementNumber}</p></div>
                             )}
                         </CardContent>
                     </Card>
+
+                    {canCustomerPay && (
+                        <Card className="border-primary bg-primary/5">
+                            <CardHeader>
+                                <CardTitle>Action Required: Complete Payment</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="mb-4">The final price for this service has been set to <strong>₹{task.finalRate.toFixed(2)}</strong>. Please approve and pay to proceed.</p>
+                                 <Button onClick={handlePayment} disabled={isPaying}>
+                                    {isPaying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wallet className="mr-2 h-4 w-4" />}
+                                    Approve & Pay ₹{task.finalRate.toFixed(2)}
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {task.finalCertificate && (
                          <Card>
@@ -422,9 +575,12 @@ export default function TaskDetailPage() {
                 <div className="space-y-6">
                      <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2">VLE Actions</CardTitle>
+                            <CardTitle className="flex items-center gap-2">Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                           {canAdminSetPrice && (
+                                <SetPriceDialog taskId={task.id} customerId={task.creatorId} onPriceSet={() => {}} />
+                           )}
                            {canVleTakeAction ? (
                                 <div className='flex flex-col gap-2'>
                                     <RequestInfoDialog taskId={task.id} vleName={userProfile.name} customerId={task.creatorId} />
@@ -437,11 +593,11 @@ export default function TaskDetailPage() {
                            )}
                            {isAssignedVle && task.status === 'Completed' && (
                                 <Card className="bg-muted/50">
-                                    <CardHeader>
+                                    <CardHeader className="p-4">
                                         <CardTitle className="text-base">Upload Final Certificate</CardTitle>
-                                        <CardDescription>Upload the final document for the customer.</CardDescription>
+                                        <CardDescription className="text-xs">Upload the final document for the customer.</CardDescription>
                                     </CardHeader>
-                                    <CardContent>
+                                    <CardContent className="p-4 pt-0">
                                         <div className="flex gap-2">
                                             <Button type="button" onClick={() => vleFileInputRef.current?.click()} size="sm" variant="secondary">
                                                 <FileUp className="mr-2 h-4 w-4"/> Choose File
@@ -455,7 +611,7 @@ export default function TaskDetailPage() {
                                             </div>
                                         )}
                                     </CardContent>
-                                    <CardFooter>
+                                    <CardFooter className="p-4 pt-0">
                                         <Button onClick={handleCertificateUpload} disabled={isCertUploading || !selectedCertificate}>
                                             {isCertUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
                                             Upload Certificate
@@ -480,7 +636,6 @@ export default function TaskDetailPage() {
                                     <Button type="button" onClick={() => customerFileInputRef.current?.click()} variant="secondary" className="bg-primary/20 text-primary hover:bg-primary/30">
                                         <FileUp className="mr-2 h-4 w-4"/> Choose Files
                                     </Button>
-                                    {/* <Button type="button" variant="outline" disabled><Camera className="mr-2 h-4 w-4" /> Use Camera</Button> */}
                                 </div>
                                 <Input id="customer-documents" type="file" multiple onChange={handleCustomerFileChange} ref={customerFileInputRef} className="hidden" />
                                 {selectedFiles.length > 0 && (
@@ -521,5 +676,3 @@ export default function TaskDetailPage() {
         </div>
     );
 }
-
-    

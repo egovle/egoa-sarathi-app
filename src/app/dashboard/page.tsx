@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction, limit } from 'firebase/firestore';
 import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -380,7 +380,7 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
     );
 };
 
-const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any) => void, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
+const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any, service: any) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
@@ -388,6 +388,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const parentServices = useMemo(() => services.filter(s => !s.parentId), [services]);
   const subServices = useMemo(() => {
@@ -401,12 +402,15 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
   const handleCreateTask = async (e: FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+
     if(selectedFiles.length === 0) {
         toast({
             title: 'Document Required',
             description: 'Please upload at least one document.',
             variant: 'destructive'
         });
+        setIsSubmitting(false);
         return;
     }
     const form = e.target as HTMLFormElement;
@@ -414,16 +418,18 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
     if (!finalService) {
         toast({ title: 'Service Required', description: 'Please select a valid service.', variant: 'destructive'});
+        setIsSubmitting(false);
         return;
     }
 
-    const newTask = {
+    const newTaskData = {
         customer: form.name.value,
         customerAddress: form.address.value,
         customerMobile: form.mobile.value,
         customerEmail: form.email.value,
         service: finalService.name,
-        status: 'Unassigned',
+        serviceId: finalService.id,
+        // Status and rate will be handled by the parent component
         date: new Date().toISOString(),
         history: [{
             timestamp: new Date().toISOString(),
@@ -442,13 +448,15 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         creatorId: creatorId,
     };
 
-    await onTaskCreated(newTask);
-    
-    toast({
-      title: 'Task Created!',
-      description: `Your new service request has been submitted.`,
-    });
-    setDialogOpen(false);
+    try {
+        await onTaskCreated(newTaskData, finalService);
+        setDialogOpen(false); // Close dialog on success
+    } catch (error) {
+        // Error toast is handled by the caller
+        console.error(error);
+    } finally {
+        setIsSubmitting(false);
+    }
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -468,6 +476,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
           setSelectedSubCategory('');
           setSelectedFiles([]);
           setIsCameraOpen(false);
+          setIsSubmitting(false);
       }
   }
 
@@ -523,7 +532,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                             </SelectTrigger>
                             <SelectContent>
                                 {subServices?.map(s => (
-                                    <SelectItem key={s.id} value={s.id}>{s.name} - ₹{s.rate}</SelectItem>
+                                    <SelectItem key={s.id} value={s.id}>{s.name} - {s.isVariable ? `From ₹${s.rate}` : `₹${s.rate}`}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -554,7 +563,10 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
               </div>
             </div>
             <DialogFooter>
-              <Button type="submit">Create Task</Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Create Task
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -789,7 +801,7 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
 )};
 
 
-const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -920,7 +932,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
     );
 }
 
-const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
     const [searchQuery, setSearchQuery] = useState('');
     
     const filteredTasks = useMemo(() => {
@@ -1124,6 +1136,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
     const vlesForManagement = vles.filter(v => !v.isAdmin);
     const availableVles = vlesForManagement.filter(v => v.status === 'Approved' && v.available);
     const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
+    const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
     const feedback = allTasks.filter(t => t.feedback).map(t => ({...t.feedback, taskId: t.id, customer: t.customer, date: t.date, service: t.service}));
     const searchParams = useSearchParams();
@@ -1198,11 +1211,12 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
             </TabsList>
 
             <TabsContent value="overview" className="mt-4 space-y-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <StatCard title="Total Tasks" value={allTasks.length.toString()} icon={Briefcase} description="All tasks in the system" />
                     <StatCard title="Total VLEs" value={vlesForManagement.length.toString()} icon={Users} description="Registered VLEs" />
                     <StatCard title="Total Customers" value={allUsers.length.toString()} icon={Users2} description="Registered customers" />
                     <StatCard title="Open Complaints" value={complaints.filter(c => c.status === 'Open').length.toString()} icon={AlertTriangle} description="Awaiting admin response" />
+                    <StatCard title="Pending Pricing" value={pricingTasks.length.toString()} icon={Wallet} description="Tasks needing price approval" />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                     <Card>
@@ -1238,33 +1252,39 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                             )}
                         </CardContent>
                     </Card>
-                    <Card>
-                         <CardHeader>
-                            <CardTitle>Customer Feedback</CardTitle>
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Tasks Pending Price Approval</CardTitle>
                         </CardHeader>
                         <CardContent>
-                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Customer</TableHead>
-                                        <TableHead className="text-center">Rating</TableHead>
-                                        <TableHead>Comment</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {feedback.length > 0 ? feedback.slice(0, 5).map(fb => (
-                                        <TableRow key={fb.date}>
-                                            <TableCell>{fb.customer}</TableCell>
-                                            <TableCell><StarRating rating={fb.rating} readOnly={true} /></TableCell>
-                                            <TableCell className='truncate max-w-xs'>{fb.comment}</TableCell>
-                                        </TableRow>
-                                    )) : (
+                            {pricingTasks.length > 0 ? (
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={3} className="h-24 text-center">No feedback yet.</TableCell>
+                                            <TableHead>Task ID</TableHead>
+                                            <TableHead>Customer</TableHead>
+                                            <TableHead>Service</TableHead>
+                                            <TableHead className="text-right">Action</TableHead>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {pricingTasks.map(task => (
+                                            <TableRow key={task.id}>
+                                                <TableCell>{task.id.slice(-6).toUpperCase()}</TableCell>
+                                                <TableCell>{task.customer}</TableCell>
+                                                <TableCell>{task.service}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button asChild variant="outline" size="sm">
+                                                        <Link href={`/dashboard/task/${task.id}`}><PenSquare className="mr-2 h-4 w-4" />Set Price</Link>
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No tasks are currently pending pricing.</p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -1514,7 +1534,7 @@ export default function DashboardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     
-    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || (userProfile?.isAdmin ? 'overview' : 'tasks'));
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'tasks');
 
     const [tasks, setTasks] = useState<any[]>([]);
     const [vles, setVles] = useState<any[]>([]);
@@ -1525,10 +1545,13 @@ export default function DashboardPage() {
     // This effect keeps the activeTab state in sync with the URL's search params.
     useEffect(() => {
         const tabFromUrl = searchParams.get('tab');
+        const defaultTab = userProfile?.isAdmin ? 'overview' : (userProfile?.role === 'vle' ? 'tasks' : 'tasks');
+
         if (tabFromUrl && tabFromUrl !== activeTab) {
             setActiveTab(tabFromUrl);
-        } else if (!tabFromUrl && activeTab === 'profile') {
-            const defaultTab = userProfile?.isAdmin ? 'overview' : 'tasks';
+        } else if (!tabFromUrl) {
+            // If there's no tab in URL, reset to default based on role
+            // This handles clicking the "Home" icon
             setActiveTab(defaultTab);
         }
     }, [searchParams, userProfile, activeTab]);
@@ -1634,14 +1657,85 @@ export default function DashboardPage() {
     }, [user, realtimeProfile]);
 
 
-    const handleCreateTask = async (newTask: any) => {
-        const docRef = await addDoc(collection(db, "tasks"), newTask);
-        await createNotificationForAdmins(
-            'New Task Created',
-            `A new task '${newTask.service}' has been created by ${newTask.customer}.`,
-            `/dashboard/task/${docRef.id}`
-        );
+    const handleCreateTask = async (newTaskData: any, service: any) => {
+        if (service.isVariable) {
+            // --- Variable Rate Flow ---
+            const taskWithStatus = { ...newTaskData, status: 'Pending Price Approval', rate: service.rate };
+            const docRef = await addDoc(collection(db, "tasks"), taskWithStatus);
+            toast({
+                title: 'Request Submitted!',
+                description: 'An admin will review the details and notify you of the final cost.'
+            });
+            await createNotificationForAdmins(
+                'New Variable-Rate Task',
+                `A task for '${service.name}' requires a price to be set.`,
+                `/dashboard/task/${docRef.id}`
+            );
+        } else {
+            // --- Fixed Rate Flow ---
+            const rate = service.rate;
+            if ((realtimeProfile?.walletBalance || 0) < rate) {
+                toast({
+                    title: 'Insufficient Balance',
+                    description: `Your wallet balance is too low to book this service. Please add funds.`,
+                    variant: 'destructive',
+                });
+                throw new Error("Insufficient balance"); // Abort submission
+            }
+
+            const adminQuery = query(collection(db, 'vles'), where('isAdmin', '==', true), limit(1));
+            const adminSnapshot = await getDocs(adminQuery);
+            if (adminSnapshot.empty) {
+                toast({ title: 'Error', description: 'Could not find an admin account to process payment.', variant: 'destructive' });
+                throw new Error("No admin account found");
+            }
+            const adminUser = { id: adminSnapshot.docs[0].id, ...adminSnapshot.docs[0].data() };
+
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const creatorRef = doc(db, realtimeProfile.role === 'vle' ? 'vles' : 'users', user!.uid);
+                    const adminRef = doc(db, 'vles', adminUser.id);
+
+                    const creatorDoc = await transaction.get(creatorRef);
+                    const adminDoc = await transaction.get(adminRef);
+
+                    if (!creatorDoc.exists() || !adminDoc.exists()) throw new Error("User or admin not found during transaction.");
+                    
+                    const creatorBalance = creatorDoc.data().walletBalance || 0;
+                    if (creatorBalance < rate) throw new Error("Insufficient wallet balance.");
+
+                    const newCreatorBalance = creatorBalance - rate;
+                    const newAdminBalance = (adminDoc.data().walletBalance || 0) + rate;
+                    
+                    transaction.update(creatorRef, { walletBalance: newCreatorBalance });
+                    transaction.update(adminRef, { walletBalance: newAdminBalance });
+                });
+
+                // --- If transaction succeeds, create the task ---
+                const taskWithStatus = { ...newTaskData, status: 'Unassigned', rate: rate };
+                const docRef = await addDoc(collection(db, "tasks"), taskWithStatus);
+                toast({
+                    title: 'Task Created & Paid!',
+                    description: `₹${rate.toFixed(2)} has been deducted from your wallet.`,
+                });
+                await createNotificationForAdmins(
+                    'New Task Created',
+                    `A new task '${service.name}' has been created by ${newTaskData.customer}.`,
+                    `/dashboard/task/${docRef.id}`
+                );
+
+            } catch (error: any) {
+                console.error("Task creation transaction failed: ", error);
+                toast({
+                    title: 'Payment Failed',
+                    description: error.message || 'Could not process the payment. Please try again.',
+                    variant: 'destructive',
+                });
+                throw error; // Propagate error to stop dialog from closing
+            }
+        }
     }
+
 
     const handleComplaintSubmit = async (taskId: string, complaint: any) => {
         const taskRef = doc(db, "tasks", taskId);
@@ -1757,7 +1851,7 @@ export default function DashboardPage() {
             case 'vle':
                 return <VLEDashboard tasks={tasks} userId={user.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'customer':
-                return <CustomerDashboard tasks={tasks} userId={user.uid} userProfile={userProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
+                return <CustomerDashboard tasks={tasks} userId={user.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
             default:
                  return (
                     <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
