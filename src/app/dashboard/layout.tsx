@@ -10,7 +10,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where, doc, writeBatch, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, writeBatch } from "firebase/firestore";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -44,14 +44,17 @@ export default function DashboardLayout({
   useEffect(() => {
     if (!user) return;
 
+    // The orderBy('date') clause was removed to avoid a composite index requirement in Firestore.
+    // Sorting is now handled on the client-side, which is efficient for a typical number of notifications.
     const q = query(
       collection(db, "notifications"),
-      where("userId", "==", user.uid),
-      orderBy("date", "desc")
+      where("userId", "==", user.uid)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort notifications by date in descending order (newest first)
+      notifs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setNotifications(notifs);
     });
 
