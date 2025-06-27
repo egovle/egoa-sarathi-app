@@ -380,7 +380,7 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
     );
 };
 
-const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any) => void, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any }) => {
+const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any) => void, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
   const { toast } = useToast();
   const [service, setService] = useState('');
   const [otherService, setOtherService] = useState('');
@@ -491,12 +491,9 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                       <Select onValueChange={setService} value={service}>
                           <SelectTrigger><SelectValue placeholder="Select a service" /></SelectTrigger>
                           <SelectContent>
-                              <SelectItem value="New PAN">New PAN</SelectItem>
-                              <SelectItem value="Correction of PAN">Correction of PAN</SelectItem>
-                              <SelectItem value="Non-individual PAN card">Non-individual PAN card</SelectItem>
-                              <SelectItem value="Passport">Passport</SelectItem>
-                              <SelectItem value="Driving License">Driving License</SelectItem>
-                              <SelectItem value="Residence Certificate">Residence Certificate</SelectItem>
+                              {services?.map(s => (
+                                <SelectItem key={s.id} value={s.name}>{s.name} - ₹{s.rate}</SelectItem>
+                              ))}
                               <SelectItem value="Other">Other</SelectItem>
                           </SelectContent>
                       </Select>
@@ -767,7 +764,7 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
 )};
 
 
-const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, onTaskCreated: (task: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     
     return (
@@ -777,7 +774,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
                 <TabsTrigger value="tasks">My Tasks</TabsTrigger>
                 <TabsTrigger value="complaints">My Complaints</TabsTrigger>
             </TabsList>
-             <TaskCreatorDialog creatorId={userId} creatorProfile={userProfile} type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
+             <TaskCreatorDialog services={services} creatorId={userId} creatorProfile={userProfile} type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
           </div>
             <TabsContent value="tasks" className="mt-4">
                 <Card>
@@ -878,7 +875,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, onTaskCreated, onCompla
     );
 }
 
-const VLEDashboard = ({ tasks, userId, userProfile, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
     
     return (
     <Tabs defaultValue="tasks" className="w-full">
@@ -887,7 +884,7 @@ const VLEDashboard = ({ tasks, userId, userProfile, onTaskCreated, onVleAvailabi
                 <TabsTrigger value="tasks">Assigned Tasks</TabsTrigger>
             </TabsList>
             <div className="ml-auto flex items-center gap-2">
-                <TaskCreatorDialog type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={userId} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
+                <TaskCreatorDialog services={services} type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={userId} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
             </div>
         </div>
         <TabsContent value="tasks" className="mt-4">
@@ -1366,11 +1363,12 @@ export default function DashboardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     
-    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'tasks');
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || (userProfile?.isAdmin ? 'overview' : 'tasks'));
 
     const [tasks, setTasks] = useState<any[]>([]);
     const [vles, setVles] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [services, setServices] = useState<any[]>([]);
     const [realtimeProfile, setRealtimeProfile] = useState<any | null>(null);
     
     useEffect(() => {
@@ -1425,8 +1423,16 @@ export default function DashboardPage() {
         let unsubscribeTasks: () => void = () => {};
         let unsubscribeVles: () => void = () => {};
         let unsubscribeUsers: () => void = () => {};
+        let unsubscribeServices: () => void = () => {};
 
         const primaryRole = realtimeProfile.isAdmin ? 'admin' : realtimeProfile.role;
+
+        // All users need to see the list of services for the dropdown
+        const servicesQuery = query(collection(db, "services"), orderBy("name"));
+        unsubscribeServices = onSnapshot(servicesQuery, (snapshot) => {
+            const fetchedServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setServices(fetchedServices);
+        });
 
         if (primaryRole === 'admin') {
             const tasksQuery = query(collection(db, "tasks"), orderBy("date", "desc"));
@@ -1467,6 +1473,7 @@ export default function DashboardPage() {
             unsubscribeTasks();
             unsubscribeVles();
             unsubscribeUsers();
+            unsubscribeServices();
         };
     }, [user, realtimeProfile]);
 
@@ -1592,9 +1599,9 @@ export default function DashboardPage() {
             case 'admin':
                 return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} />;
             case 'vle':
-                return <VLEDashboard tasks={tasks} userId={user.uid} userProfile={realtimeProfile} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
+                return <VLEDashboard tasks={tasks} userId={user.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'customer':
-                return <CustomerDashboard tasks={tasks} userId={user.uid} userProfile={userProfile} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
+                return <CustomerDashboard tasks={tasks} userId={user.uid} userProfile={userProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
             default:
                  return (
                     <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
