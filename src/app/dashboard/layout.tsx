@@ -14,12 +14,13 @@ import {
   BrainCircuit,
   LifeBuoy,
   Mail,
-  Phone
+  Phone,
+  Trash2
 } from "lucide-react"
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where, doc, writeBatch } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, writeBatch, getDocs } from "firebase/firestore";
 
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -79,8 +81,9 @@ export default function DashboardLayout({
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -132,6 +135,34 @@ export default function DashboardLayout({
       toast({ title: 'Error', description: 'Could not mark notifications as read.', variant: 'destructive' });
     }
   };
+  
+  const handleClearAllNotifications = async () => {
+      if (!user) return;
+
+      const q = query(collection(db, "notifications"), where("userId", "==", user.uid));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        toast({ title: 'No notifications to clear.' });
+        setIsClearAlertOpen(false);
+        return;
+      }
+
+      const batch = writeBatch(db);
+      snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      try {
+        await batch.commit();
+        toast({ title: 'All notifications cleared.' });
+      } catch (error) {
+        console.error("Error clearing notifications:", error);
+        toast({ title: 'Error', description: 'Could not clear notifications.', variant: 'destructive' });
+      } finally {
+        setIsClearAlertOpen(false);
+      }
+    };
 
   const handleLogout = async () => {
     try {
@@ -179,6 +210,20 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-muted/40">
+       <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will permanently delete all of your notifications. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearAllNotifications} className={buttonVariants({ variant: "destructive" })}>Clear All</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
       <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
         <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
           <Link
@@ -193,25 +238,27 @@ export default function DashboardLayout({
           ))}
         </nav>
         <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
-           <Popover>
-             <PopoverTrigger asChild>
-                <button className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8">
-                    <LifeBuoy className="h-5 w-5" />
-                    <span className="sr-only">Support</span>
-                </button>
-             </PopoverTrigger>
-             <PopoverContent side="right" align="start" className="w-auto p-4">
-                <div className="grid gap-4">
-                    <div className="space-y-1">
-                        <h4 className="font-medium leading-none">Support</h4>
-                        <p className="text-sm text-muted-foreground">
-                            Get help with our services.
-                        </p>
-                    </div>
-                    <SupportContent />
-                </div>
-             </PopoverContent>
-           </Popover>
+            {!userProfile?.isAdmin && (
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <button className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8">
+                            <LifeBuoy className="h-5 w-5" />
+                            <span className="sr-only">Support</span>
+                        </button>
+                    </PopoverTrigger>
+                    <PopoverContent side="right" align="start" className="w-auto p-4">
+                        <div className="grid gap-4">
+                            <div className="space-y-1">
+                                <h4 className="font-medium leading-none">Support</h4>
+                                <p className="text-sm text-muted-foreground">
+                                    Get help with our services.
+                                </p>
+                            </div>
+                            <SupportContent />
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            )}
         </nav>
       </aside>
       <div className="flex flex-col sm:gap-4 sm:py-4 sm:pl-14">
@@ -235,13 +282,15 @@ export default function DashboardLayout({
                 {NAV_ITEMS.map(item => (
                     <MobileNavLink key={item.href} {...item} isActive={pathname === item.href} />
                 ))}
-                 <div className="mt-auto border-t p-4">
-                    <div className="mb-4">
-                        <h4 className="font-semibold">Support</h4>
-                        <p className="text-sm text-muted-foreground">Get help with our services.</p>
+                 {!userProfile?.isAdmin && (
+                    <div className="mt-auto border-t p-4">
+                        <div className="mb-4">
+                            <h4 className="font-semibold">Support</h4>
+                            <p className="text-sm text-muted-foreground">Get help with our services.</p>
+                        </div>
+                        <SupportContent />
                     </div>
-                    <SupportContent />
-                 </div>
+                )}
               </nav>
             </SheetContent>
           </Sheet>
@@ -267,12 +316,20 @@ export default function DashboardLayout({
                             <h4 className="font-medium">Notifications</h4>
                             <p className="text-sm text-muted-foreground">You have {unreadNotifications} unread messages.</p>
                          </div>
-                         {unreadNotifications > 0 && (
-                            <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="text-xs">
-                                <Check className="mr-1 h-3 w-3" />
-                                Mark all as read
-                            </Button>
-                         )}
+                         <div className="flex items-center gap-2">
+                            {unreadNotifications > 0 && (
+                                <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="text-xs">
+                                    <Check className="mr-1 h-3 w-3" />
+                                    Mark all as read
+                                </Button>
+                            )}
+                            {notifications.length > 0 && (
+                                <Button variant="ghost" size="sm" onClick={() => setIsClearAlertOpen(true)} className="text-xs text-destructive hover:text-destructive">
+                                    <Trash2 className="mr-1 h-3 w-3" />
+                                    Clear all
+                                </Button>
+                             )}
+                         </div>
                       </div>
                   </div>
                   <div className="space-y-1 p-2 max-h-80 overflow-y-auto">
@@ -307,20 +364,22 @@ export default function DashboardLayout({
               <DropdownMenuItem asChild>
                 <Link href="/dashboard?tab=profile">Profile</Link>
               </DropdownMenuItem>
-              <Dialog>
-                <DialogTrigger asChild>
-                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}>Support</DropdownMenuItem>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-xs">
-                    <DialogHeader>
-                        <DialogTitle>Contact Support</DialogTitle>
-                        <DialogDescription>
-                          Reach out to us for any assistance.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <SupportContent />
-                </DialogContent>
-              </Dialog>
+              {!userProfile?.isAdmin && (
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>Support</DropdownMenuItem>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-xs">
+                        <DialogHeader>
+                            <DialogTitle>Contact Support</DialogTitle>
+                            <DialogDescription>
+                            Reach out to us for any assistance.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <SupportContent />
+                    </DialogContent>
+                </Dialog>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
