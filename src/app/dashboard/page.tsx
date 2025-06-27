@@ -1294,7 +1294,7 @@ export default function DashboardPage() {
     const [tasks, setTasks] = useState<any[]>([]);
     const [vles, setVles] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
-    const [realtimeProfile, setRealtimeProfile] = useState<any | null>(userProfile);
+    const [realtimeProfile, setRealtimeProfile] = useState<any | null>(null);
     
     useEffect(() => {
         if (!loading && !user) {
@@ -1304,21 +1304,30 @@ export default function DashboardPage() {
 
     // Set up a real-time listener for the user's own profile for live updates (e.g., availability)
     useEffect(() => {
-        if (!user || !userProfile) return;
-
-        const collectionName = userProfile.role === 'vle' ? 'vles' : 'users';
+        if (!user) return;
+        
+        // Determine the collection based on an initial guess or stored role, before the full profile is loaded
+        const probableRole = userProfile?.role || 'customer'; // default to customer if profile is not yet loaded
+        const collectionName = probableRole === 'vle' ? 'vles' : 'users';
         const docRef = doc(db, collectionName, user.uid);
         
         const unsubscribe = onSnapshot(docRef, (doc) => {
             if (doc.exists()) {
                 setRealtimeProfile({ id: doc.id, ...doc.data() });
+            } else if (collectionName === 'users') { // If not found in users, check vles
+                 const vleDocRef = doc(db, 'vles', user.uid);
+                 onSnapshot(vleDocRef, (vleDoc) => {
+                     if (vleDoc.exists()) {
+                         setRealtimeProfile({ id: vleDoc.id, ...vleDoc.data() });
+                     }
+                 });
             }
         }, (error) => {
             console.error("Error listening to profile updates:", error);
         });
 
         return () => unsubscribe();
-    }, [user, userProfile]);
+    }, [user, userProfile?.role]);
 
     // Fetch data based on user role
     useEffect(() => {
@@ -1349,14 +1358,20 @@ export default function DashboardPage() {
             });
 
         } else if (primaryRole === 'vle') {
-            const tasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid), orderBy("date", "desc"));
+            const tasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
             unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
-                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Client-side sorting
+                fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setTasks(fetchedTasks);
             });
         } else { // Customer
-            const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
+            const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
             unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
-                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                 const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Client-side sorting
+                fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setTasks(fetchedTasks);
             });
         }
         
