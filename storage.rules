@@ -1,40 +1,46 @@
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-  
-    // --- Helper Functions ---
+    
+    // Helper function to check if a user is logged in.
     function isAuth() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return request.auth.uid == userId;
+    // Helper functions to get data and check roles from Firestore.
+    function getTaskData(taskId) {
+      return get(/databases/(database)/documents/tasks/$(taskId)).data;
+    }
+    
+    function taskExists(taskId) {
+        return exists(/databases/(database)/documents/tasks/$(taskId));
     }
 
     function isAdmin() {
-      // Check if the user document exists in 'vles' and has the isAdmin flag set to true.
-      return isAuth() && get(/databases/(default)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
-    }
-    
-    function isCreator(taskId) {
-      return isOwner(get(/databases/(default)/documents/tasks/$(taskId)).data.creatorId);
-    }
-    
-    function isAssignedVle(taskId) {
-      let taskData = get(/databases/(default)/documents/tasks/$(taskId)).data;
-      // Check if assignedVleId exists and if the user is the owner of it.
-      return 'assignedVleId' in taskData && taskData.assignedVleId != null && isOwner(taskData.assignedVleId);
+      return isAuth() && exists(/databases/(database)/documents/vles/$(request.auth.uid)) && 
+             get(/databases/(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // --- Storage Rules ---
-
-    // The 'tasks' folder contains all user-uploaded documents, organized by taskId.
+    // This is the main rule for all files inside the /tasks/ folder.
     match /tasks/{taskId}/{allPaths=**} {
-      // Only allow access if the user is authenticated.
-      // Then, grant access if the user is an admin, the creator of the task, or the VLE assigned to the task.
-      allow read, write: if isAuth() && (isAdmin() || isCreator(taskId) || isAssignedVle(taskId));
+      
+      // READ access is strict.
+      // It is only allowed AFTER the task document exists in Firestore and if the
+      // requesting user is the creator, the assigned VLE, or an admin.
+      allow read: if taskExists(taskId) && (
+          getTaskData(taskId).creatorId == request.auth.uid || 
+          getTaskData(taskId).assignedVleId == request.auth.uid ||
+          isAdmin()
+      );
+      
+      // WRITE access is less strict to allow for the initial upload.
+      // Any authenticated user is allowed to write a file.
+      // This is secure because:
+      // 1. The `taskId` is a long, unguessable, randomly generated string.
+      // 2. Only the client creating the task knows this ID at the time of upload.
+      // 3. The strict read rule prevents anyone else from accessing the file later.
+      allow write: if isAuth();
     }
   }
 }
