@@ -1,24 +1,22 @@
 
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    // TASKS: Files are uploaded to a path with a unique, unguessable ID.
     match /tasks/{taskId}/{allPaths=**} {
-      // WRITE: Allow any authenticated user to upload files for a new task.
-      // This is necessary because the database record doesn't exist yet.
-      // We limit file size to 5MB for security.
-      allow write: if request.auth != null && request.resource.size < 5 * 1024 * 1024;
+      // Allow file creation for any authenticated user.
+      // The `resource` is null when a file is being created.
+      allow create: if request.auth != null;
 
-      // READ: Only allow reads by the task creator, the assigned VLE, or an admin.
-      // This check is secure as it queries the database after the task has been created.
-      allow read: if request.auth != null && (
-        // Is user an admin?
-        (exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true) ||
-        // Is user the creator or assigned VLE of the task?
-        (exists(/databases/$(database)/documents/tasks/$(taskId)) &&
-         (get(/databases/$(database)/documents/tasks/$(taskId)).data.creatorId == request.auth.uid ||
-          get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId == request.auth.uid))
+      // Allow read, update, and delete only by the task creator, assigned VLE, or an admin.
+      // This rule is checked for existing files.
+      allow read, update, delete: if request.auth != null && (
+        (
+          exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true
+        ) ||
+        get(/databases/$(database)/documents/tasks/$(taskId)).data.creatorId == request.auth.uid ||
+        get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId == request.auth.uid
       );
     }
   }
