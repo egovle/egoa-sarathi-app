@@ -512,7 +512,15 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
     <>
       <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>{buttonTrigger}</DialogTrigger>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent 
+            className="sm:max-w-lg"
+            onPointerDownOutside={(e) => {
+                const target = e.target as HTMLElement;
+                if (target.closest('[data-radix-popper-content-wrapper]')) {
+                    e.preventDefault();
+                }
+            }}
+        >
           <form onSubmit={handleCreateTask}>
             <DialogHeader>
               <DialogTitle>Create a new Service Request</DialogTitle>

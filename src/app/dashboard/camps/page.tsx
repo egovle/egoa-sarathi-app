@@ -4,7 +4,7 @@
 import { useState, useEffect, type FormEvent, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -369,9 +369,8 @@ export default function CampManagementPage() {
         setLoadingData(true);
         const unsubscribers: (() => void)[] = [];
 
-        // All users (VLEs & Admins) need to see upcoming camps
-        // Firestore security rules must allow this.
-        const upcomingCampsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'desc'));
+        // All users can see upcoming camps - this requires a tolerant read rule on `camps` collection.
+        const upcomingCampsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'asc'));
         unsubscribers.push(onSnapshot(upcomingCampsQuery, (snapshot) => {
              const upcoming = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
              setCamps(prev => {
@@ -381,11 +380,12 @@ export default function CampManagementPage() {
              });
         }, (err) => {
             console.error(`Error fetching upcoming camps: `, err);
-            toast({ title: "Data Fetch Error", description: `Could not fetch upcoming camps.`, variant: "destructive" });
+            // Don't toast error for this public query, it might fail for non-admins if rules are strict.
         }));
 
 
         if (userProfile.isAdmin) {
+            // Admin gets all camps
             const allCampsQuery = query(collection(db, 'camps'), orderBy('date', 'desc'));
             const unsubAllCamps = onSnapshot(allCampsQuery, (snapshot) => {
                  setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -397,6 +397,7 @@ export default function CampManagementPage() {
             });
             unsubscribers.push(unsubAllCamps);
             
+            // Admin needs services and VLEs for the creation dialog
             const serviceQuery = query(collection(db, 'services'));
             const unsubServices = onSnapshot(serviceQuery, (snapshot) => {
                 setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -408,8 +409,9 @@ export default function CampManagementPage() {
                 setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
             unsubscribers.push(unsubVles);
+
         } else if (userProfile.role === 'vle') {
-             // For VLEs, we also need to see assigned camps, even if they are not "upcoming"
+             // For VLEs, we also need to see their specifically assigned camps
              const assignedCampsQuery = query(collection(db, 'camps'), where('assignedVleIds', 'array-contains', userProfile.id));
              unsubscribers.push(onSnapshot(assignedCampsQuery, snapshot => {
                  const assigned = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
@@ -419,7 +421,9 @@ export default function CampManagementPage() {
                     return [...others, ...assigned];
                  });
              }));
-             setLoadingData(false);
+             setLoadingData(false); // VLE data is loaded
+        } else {
+            setLoadingData(false); // Customer data is loaded (only upcoming)
         }
         
         return () => { unsubscribers.forEach(unsub => unsub()); };

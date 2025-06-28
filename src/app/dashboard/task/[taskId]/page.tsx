@@ -334,23 +334,27 @@ export default function TaskDetailPage() {
             toast({ title: "No files selected", variant: "destructive" });
             return;
         }
+        if (!userProfile) {
+            toast({ title: "Profile not loaded", description: "Please wait a moment and try again.", variant: "destructive" });
+            return;
+        }
         setIsUploading(true);
 
-        const uploadPromises = selectedFiles.map(async (file) => {
-            const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-            await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(storageRef);
-            return { name: file.name, url: downloadURL };
-        });
-
         try {
+            const uploadPromises = selectedFiles.map(async (file) => {
+                const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
+                await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(storageRef);
+                return { name: file.name, url: downloadURL };
+            });
+
             const newDocuments = await Promise.all(uploadPromises);
             const taskRef = doc(db, 'tasks', taskId as string);
 
             const historyEntry = {
                 timestamp: new Date().toISOString(),
-                actorName: userProfile?.name,
-                actorRole: userProfile?.isAdmin ? 'Admin' : 'Customer',
+                actorName: userProfile.name,
+                actorRole: userProfile.isAdmin ? 'Admin' : 'Customer',
                 action: 'Documents Uploaded',
                 details: `${newDocuments.length} new document(s) uploaded.`,
             };
@@ -361,7 +365,6 @@ export default function TaskDetailPage() {
                 history: arrayUnion(historyEntry),
             });
 
-            // Notify the assigned VLE that new documents are available
             if (task.assignedVleId) {
                  await createNotification(
                     task.assignedVleId,
@@ -371,7 +374,6 @@ export default function TaskDetailPage() {
                 );
             }
            
-
             toast({ title: "Upload Complete", description: "Files uploaded successfully." });
             setSelectedFiles([]);
         } catch (error) {
@@ -393,6 +395,10 @@ export default function TaskDetailPage() {
             toast({ title: "No file selected", description: "Please choose a certificate to upload.", variant: "destructive" });
             return;
         }
+        if (!userProfile) {
+            toast({ title: "Profile not loaded", description: "Please wait a moment and try again.", variant: "destructive" });
+            return;
+        }
         setIsCertUploading(true);
         
         try {
@@ -404,7 +410,7 @@ export default function TaskDetailPage() {
             const taskRef = doc(db, 'tasks', taskId as string);
             const historyEntry = {
                 timestamp: new Date().toISOString(),
-                actorName: userProfile?.name || 'VLE',
+                actorName: userProfile.name,
                 actorRole: 'VLE',
                 action: 'Final Certificate Uploaded',
                 details: `Uploaded: ${finalCertificate.name}`,
@@ -652,7 +658,7 @@ export default function TaskDetailPage() {
                                 </Card>
                            )}
 
-                           {((!isAssignedVle && !isAdmin) || (isAdmin && !canAdminSetPrice)) && !canUploadMoreDocs && task.status !== 'Completed' && (
+                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs) && task.status !== 'Completed' && (
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
                            )}
                         </CardContent>
@@ -716,8 +722,8 @@ export default function TaskDetailPage() {
                             <ul className="space-y-2 text-sm">
                                 {task.documents.map((doc: any, i: number) => (
                                     <li key={i}>
-                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 text-primary hover:underline break-all">
-                                           <FileText className="h-4 w-4 mt-0.5 shrink-0" /> <span>{doc.name}</span>
+                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 text-primary hover:underline break-words">
+                                           <FileText className="h-4 w-4 mt-0.5 shrink-0" /> <span className="break-all">{doc.name}</span>
                                         </a>
                                     </li>
                                 ))}
