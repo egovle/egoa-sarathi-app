@@ -1,83 +1,97 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
     // --- Helper Functions ---
-    function isAuth() { return request.auth != null; }
-    function isOwner(userId) { return request.auth.uid == userId; }
-    function isAdmin() {
-      // Check if the user document exists and has the isAdmin flag.
-      return isAuth() && get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
+    function isAuth() {
+      return request.auth != null;
     }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      // Check for existence before getting data to prevent errors on non-vle users.
+      return isAuth() && 
+             exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
     function isVle() {
-        // Check if a user has a profile in the vles collection.
         return isAuth() && exists(/databases/$(database)/documents/vles/$(request.auth.uid));
     }
 
     // --- Global Admin Rule ---
-    // Admins have god-mode. This simplifies all other rules and ensures functions like "Reset" work.
+    // A global rule that gives admins full read/write access everywhere.
+    // This simplifies other rules and ensures admin functions like 'reset' will always work.
     match /{document=**} {
-        allow read, write: if isAdmin();
+      allow read, write: if isAdmin();
     }
 
-    // --- Non-Admin Rules ---
+    // --- Collection Rules ---
 
-    // Users: Can manage their own profile, but cannot make themselves admin.
-    // This allows them to debit their own wallet during transactions initiated by the client.
+    // Users can read/update their own profile.
+    // The update rule allows changing any field except for privilege escalation fields (role, isAdmin).
+    // This is necessary for transactions where a user debits their own wallet.
     match /users/{userId} {
-        allow read, create: if isOwner(userId);
-        allow update: if isOwner(userId) && request.resource.data.isAdmin == resource.data.isAdmin;
+      allow read, create: if isOwner(userId);
+      allow update: if isOwner(userId) &&
+                       request.resource.data.isAdmin == resource.data.isAdmin &&
+                       request.resource.data.role == resource.data.role;
     }
     
-    // VLEs: Can manage their own profile, but cannot approve themselves or make themselves admin.
+    // VLEs can read/update their own profile.
+    // VLEs cannot change their status ('Pending'/'Approved') or admin rights. Only admins can.
     match /vles/{vleId} {
-        allow read, create: if isOwner(vleId);
-        allow update: if isOwner(vleId) && 
+      allow read, create: if isOwner(vleId);
+      allow update: if isOwner(vleId) &&
                        request.resource.data.status == resource.data.status &&
-                       request.resource.data.isAdmin == resource.data.isAdmin;
+                       request.resource.data.isAdmin == resource.data.isAdmin &&
+                       request.resource.data.role == resource.data.role;
     }
     
-    // Services: Any logged-in user can see the list of services.
+    // Anyone can read services.
     match /services/{serviceId} {
-        allow read: if isAuth();
+      allow read: if isAuth();
     }
     
-    // Notifications: Users can manage their own notifications.
+    // Notifications:
+    // Any authenticated user can create a notification (e.g., a VLE notifying a customer).
+    // Users can only read/update/delete their own notifications.
     match /notifications/{notificationId} {
        allow create: if isAuth();
        allow read, update, delete: if isOwner(resource.data.userId);
     }
-
-    // Tasks: Granular permissions for task lifecycle.
+    
+    // Tasks:
     match /tasks/{taskId} {
-        allow create: if isAuth();
-        allow read: if isOwner(resource.data.creatorId) || isOwner(resource.data.assignedVleId);
-        allow update: if isOwner(resource.data.assignedVleId) ||
+      allow create: if isAuth();
+      allow read: if isOwner(resource.data.creatorId) || isOwner(resource.data.assignedVleId);
+      allow update: if isOwner(resource.data.assignedVleId) ||
                        (isOwner(resource.data.creatorId) && 
                          (request.resource.data.complaint != resource.data.complaint || 
                           request.resource.data.feedback != resource.data.feedback ||
-                          request.resource.data.documents.size() > resource.data.documents.size() ||
-                          request.resource.data.status == 'Awaiting Payment')
+                          request.resource.data.documents != resource.data.documents ||
+                          request.resource.data.status == 'Awaiting Payment' ||
+                          request.resource.data.status == 'Unassigned')
                        );
     }
 
-    // Camps: Any logged-in user can see public camps.
+    // Camps: Anyone can read camps.
     match /camps/{campId} {
-        allow read: if isAuth();
+      allow read: if isAuth();
     }
     
-    // Camp Suggestions: Only VLEs can create suggestions. Admins manage them.
+    // Camp Suggestions: Only VLEs can create suggestions.
     match /campSuggestions/{suggestionId} {
-        allow create: if isVle();
-        // Admin read/delete is handled by the global admin rule.
+      allow create: if isVle();
     }
 
-    // Payment Requests: Any user can create a request. Admins manage them.
+    // Payment Requests: Any authenticated user can create a request.
     match /paymentRequests/{reqId} {
-        allow create: if isAuth();
-        // Admin read/update/delete is handled by the global admin rule.
+      allow create: if isAuth();
     }
   }
 }
