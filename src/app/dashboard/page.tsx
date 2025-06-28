@@ -930,75 +930,6 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
     </div>
 )};
 
-const UpcomingCamps = () => {
-    const [camps, setCamps] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        // NOTE: This requires Firestore security rules to allow global reads on 'camps' for any authenticated user.
-        const q = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'asc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            setLoading(false);
-        }, (error) => {
-            console.error("Could not fetch upcoming camps:", error);
-            setLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, []);
-
-    if (loading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Upcoming Camps</CardTitle>
-                </CardHeader>
-                <CardContent className="flex justify-center items-center h-24">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                </CardContent>
-            </Card>
-        );
-    }
-    
-    if (camps.length === 0) {
-        return null; // Don't show the card if there are no upcoming camps
-    }
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Tent className="h-5 w-5 text-primary"/>Upcoming Camps</CardTitle>
-                <CardDescription>Find out about service camps happening near you.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Location</TableHead>
-                            <TableHead>Services Offered</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {camps.map(camp => (
-                            <TableRow key={camp.id}>
-                                <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
-                                <TableCell>{camp.location}</TableCell>
-                                <TableCell className="max-w-sm">
-                                     <div className="flex flex-wrap gap-1">
-                                        {camp.servicesOffered?.map((s: string, i: number) => <Badge key={i} variant="secondary">{s}</Badge>)}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
-    );
-};
-
 
 const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
@@ -1022,7 +953,6 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
              <TaskCreatorDialog services={services} creatorId={userId} creatorProfile={userProfile} type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />Create New Booking</Button>} />
           </div>
             <TabsContent value="tasks" className="mt-4 space-y-6">
-                <UpcomingCamps />
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">

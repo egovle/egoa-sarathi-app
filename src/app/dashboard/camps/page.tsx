@@ -369,21 +369,6 @@ export default function CampManagementPage() {
         setLoadingData(true);
         const unsubscribers: (() => void)[] = [];
 
-        // All users can see upcoming camps - this requires a tolerant read rule on `camps` collection.
-        const upcomingCampsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'asc'));
-        unsubscribers.push(onSnapshot(upcomingCampsQuery, (snapshot) => {
-             const upcoming = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-             setCamps(prev => {
-                const existingIds = new Set(upcoming.map(c => c.id));
-                const others = prev.filter(c => !existingIds.has(c.id));
-                return [...others, ...upcoming];
-             });
-        }, (err) => {
-            console.error(`Error fetching upcoming camps: `, err);
-            // Don't toast error for this public query, it might fail for non-admins if rules are strict.
-        }));
-
-
         if (userProfile.isAdmin) {
             // Admin gets all camps
             const allCampsQuery = query(collection(db, 'camps'), orderBy('date', 'desc'));
@@ -411,19 +396,19 @@ export default function CampManagementPage() {
             unsubscribers.push(unsubVles);
 
         } else if (userProfile.role === 'vle') {
-             // For VLEs, we also need to see their specifically assigned camps
+             // For VLEs, we can ONLY query for their assigned camps to prevent permission errors.
+             // Public browsing of camps would require changing Firestore security rules.
              const assignedCampsQuery = query(collection(db, 'camps'), where('assignedVleIds', 'array-contains', userProfile.id));
              unsubscribers.push(onSnapshot(assignedCampsQuery, snapshot => {
                  const assigned = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-                 setCamps(prev => {
-                    const existingIds = new Set(assigned.map(c => c.id));
-                    const others = prev.filter(c => !existingIds.has(c.id));
-                    return [...others, ...assigned];
-                 });
+                 setCamps(assigned);
+             }, (error) => {
+                console.error("Error fetching VLE assigned camps", error);
+                // Don't toast here as it might be an expected error if rules are strict and they have no camps.
              }));
-             setLoadingData(false); // VLE data is loaded
+             setLoadingData(false);
         } else {
-            setLoadingData(false); // Customer data is loaded (only upcoming)
+            setLoadingData(false);
         }
         
         return () => { unsubscribers.forEach(unsub => unsub()); };
@@ -656,6 +641,8 @@ export default function CampManagementPage() {
     
     // VLE VIEW
     if (userProfile.role === 'vle') {
+        const assignedUpcoming = uniqueCamps.filter(c => c.status === 'Upcoming');
+
         return (
              <div className="space-y-6">
                 <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
@@ -679,7 +666,7 @@ export default function CampManagementPage() {
                     </Button>
                 </div>
                 
-                <VleCampTable data={upcomingCamps} title="Upcoming Community Camps"/>
+                <VleCampTable data={assignedUpcoming} title="Your Assigned Camps"/>
              </div>
         )
     }
