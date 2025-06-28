@@ -384,7 +384,7 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
     );
 };
 
-const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any, service: any, uploadedDocs: any[]) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
+const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (taskId: string, task: any, service: any, uploadedDocs: any[]) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
@@ -420,7 +420,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
       setSelectedSubCategory('');
   }, [selectedCategory])
 
-  const handleCreateTask = async (e: FormEvent) => {
+  const handleDialogSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!creatorProfile || !creatorId) {
         toast({ title: "Error", description: "Your profile is still loading, please wait a moment.", variant: 'destructive' });
@@ -460,10 +460,10 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
     setIsSubmitting(true);
     
     try {
-        // Step 1: Upload files to get their URLs first
-        const tempTaskId = doc(collection(db, "tasks")).id; // Generate a temporary ID for the storage path
+        const taskId = doc(collection(db, "tasks")).id;
+        
         const uploadPromises = selectedFiles.map(async (file) => {
-            const storageRef = ref(storage, `tasks/${tempTaskId}/${Date.now()}_${file.name}`);
+            const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
             await uploadBytes(storageRef, file);
             const downloadURL = await getDownloadURL(storageRef);
             return { name: file.name, url: downloadURL };
@@ -471,7 +471,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
         const uploadedDocuments = await Promise.all(uploadPromises);
 
-        // Step 2: Now create the task with the final document URLs
         const newTaskData = {
             customer: form.name.value,
             customerAddress: form.address.value,
@@ -498,10 +497,9 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             finalCertificate: null,
         };
 
-        await onTaskCreated(newTaskData, selectedService, uploadedDocuments);
-        setDialogOpen(false); // Close dialog on success
+        await onTaskCreated(taskId, newTaskData, selectedService, uploadedDocuments);
+        setDialogOpen(false); 
     } catch (error) {
-        // Error toast is handled by the caller
         console.error("Error creating task:", error);
     } finally {
         setIsSubmitting(false);
@@ -542,7 +540,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                 }
             }}
         >
-          <form onSubmit={handleCreateTask}>
+          <form onSubmit={handleDialogSubmit}>
             <DialogHeader>
               <DialogTitle>Create a new Service Request</DialogTitle>
               <DialogDescription>
@@ -952,7 +950,7 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
 )};
 
 
-const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, uploadedDocs: any[]) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (taskId: string, task: any, service: any, uploadedDocs: any[]) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -1089,7 +1087,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
     );
 }
 
-const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, uploadedDocs: any[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (taskId: string, task: any, service: any, uploadedDocs: any[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
     const [searchQuery, setSearchQuery] = useState('');
     
     const filteredTasks = useMemo(() => {
@@ -1203,7 +1201,6 @@ const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger
             toast({ title: 'Task Assigned', description: `Task ${taskId.slice(-6).toUpperCase()} has been assigned.`});
             setOpen(false);
         } catch (error) {
-            // Error toast is handled by the caller
             console.error("Assignment failed, dialog will remain open.");
         }
     }
@@ -1893,7 +1890,7 @@ export default function DashboardPage() {
     }, [user, realtimeProfile]);
 
 
-    const handleCreateTask = async (newTaskData: any, service: any, uploadedDocs: any[]) => {
+    const handleCreateTask = async (taskId: string, newTaskData: any, service: any, uploadedDocs: any[]) => {
         if (!user || !realtimeProfile) {
             toast({
                 title: 'Error',
@@ -1903,9 +1900,6 @@ export default function DashboardPage() {
             throw new Error("Profile not loaded");
         }
         
-        const taskRef = doc(collection(db, "tasks"));
-        const taskId = taskRef.id;
-
         const taskWithDocs = { ...newTaskData, documents: uploadedDocs };
 
         if (service.isVariable) {
