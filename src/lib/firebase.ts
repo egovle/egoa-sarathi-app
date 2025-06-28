@@ -1,4 +1,3 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
@@ -14,7 +13,7 @@ const firebaseConfig = {
 
 // Check if the Firebase API key is provided. If not, the app cannot connect to Firebase.
 if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'your_api_key_here') {
-    throw new Error("Firebase API Key is missing or is still set to the default placeholder. Please create a .env.local file and add your NEXT_PUBLIC_FIREBASE_API_KEY.");
+    throw new Error("CRITICAL: Firebase configuration is missing. Please follow these steps: 1. Create a file named .env.local in the root of your project. 2. Copy the contents of .env.local.example into it. 3. Replace the placeholder values with your actual Firebase project credentials. You can find these in your Firebase project settings.");
 }
 
 // Initialize Firebase
