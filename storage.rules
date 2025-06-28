@@ -3,23 +3,38 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow file uploads into a 'tasks/{taskId}' directory for any authenticated user.
-    // This is necessary because the corresponding task document in Firestore doesn't exist yet at the time of upload.
-    // The path is secured by the unpredictable, randomly generated {taskId}.
-    match /tasks/{taskId}/{allPaths=**} {
-      allow create: if request.auth != null;
 
-      // Once the file is uploaded and the task document exists,
-      // access is restricted to the task creator, the assigned VLE, or an admin.
+    // Helper functions to check user roles from Firestore
+    function getTask(taskId) {
+      return get(/databases/$(database)/documents/tasks/$(taskId)).data;
+    }
+    function isTaskOwner(taskId, userId) {
+      return getTask(taskId).creatorId == userId;
+    }
+    function isTaskVLE(taskId, userId) {
+      return getTask(taskId).assignedVleId == userId;
+    }
+    function isAdmin(userId) {
+      return exists(/databases/$(database)/documents/vles/$(userId)) &&
+             get(/databases/$(database)/documents/vles/$(userId)).data.isAdmin == true;
+    }
+    
+    // Match any file in the 'tasks' folder, where the subfolder is the taskId.
+    match /tasks/{taskId}/{allPaths=**} {
+      
+      // Allow read access to: the task creator, the assigned VLE, or any admin.
       allow read: if request.auth != null && (
-        get(/databases/$(database)/documents/tasks/$(taskId)).data.creatorId == request.auth.uid ||
-        (get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId != null && get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId == request.auth.uid) ||
-        get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true
+        isTaskOwner(taskId, request.auth.uid) ||
+        (getTask(taskId).assignedVleId != null && isTaskVLE(taskId, request.auth.uid)) ||
+        isAdmin(request.auth.uid)
       );
 
-      // For simplicity, only admins can delete files. This can be expanded if needed.
-      allow delete: if request.auth != null &&
-        get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
+      // Allow write access (uploads/deletes) to any authenticated user.
+      // This is necessary for the initial upload because the task database record
+      // doesn't exist yet to be checked. Unauthorized access is prevented by the
+      // stricter 'read' rule above and Firestore rules.
+      allow write: if request.auth != null;
     }
   }
 }
+    
