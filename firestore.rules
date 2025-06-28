@@ -1,0 +1,84 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // --- Helper Functions ---
+    function isAdmin() {
+      // Check if the requesting user is an admin by looking at their VLE profile.
+      return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // --- User & VLE Profile Rules ---
+    // These rules protect sensitive fields like wallet balance and roles.
+    match /users/{userId} {
+      allow read: if request.auth.uid == userId || isAdmin();
+      // Allow update only if the user is the owner (and not changing wallet/role) OR is an admin.
+      allow update: if isAdmin() || (
+        request.auth.uid == userId &&
+        request.resource.data.walletBalance == resource.data.walletBalance &&
+        request.resource.data.isAdmin == resource.data.isAdmin
+      );
+    }
+    
+    match /vles/{vleId} {
+      allow read: if request.auth.uid == vleId || isAdmin();
+      // Allow update only if the user is the owner (and not changing wallet/role/status) OR is an admin.
+      allow update: if isAdmin() || (
+        request.auth.uid == vleId &&
+        request.resource.data.walletBalance == resource.data.walletBalance &&
+        request.resource.data.isAdmin == resource.data.isAdmin &&
+        request.resource.data.status == resource.data.status
+      );
+    }
+    
+    // --- Service Catalog Rules ---
+    match /services/{serviceId} {
+      allow read: if request.auth != null; // Any logged-in user can see the list of services.
+      allow write: if isAdmin(); // Only admins can manage services.
+    }
+
+    // --- Public Camp Rules ---
+    match /camps/{campId} {
+        allow read: if request.auth != null; // Any logged-in user can see camp info.
+        allow write: if isAdmin(); // Only admins can create/edit camps.
+    }
+    
+    // --- Notification Rules ---
+    match /notifications/{notificationId} {
+       // Let the app create notifications, but only allow users to manage their own.
+       allow create: if request.auth != null;
+       allow read, update, delete: if request.auth.uid == resource.data.userId;
+    }
+
+    // --- Wallet Balance Request Rules ---
+    match /paymentRequests/{reqId} {
+      // A user can only create a request for themself.
+      allow create: if request.auth.uid == request.resource.data.userId;
+      // A user can read their own requests. Admins can read all.
+      allow read: if request.auth.uid == resource.data.userId || isAdmin();
+      // Only an admin can approve (update) or delete a request.
+      allow update, delete: if isAdmin();
+    }
+
+    // --- Task Management Rules ---
+    match /tasks/{taskId} {
+      // A user can only create a task for themself.
+      allow create: if request.auth.uid == request.resource.data.creatorId;
+      
+      // The task creator, assigned VLE, or an admin can read the task.
+      allow read: if request.auth.uid == resource.data.creatorId || 
+                     request.auth.uid == resource.data.assignedVleId || 
+                     isAdmin();
+                     
+      // The task creator, assigned VLE, or an admin can update the task.
+      // The application logic is responsible for what fields can be changed.
+      // This rule just provides the gate.
+      allow update: if request.auth.uid == resource.data.creatorId || 
+                     request.auth.uid == resource.data.assignedVleId || 
+                     isAdmin();
+    }
+  }
+}

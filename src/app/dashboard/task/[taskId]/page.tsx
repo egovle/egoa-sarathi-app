@@ -359,18 +359,27 @@ export default function TaskDetailPage() {
                 action: 'Documents Uploaded',
                 details: `${newDocuments.length} new document(s) uploaded.`,
             };
+            
+            // Revert status so VLE can continue, unless it's a new task created by admin/vle
+            const currentStatus = task.status;
+            let nextStatus = 'Assigned'; // Default status after doc upload
+            if(currentStatus === 'Awaiting Documents'){
+                nextStatus = task.assignedVleId ? 'Assigned' : 'Unassigned';
+            }
+
 
             await updateDoc(taskRef, {
-                status: 'Assigned', // Revert status so VLE can continue
+                status: nextStatus, 
                 documents: arrayUnion(...newDocuments),
                 history: arrayUnion(historyEntry),
             });
 
-            if (task.assignedVleId) {
+            const notificationRecipient = actorRole === 'Customer' ? task.assignedVleId : task.creatorId;
+            if (notificationRecipient) {
                  await createNotification(
-                    task.assignedVleId,
+                    notificationRecipient,
                     'New Documents Uploaded',
-                    `New documents have been uploaded for task ${taskId.slice(-6).toUpperCase()}.`,
+                    `${userProfile.name} uploaded new documents for task ${taskId.slice(-6).toUpperCase()}.`,
                     `/dashboard/task/${taskId}`
                 );
             }
@@ -382,7 +391,6 @@ export default function TaskDetailPage() {
             toast({ title: "Upload Failed", variant: "destructive" });
         } finally {
             setIsUploading(false);
-            // Reset the file input
             if(fileInputRef.current) {
                 fileInputRef.current.value = "";
             }
@@ -741,5 +749,3 @@ export default function TaskDetailPage() {
         </div>
     );
 }
-
-    
