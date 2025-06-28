@@ -5,88 +5,79 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // --- Helper Functions ---
-    function isAuth() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
+    function isAuth() { return request.auth != null; }
+    function isOwner(userId) { return request.auth.uid == userId; }
     function isAdmin() {
+      // Check if the user document exists and has the isAdmin flag.
       return isAuth() && get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
-    
     function isVle() {
+        // Check if a user has a profile in the vles collection.
         return isAuth() && exists(/databases/$(database)/documents/vles/$(request.auth.uid));
     }
 
-    // --- Collection Rules ---
+    // --- Global Admin Rule ---
+    // Admins have god-mode. This simplifies all other rules and ensures functions like "Reset" work.
+    match /{document=**} {
+        allow read, write: if isAdmin();
+    }
 
-    // Users collection
+    // --- Non-Admin Rules ---
+
+    // Users: Can manage their own profile, but cannot make themselves admin.
+    // This allows them to debit their own wallet during transactions initiated by the client.
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow update: if (isAdmin() || 
-                      (isOwner(userId) && request.resource.data.walletBalance == resource.data.walletBalance));
-      allow create: if isOwner(userId);
-      allow delete: if isAdmin();
+        allow read, create: if isOwner(userId);
+        allow update: if isOwner(userId) && request.resource.data.isAdmin == resource.data.isAdmin;
     }
     
-    // VLEs collection
+    // VLEs: Can manage their own profile, but cannot approve themselves or make themselves admin.
     match /vles/{vleId} {
-      allow read: if isOwner(vleId) || isAdmin();
-      allow update: if (isAdmin() || 
-                      (isOwner(vleId) && 
-                       request.resource.data.walletBalance == resource.data.walletBalance &&
-                       request.resource.data.status == resource.data.status));
-      allow create: if isOwner(vleId);
-      allow delete: if isAdmin();
+        allow read, create: if isOwner(vleId);
+        allow update: if isOwner(vleId) && 
+                       request.resource.data.status == resource.data.status &&
+                       request.resource.data.isAdmin == resource.data.isAdmin;
     }
     
-    // Services collection
+    // Services: Any logged-in user can see the list of services.
     match /services/{serviceId} {
-      allow read: if isAuth();
-      allow create, update, delete: if isAdmin();
+        allow read: if isAuth();
     }
     
-    // Notifications collection
+    // Notifications: Users can manage their own notifications.
     match /notifications/{notificationId} {
        allow create: if isAuth();
-       allow read, update: if isOwner(resource.data.userId);
-       allow delete: if isOwner(resource.data.userId) || isAdmin();
+       allow read, update, delete: if isOwner(resource.data.userId);
     }
-    
-    // Tasks collection
+
+    // Tasks: Granular permissions for task lifecycle.
     match /tasks/{taskId} {
-      allow create: if isAuth();
-      allow read: if isOwner(resource.data.creatorId) || isOwner(resource.data.assignedVleId) || isAdmin();
-      allow update: if (isOwner(resource.data.assignedVleId) || isAdmin()) ||
+        allow create: if isAuth();
+        allow read: if isOwner(resource.data.creatorId) || isOwner(resource.data.assignedVleId);
+        allow update: if isOwner(resource.data.assignedVleId) ||
                        (isOwner(resource.data.creatorId) && 
                          (request.resource.data.complaint != resource.data.complaint || 
                           request.resource.data.feedback != resource.data.feedback ||
-                          request.resource.data.documents != resource.data.documents ||
+                          request.resource.data.documents.size() > resource.data.documents.size() ||
                           request.resource.data.status == 'Awaiting Payment')
                        );
-      allow delete: if isAdmin();
     }
 
-    // Camps collection
+    // Camps: Any logged-in user can see public camps.
     match /camps/{campId} {
-      allow read: if isAuth();
-      allow create, update, delete: if isAdmin();
+        allow read: if isAuth();
     }
     
-    // Camp Suggestions collection
+    // Camp Suggestions: Only VLEs can create suggestions. Admins manage them.
     match /campSuggestions/{suggestionId} {
-      allow create: if isVle();
-      allow read, delete: if isAdmin();
+        allow create: if isVle();
+        // Admin read/delete is handled by the global admin rule.
     }
 
-    // Payment Requests collection
+    // Payment Requests: Any user can create a request. Admins manage them.
     match /paymentRequests/{reqId} {
-      allow create: if isAuth();
-      allow read, update: if isAdmin();
-      allow delete: if isAdmin();
+        allow create: if isAuth();
+        // Admin read/update/delete is handled by the global admin rule.
     }
   }
 }
