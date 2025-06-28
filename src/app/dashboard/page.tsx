@@ -3,8 +3,8 @@
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction, limit } from 'firebase/firestore';
-import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent } from 'lucide-react';
+import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction, limit, writeBatch } from 'firebase/firestore';
+import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
+import { services as seedServices } from '@/lib/seed';
 
 
 // --- NOTIFICATION HELPERS ---
@@ -1267,7 +1268,7 @@ const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.R
 };
 
 
-const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest }: { allTasks: any[], vles: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void }) => {
+const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData }: { allTasks: any[], vles: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void, onResetData: () => Promise<void> }) => {
     const vlesForManagement = vles.filter(v => !v.isAdmin);
     const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
     const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
@@ -1455,6 +1456,41 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
                         </CardContent>
                     </Card>
                 </div>
+                <Card className="mt-6 border-destructive/50">
+                    <CardHeader>
+                        <div className="flex items-center gap-4">
+                            <div className="flex-shrink-0 bg-destructive/10 text-destructive p-3 rounded-full">
+                               <AlertTriangle className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <CardTitle>Danger Zone</CardTitle>
+                                <CardDescription>These actions are permanent and cannot be undone.</CardDescription>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                         <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive">
+                                    <Trash2 className="mr-2 h-4 w-4" /> Reset Application Data
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This will permanently delete all tasks, camps, notifications, and payment requests. It will also re-seed the services list and reset all user/VLE wallets to zero.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={onResetData} className="bg-destructive hover:bg-destructive/90">Yes, Reset Everything</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                        <p className="text-xs text-muted-foreground mt-2">Use this to return the application to its default state for testing.</p>
+                    </CardContent>
+                </Card>
             </TabsContent>
 
             <TabsContent value="vle-management" className="mt-4">
@@ -2088,6 +2124,47 @@ export default function DashboardPage() {
         }
     };
 
+    const handleResetData = async () => {
+        toast({ title: 'Resetting Data...', description: 'Please wait, this may take a moment.' });
+        try {
+            const batch = writeBatch(db);
+
+            // Collections to clear
+            const collectionsToClear = ['tasks', 'camps', 'notifications', 'paymentRequests', 'services'];
+            
+            for (const collectionName of collectionsToClear) {
+                const snapshot = await getDocs(collection(db, collectionName));
+                snapshot.docs.forEach(doc => batch.delete(doc.ref));
+            }
+
+            // Reset user wallets
+            const usersSnapshot = await getDocs(collection(db, 'users'));
+            usersSnapshot.docs.forEach(userDoc => {
+                batch.update(userDoc.ref, { walletBalance: 0 });
+            });
+
+            // Reset VLE wallets (non-admins)
+            const vlesSnapshot = await getDocs(query(collection(db, 'vles'), where('isAdmin', '==', false)));
+            vlesSnapshot.docs.forEach(vleDoc => {
+                batch.update(vleDoc.ref, { walletBalance: 0 });
+            });
+
+            // Re-seed services
+            seedServices.forEach(service => {
+                const { id, ...serviceData } = service; // Exclude hardcoded ID from seed data
+                const docRef = id ? doc(db, "services", id) : doc(collection(db, "services"));
+                batch.set(docRef, serviceData);
+            });
+
+            await batch.commit();
+
+            toast({ title: 'Application Reset', description: 'All data has been cleared and default services have been seeded.' });
+        } catch (error: any) {
+            console.error("Error resetting data:", error);
+            toast({ title: 'Reset Failed', description: error.message || 'Could not reset the application data.', variant: 'destructive' });
+        }
+    };
+
     if (loading || !user || !realtimeProfile) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
@@ -2105,7 +2182,7 @@ export default function DashboardPage() {
 
         switch (primaryRole) {
             case 'admin':
-                return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} />;
+                return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} />;
             case 'vle':
                 return <VLEDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'customer':
@@ -2121,5 +2198,3 @@ export default function DashboardPage() {
 
     return renderContent();
 }
-
-    
