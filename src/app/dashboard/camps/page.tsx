@@ -4,7 +4,7 @@
 import { useState, useEffect, type FormEvent, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, where, getDocs, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -126,7 +126,6 @@ const SuggestCampDialog = ({ onFinished }: { onFinished: () => void; }) => {
             name: `Suggested by ${userProfile.name}`,
             location,
             date: date.toISOString(),
-            status: 'Suggested',
             suggestedBy: {
                 id: userProfile.id,
                 name: userProfile.name,
@@ -134,12 +133,13 @@ const SuggestCampDialog = ({ onFinished }: { onFinished: () => void; }) => {
         };
 
         try {
-            await addDoc(collection(db, "camps"), suggestionData);
+            await addDoc(collection(db, "campSuggestions"), suggestionData);
             await createNotificationForAdmins('New Camp Suggested', `${userProfile.name} suggested a camp at ${location}.`);
             toast({ title: 'Suggestion Sent!', description: 'Your camp suggestion has been sent to the admin for review.' });
             onFinished();
         } catch (error: any) {
-            toast({ title: 'Error', description: error.message || 'Could not send suggestion.', variant: 'destructive' });
+            console.error("Error submitting suggestion:", error);
+            toast({ title: 'Error', description: error.message || 'Could not send suggestion. Please check permissions.', variant: 'destructive' });
         }
         setLoading(false);
     };
@@ -182,11 +182,12 @@ const SuggestCampDialog = ({ onFinished }: { onFinished: () => void; }) => {
 
 // --- Main Page Component ---
 export default function CampManagementPage() {
-    const { userProfile, loading: authLoading } = useAuth();
+    const { user, userProfile, loading: authLoading } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     
     const [allCamps, setAllCamps] = useState<any[]>([]);
+    const [campSuggestions, setCampSuggestions] = useState<any[]>([]);
     const [loadingData, setLoadingData] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSuggestFormOpen, setIsSuggestFormOpen] = useState(false);
@@ -195,15 +196,13 @@ export default function CampManagementPage() {
 
     // Effect for authorization
     useEffect(() => {
-        if (!authLoading && !userProfile) {
+        if (!authLoading && !user) {
             router.push('/');
         }
-    }, [userProfile, authLoading, router]);
+    }, [user, authLoading, router]);
 
-    // Effect for fetching data
+    // Effect for fetching camps data
     useEffect(() => {
-        if (!userProfile) return;
-
         setLoadingData(true);
         const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
 
@@ -219,12 +218,25 @@ export default function CampManagementPage() {
         
         return () => { unsubCamps() };
 
+    }, [toast]);
+    
+    // Effect for fetching camp suggestions (Admins only)
+    useEffect(() => {
+        if (!userProfile?.isAdmin) return;
+
+        const suggestionsQuery = query(collection(db, 'campSuggestions'), orderBy('date', 'asc'));
+        const unsubSuggestions = onSnapshot(suggestionsQuery, (snapshot) => {
+            setCampSuggestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("Error fetching camp suggestions:", error);
+            toast({ title: "Error", description: "Could not fetch suggestions.", variant: "destructive" });
+        });
+
+        return () => unsubSuggestions();
     }, [userProfile, toast]);
     
-    const upcomingCamps = useMemo(() => allCamps.filter(c => new Date(c.date) >= new Date() && c.status !== 'Suggested'), [allCamps]);
+    const upcomingCamps = useMemo(() => allCamps.filter(c => new Date(c.date) >= new Date()), [allCamps]);
     const pastCamps = useMemo(() => allCamps.filter(c => new Date(c.date) < new Date()), [allCamps]);
-    const suggestedCamps = useMemo(() => allCamps.filter(c => c.status === 'Suggested'), [allCamps]);
-
 
     const handleEdit = (camp: any) => {
         setSelectedCamp(camp);
@@ -245,10 +257,38 @@ export default function CampManagementPage() {
     };
 
     const handleApproveSuggestion = async (suggestion: any) => {
-        const campRef = doc(db, 'camps', suggestion.id);
-        await updateDoc(campRef, { status: 'Upcoming' });
-        toast({ title: 'Suggestion Approved', description: 'The camp is now listed as upcoming.' });
+        const { id, ...suggestionData } = suggestion;
+        const campData = {
+            ...suggestionData,
+            status: 'Upcoming',
+        };
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                const newCampRef = doc(collection(db, "camps"));
+                const suggestionRef = doc(db, "campSuggestions", id);
+                transaction.set(newCampRef, campData);
+                transaction.delete(suggestionRef);
+            });
+            
+            toast({ title: 'Suggestion Approved', description: 'The camp is now listed as upcoming.' });
+            if (suggestion.suggestedBy?.id) {
+                await createNotification(suggestion.suggestedBy.id, 'Camp Suggestion Approved!', `Your suggestion for a camp at ${suggestion.location} has been approved.`);
+            }
+        } catch (error: any) {
+            console.error("Error approving suggestion: ", error);
+            toast({ title: "Approval Failed", description: error.message || "Could not approve the suggestion.", variant: "destructive"});
+        }
+    };
+    
+    const handleRejectSuggestion = async (suggestion: any) => {
+        await deleteDoc(doc(db, "campSuggestions", suggestion.id));
+        toast({ title: 'Suggestion Rejected', description: 'The suggestion has been removed.' });
+         if (suggestion.suggestedBy?.id) {
+            await createNotification(suggestion.suggestedBy.id, 'Camp Suggestion Update', `Your suggestion for a camp at ${suggestion.location} was not approved.`);
+        }
     }
+
 
     const handleFormFinished = () => {
         setIsFormOpen(false);
@@ -331,7 +371,6 @@ export default function CampManagementPage() {
                     className="sm:max-w-lg"
                     onInteractOutside={(e) => {
                       const target = e.target as HTMLElement;
-                      // Allow interaction with popover content
                       if (target.closest('[data-radix-popper-content-wrapper]')) {
                         e.preventDefault();
                       }
@@ -351,7 +390,7 @@ export default function CampManagementPage() {
             <Tabs defaultValue='upcoming' className="w-full">
                 <TabsList>
                     <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                    <TabsTrigger value="suggestions">VLE Suggestions <Badge className="ml-2">{suggestedCamps.length}</Badge></TabsTrigger>
+                    <TabsTrigger value="suggestions">VLE Suggestions <Badge className="ml-2">{campSuggestions.length}</Badge></TabsTrigger>
                     <TabsTrigger value="past">Past</TabsTrigger>
                 </TabsList>
                 <TabsContent value="upcoming" className="mt-4">
@@ -371,14 +410,14 @@ export default function CampManagementPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {suggestedCamps.length > 0 ? suggestedCamps.map(camp => (
+                                    {campSuggestions.length > 0 ? campSuggestions.map(camp => (
                                         <TableRow key={camp.id}>
                                             <TableCell>{camp.suggestedBy?.name}</TableCell>
                                             <TableCell>{camp.location}</TableCell>
                                             <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
                                             <TableCell className="text-right space-x-2">
                                                 <Button size="sm" variant="outline" onClick={() => handleApproveSuggestion(camp)}><UserPlus className="mr-2 h-4 w-4" />Approve</Button>
-                                                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(camp)}><Trash className="mr-2 h-4 w-4" />Reject</Button>
+                                                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleRejectSuggestion(camp)}><Trash className="mr-2 h-4 w-4" />Reject</Button>
                                             </TableCell>
                                         </TableRow>
                                     )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new suggestions.</TableCell></TableRow>}
@@ -425,5 +464,3 @@ export default function CampManagementPage() {
 
     return userProfile.isAdmin ? <AdminView /> : <PublicView />;
 }
-
-    
