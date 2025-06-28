@@ -57,11 +57,10 @@ async function createNotificationForAdmins(title: string, description: string, l
 
 // --- TASK DETAIL PAGE DIALOGS ---
 
-const SetPriceDialog = ({ taskId, customerId, onPriceSet }: { taskId: string, customerId: string, onPriceSet: () => void }) => {
+const SetPriceDialog = ({ taskId, customerId, onPriceSet, adminId }: { taskId: string, customerId: string, onPriceSet: () => void, adminId: string }) => {
     const [open, setOpen] = useState(false);
     const [price, setPrice] = useState('');
     const { toast } = useToast();
-    const { userProfile } = useAuth();
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -74,7 +73,7 @@ const SetPriceDialog = ({ taskId, customerId, onPriceSet }: { taskId: string, cu
         const taskRef = doc(db, "tasks", taskId);
         const historyEntry = {
             timestamp: new Date().toISOString(),
-            actorName: userProfile?.name || 'Admin',
+            actorId: adminId,
             actorRole: 'Admin',
             action: 'Final Price Set',
             details: `Final price set to ₹${finalRate.toFixed(2)}.`,
@@ -135,7 +134,7 @@ const SetPriceDialog = ({ taskId, customerId, onPriceSet }: { taskId: string, cu
     );
 };
 
-const RequestInfoDialog = ({ taskId, vleName, customerId }: { taskId:string, vleName: string, customerId: string }) => {
+const RequestInfoDialog = ({ taskId, vleId, customerId }: { taskId:string, vleId: string, customerId: string }) => {
     const [open, setOpen] = useState(false);
     const [message, setMessage] = useState('');
     const { toast } = useToast();
@@ -150,7 +149,7 @@ const RequestInfoDialog = ({ taskId, vleName, customerId }: { taskId:string, vle
         const taskRef = doc(db, "tasks", taskId);
         const historyEntry = {
             timestamp: new Date().toISOString(),
-            actorName: vleName,
+            actorId: vleId,
             actorRole: 'VLE',
             action: 'Information Requested',
             details: message,
@@ -209,7 +208,7 @@ const RequestInfoDialog = ({ taskId, vleName, customerId }: { taskId:string, vle
     );
 };
 
-const CompleteTaskDialog = ({ taskId, vleName, customerId }: { taskId: string, vleName: string, customerId: string }) => {
+const SubmitAcknowledgementDialog = ({ taskId, vleId, customerId }: { taskId: string, vleId: string, customerId: string }) => {
     const [open, setOpen] = useState(false);
     const [ackNumber, setAckNumber] = useState('');
     const { toast } = useToast();
@@ -224,25 +223,25 @@ const CompleteTaskDialog = ({ taskId, vleName, customerId }: { taskId: string, v
         const taskRef = doc(db, "tasks", taskId);
         const historyEntry = {
             timestamp: new Date().toISOString(),
-            actorName: vleName,
+            actorId: vleId,
             actorRole: 'VLE',
-            action: 'Task Completed',
+            action: 'Acknowledgement Submitted',
             details: `Acknowledgement No: ${ackNumber}`,
         };
 
         try {
             await updateDoc(taskRef, {
-                status: 'Completed',
+                status: 'In Progress',
                 acknowledgementNumber: ackNumber,
                 history: arrayUnion(historyEntry)
             });
              await createNotification(
                 customerId,
-                'Your Task is Complete!',
-                `Task ${taskId.slice(-6).toUpperCase()} has been marked as complete.`,
+                'Your Task is In Progress',
+                `An acknowledgement number has been submitted for task ${taskId.slice(-6).toUpperCase()}.`,
                 `/dashboard/task/${taskId}`
             );
-            toast({ title: 'Task Marked as Complete', description: 'The customer has been notified.' });
+            toast({ title: 'Acknowledgement Submitted', description: 'The task is now in progress.' });
             setAckNumber('');
             setOpen(false);
         } catch (error) {
@@ -254,14 +253,14 @@ const CompleteTaskDialog = ({ taskId, vleName, customerId }: { taskId: string, v
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button><CheckCircle className="mr-2 h-4 w-4" />Mark as Complete</Button>
+                <Button><CheckCircle className="mr-2 h-4 w-4" />Submit Acknowledgement</Button>
             </DialogTrigger>
             <DialogContent>
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle>Complete Task</DialogTitle>
+                        <DialogTitle>Submit Acknowledgement</DialogTitle>
                         <DialogDescription>
-                            Enter the acknowledgement number from the government portal. This will mark the task as complete.
+                            Enter the acknowledgement number from the government portal. This will mark the task as 'In Progress'.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="py-4">
@@ -333,7 +332,7 @@ export default function TaskDetailPage() {
             toast({ title: "No files selected", variant: "destructive" });
             return;
         }
-        if (!userProfile) {
+        if (!userProfile || !user) {
             toast({ title: "Profile not loaded", description: "Please wait a moment and try again.", variant: "destructive" });
             return;
         }
@@ -354,7 +353,7 @@ export default function TaskDetailPage() {
 
             const historyEntry = {
                 timestamp: new Date().toISOString(),
-                actorName: userProfile.name,
+                actorId: user.uid,
                 actorRole: actorRole,
                 action: 'Documents Uploaded',
                 details: `${newDocuments.length} new document(s) uploaded.`,
@@ -408,7 +407,7 @@ export default function TaskDetailPage() {
             toast({ title: "No file selected", description: "Please choose a certificate to upload.", variant: "destructive" });
             return;
         }
-        if (!userProfile) {
+        if (!userProfile || !user) {
             toast({ title: "Profile not loaded", description: "Please wait a moment and try again.", variant: "destructive" });
             return;
         }
@@ -423,14 +422,15 @@ export default function TaskDetailPage() {
             const taskRef = doc(db, 'tasks', taskId as string);
             const historyEntry = {
                 timestamp: new Date().toISOString(),
-                actorName: userProfile.name,
+                actorId: user.uid,
                 actorRole: 'VLE',
-                action: 'Final Certificate Uploaded',
+                action: 'Task Completed & Certificate Uploaded',
                 details: `Uploaded: ${finalCertificate.name}`,
             };
             
             await updateDoc(taskRef, {
                 finalCertificate: finalCertificate,
+                status: 'Completed',
                 history: arrayUnion(historyEntry),
             });
 
@@ -484,7 +484,7 @@ export default function TaskDetailPage() {
                 // 2. Update task status, ready for assignment
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
-                    actorName: userProfile.name,
+                    actorId: user.uid,
                     actorRole: userProfile.role === 'vle' ? 'VLE' : 'Customer',
                     action: 'Payment Completed',
                     details: `Paid ₹${task.rate.toFixed(2)}.`,
@@ -543,6 +543,7 @@ export default function TaskDetailPage() {
     }
 
     const canVleTakeAction = isAssignedVle && (task.status === 'Assigned');
+    const isVleInProgress = isAssignedVle && task.status === 'In Progress';
     const canAdminSetPrice = isAdmin && task.status === 'Pending Price Approval';
     const canCustomerPay = isTaskCreator && task.status === 'Awaiting Payment';
     const canUploadMoreDocs = (isTaskCreator || isAdmin) && task.status === 'Awaiting Documents';
@@ -563,10 +564,10 @@ export default function TaskDetailPage() {
                             <div><Label>Service</Label><p>{task.service}</p></div>
                             <div><Label>Status</Label><div><Badge variant="outline">{task.status}</Badge></div></div>
                             <div><Label>Customer</Label><p>{task.customer}</p></div>
-                            <div>
+                             <div>
                                 <Label>Assigned VLE</Label>
                                 <p>
-                                    {isAdmin ? (task.assignedVleName || 'N/A') : (task.assignedVleId ? `VLE ID: ${task.assignedVleId.slice(-6).toUpperCase()}` : 'N/A')}
+                                    {task.assignedVleId ? `VLE ID: ${task.assignedVleId.slice(-6).toUpperCase()}` : 'N/A'}
                                 </p>
                             </div>
                              {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.rate?.toFixed(2)}</p></div>}
@@ -615,7 +616,7 @@ export default function TaskDetailPage() {
                                     <div key={index} className="relative mb-6">
                                         <div className="absolute -left-[30px] top-1.5 h-3 w-3 rounded-full bg-primary border-2 border-background"></div>
                                         <p className="font-semibold">{entry.action}</p>
-                                        <p className="text-sm text-muted-foreground">by {entry.actorName} ({entry.actorRole})</p>
+                                        <p className="text-sm text-muted-foreground">by {entry.actorRole} ({entry.actorId ? `ID: ${entry.actorId.slice(-6).toUpperCase()}` : 'System'})</p>
                                         <p className="text-sm mt-1">{entry.details}</p>
                                         <p className="text-xs text-muted-foreground mt-1">{format(new Date(entry.timestamp), "PPp")}</p>
                                     </div>
@@ -632,17 +633,17 @@ export default function TaskDetailPage() {
                             <CardTitle className="flex items-center gap-2">Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                           {canAdminSetPrice && (
-                                <SetPriceDialog taskId={task.id} customerId={task.creatorId} onPriceSet={() => {}} />
+                           {canAdminSetPrice && user && (
+                                <SetPriceDialog taskId={task.id} customerId={task.creatorId} onPriceSet={() => {}} adminId={user.uid} />
                            )}
-                           {canVleTakeAction && userProfile ? (
+                           {canVleTakeAction && user ? (
                                 <div className='flex flex-col gap-2'>
-                                    <RequestInfoDialog taskId={task.id} vleName={userProfile.name} customerId={task.creatorId} />
-                                    <CompleteTaskDialog taskId={task.id} vleName={userProfile.name} customerId={task.creatorId} />
+                                    <RequestInfoDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
+                                    <SubmitAcknowledgementDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
                                 </div>
                            ) : null }
                            
-                           {isAssignedVle && task.status === 'Completed' && (
+                           {isVleInProgress && (
                                 <Card className="bg-muted/50">
                                     <CardHeader className="p-4">
                                         <CardTitle className="text-base">Upload Final Certificate</CardTitle>
@@ -665,13 +666,13 @@ export default function TaskDetailPage() {
                                     <CardFooter className="p-4 pt-0">
                                         <Button onClick={handleCertificateUpload} disabled={isCertUploading || !selectedCertificate}>
                                             {isCertUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                                            Upload Certificate
+                                            Upload & Complete Task
                                         </Button>
                                     </CardFooter>
                                 </Card>
                            )}
                            
-                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction) && task.status !== 'Completed' && task.status !== 'Pending Price Approval' && task.status !== 'Awaiting Payment' && (
+                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress) && task.status !== 'Completed' && task.status !== 'Pending Price Approval' && task.status !== 'Awaiting Payment' && (
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
                            )}
                         </CardContent>

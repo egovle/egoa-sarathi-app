@@ -2,8 +2,9 @@
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction, limit, writeBatch } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -383,7 +384,7 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
     );
 };
 
-const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any, service: any) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
+const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any, service: any, taskId: string) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
@@ -421,7 +422,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
   const handleCreateTask = async (e: FormEvent) => {
     e.preventDefault();
-    if (!creatorProfile) {
+    if (!creatorProfile || !creatorId) {
         toast({ title: "Error", description: "Your profile is still loading, please wait a moment.", variant: 'destructive' });
         return;
     }
@@ -450,7 +451,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         setIsSubmitting(false);
         return;
     }
-
+    
     if (!selectedService.isVariable && (!selectedService.rate || selectedService.rate <= 0)) {
         toast({
             title: 'Invalid Service Selection',
@@ -461,37 +462,49 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         return;
     }
 
-    const newTaskData = {
-        customer: form.name.value,
-        customerAddress: form.address.value,
-        customerMobile: form.mobile.value,
-        customerEmail: form.email.value,
-        service: selectedService.name,
-        serviceId: selectedService.id,
-        date: new Date().toISOString(),
-        history: [{
-            timestamp: new Date().toISOString(),
-            actorName: creatorProfile?.name || form.name.value,
-            actorRole: type === 'VLE Lead' ? 'VLE' : 'Customer',
-            action: 'Task Created',
-            details: `Task created for service: ${selectedService.name}.`
-        }],
-        acknowledgementNumber: null,
-        complaint: null,
-        feedback: null,
-        type: type,
-        documents: selectedFiles.map(f => ({ name: f.name, url: '' })), // Placeholder for storage URL
-        assignedVleId: null,
-        assignedVleName: null,
-        creatorId: creatorId,
-    };
-
     try {
-        await onTaskCreated(newTaskData, selectedService);
+        const taskDocRef = doc(collection(db, "tasks"));
+        const taskId = taskDocRef.id;
+
+        const uploadPromises = selectedFiles.map(async (file) => {
+            const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
+            await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(storageRef);
+            return { name: file.name, url: downloadURL };
+        });
+
+        const uploadedDocuments = await Promise.all(uploadPromises);
+
+        const newTaskData = {
+            customer: form.name.value,
+            customerAddress: form.address.value,
+            customerMobile: form.mobile.value,
+            customerEmail: form.email.value,
+            service: selectedService.name,
+            serviceId: selectedService.id,
+            date: new Date().toISOString(),
+            history: [{
+                timestamp: new Date().toISOString(),
+                actorId: creatorId,
+                actorRole: type === 'VLE Lead' ? 'VLE' : 'Customer',
+                action: 'Task Created',
+                details: `Task created for service: ${selectedService.name}.`
+            }],
+            acknowledgementNumber: null,
+            complaint: null,
+            feedback: null,
+            type: type,
+            documents: uploadedDocuments,
+            assignedVleId: null,
+            assignedVleName: null,
+            creatorId: creatorId,
+        };
+
+        await onTaskCreated(newTaskData, selectedService, taskId);
         setDialogOpen(false); // Close dialog on success
     } catch (error) {
         // Error toast is handled by the caller
-        console.error(error);
+        console.error("Error creating task:", error);
     } finally {
         setIsSubmitting(false);
     }
@@ -524,7 +537,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         <DialogTrigger asChild>{buttonTrigger}</DialogTrigger>
         <DialogContent 
             className="sm:max-w-lg"
-            onPointerDownOutside={(e) => {
+            onInteractOutside={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest('[data-radix-popper-content-wrapper]')) {
                     e.preventDefault();
@@ -941,7 +954,7 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
 )};
 
 
-const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, taskId: string) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -1006,15 +1019,26 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center w-full"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
-                                        {task.status !== 'Completed' && !task.complaint && (
-                                            <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={
-                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><ShieldAlert className="mr-2 h-4 w-4"/>Raise Complaint</DropdownMenuItem>
-                                            } />
-                                        )}
-                                        {task.status === 'Completed' && !task.feedback && (
-                                             <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={
-                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><StarIcon className="mr-2 h-4 w-4"/>Give Feedback</DropdownMenuItem>
-                                            } />
+                                        
+                                        {task.status === 'Completed' ? (
+                                            <>
+                                                {!task.feedback && (
+                                                    <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={
+                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><StarIcon className="mr-2 h-4 w-4"/>Give Feedback</DropdownMenuItem>
+                                                    } />
+                                                )}
+                                                {!task.complaint && (
+                                                    <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={
+                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><ShieldAlert className="mr-2 h-4 w-4"/>Raise Complaint</DropdownMenuItem>
+                                                    } />
+                                                )}
+                                            </>
+                                        ) : (
+                                             !task.complaint && (
+                                                <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={
+                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><ShieldAlert className="mr-2 h-4 w-4"/>Raise Complaint</DropdownMenuItem>
+                                                } />
+                                             )
                                         )}
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -1072,7 +1096,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
     );
 }
 
-const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, taskId: string) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
     const [searchQuery, setSearchQuery] = useState('');
     
     const filteredTasks = useMemo(() => {
@@ -1876,7 +1900,7 @@ export default function DashboardPage() {
     }, [user, realtimeProfile]);
 
 
-    const handleCreateTask = async (newTaskData: any, service: any) => {
+    const handleCreateTask = async (newTaskData: any, service: any, taskId: string) => {
         if (!user || !realtimeProfile) {
             toast({
                 title: 'Error',
@@ -1885,11 +1909,13 @@ export default function DashboardPage() {
             });
             throw new Error("Profile not loaded");
         }
+        
+        const taskRef = doc(db, "tasks", taskId);
 
         if (service.isVariable) {
             // --- Variable Rate Flow ---
             const taskWithStatus = { ...newTaskData, status: 'Pending Price Approval', rate: service.rate };
-            const docRef = await addDoc(collection(db, "tasks"), taskWithStatus);
+            await setDoc(taskRef, taskWithStatus);
             toast({
                 title: 'Request Submitted!',
                 description: 'An admin will review the details and notify you of the final cost.'
@@ -1897,7 +1923,7 @@ export default function DashboardPage() {
             await createNotificationForAdmins(
                 'New Variable-Rate Task',
                 `A task for '${service.name}' requires a price to be set.`,
-                `/dashboard/task/${docRef.id}`
+                `/dashboard/task/${taskId}`
             );
         } else {
             // --- Fixed Rate Flow ---
@@ -1928,7 +1954,6 @@ export default function DashboardPage() {
                     transaction.update(creatorRef, { walletBalance: newCreatorBalance });
 
                     // 2. Create the task document within the same transaction
-                    const taskRef = doc(collection(db, "tasks")); // get a ref to a new document
                     const taskWithStatus = { ...newTaskData, status: 'Unassigned', rate: rate };
                     transaction.set(taskRef, taskWithStatus);
                 });
@@ -2036,7 +2061,7 @@ export default function DashboardPage() {
                 // Finally, update the task to be assigned.
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
-                    actorName: realtimeProfile.name,
+                    actorId: user.uid,
                     actorRole: 'Admin',
                     action: 'Task Assigned',
                     details: `Task assigned to VLE: ${vleName}. Fee of ₹${taskData.rate.toFixed(2)} processed.`
@@ -2141,13 +2166,22 @@ export default function DashboardPage() {
             const collectionsToClear = ['tasks', 'camps', 'notifications', 'paymentRequests', 'services'];
             
             for (const collectionName of collectionsToClear) {
-                // Batch delete collections in chunks of 499
                 const snapshot = await getDocs(collection(db, collectionName));
-                if (snapshot.size > 0) {
+                while (!snapshot.empty && snapshot.docs.length > 0) {
+                    const batch = writeBatch(db);
+                    const docsToDelete = snapshot.docs.slice(0, 499);
+                    docsToDelete.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                }
+            }
+            
+            const processCollectionInBatches = async (collectionName: string, updateData: object) => {
+                const snapshot = await getDocs(query(collection(db, collectionName)));
+                 if (snapshot.size > 0) {
                     let batch = writeBatch(db);
                     let count = 0;
                     for (const doc of snapshot.docs) {
-                        batch.delete(doc.ref);
+                        batch.update(doc.ref, updateData);
                         count++;
                         if (count === 499) {
                             await batch.commit();
@@ -2159,45 +2193,10 @@ export default function DashboardPage() {
                         await batch.commit();
                     }
                 }
-            }
-
-            // Batch update user wallets
-            const usersSnapshot = await getDocs(collection(db, 'users'));
-            if(usersSnapshot.size > 0) {
-                let batch = writeBatch(db);
-                let count = 0;
-                for (const userDoc of usersSnapshot.docs) {
-                    batch.update(userDoc.ref, { walletBalance: 0 });
-                    count++;
-                    if (count === 499) {
-                        await batch.commit();
-                        batch = writeBatch(db);
-                        count = 0;
-                    }
-                }
-                 if (count > 0) {
-                    await batch.commit();
-                }
-            }
-
-            // Batch update VLE wallets
-            const vlesSnapshot = await getDocs(query(collection(db, 'vles'), where('isAdmin', '==', false)));
-             if(vlesSnapshot.size > 0) {
-                let batch = writeBatch(db);
-                let count = 0;
-                for (const vleDoc of vlesSnapshot.docs) {
-                    batch.update(vleDoc.ref, { walletBalance: 0 });
-                     count++;
-                    if (count === 499) {
-                        await batch.commit();
-                        batch = writeBatch(db);
-                        count = 0;
-                    }
-                }
-                if (count > 0) {
-                    await batch.commit();
-                }
-            }
+            };
+            
+            await processCollectionInBatches('users', { walletBalance: 0 });
+            await processCollectionInBatches('vles', { walletBalance: 0 });
 
             // Batch re-seed services
             let seedBatch = writeBatch(db);
