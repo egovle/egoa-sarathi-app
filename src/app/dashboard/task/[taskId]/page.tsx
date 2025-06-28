@@ -283,19 +283,45 @@ const CompleteTaskDialog = ({ taskId, vleName, customerId }: { taskId: string, v
     );
 };
 
-const DocumentUploadCard = ({
-    taskId,
-    task,
-    userProfile,
-}: {
-    taskId: string;
-    task: any;
-    userProfile: any;
-}) => {
+export default function TaskDetailPage() {
+    const { taskId } = useParams();
+    const { user, userProfile, loading: authLoading } = useAuth();
+    const router = useRouter();
+    const { toast } = useToast();
+
+    const [task, setTask] = useState<any | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [isPaying, setIsPaying] = useState(false);
+
+    // State for VLE final certificate upload
+    const [selectedCertificate, setSelectedCertificate] = useState<File | null>(null);
+    const [isCertUploading, setIsCertUploading] = useState(false);
+    const vleFileInputRef = useRef<HTMLInputElement>(null);
+    
+    // State for additional document uploads
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const { toast } = useToast();
+
+
+    useEffect(() => {
+        if (!taskId) return;
+        const taskRef = doc(db, 'tasks', taskId as string);
+        const unsubscribe = onSnapshot(taskRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setTask({ id: docSnap.id, ...docSnap.data() });
+            } else {
+                console.error("Task not found");
+                setTask(null);
+            }
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching task:", error);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [taskId]);
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -319,7 +345,7 @@ const DocumentUploadCard = ({
 
         try {
             const newDocuments = await Promise.all(uploadPromises);
-            const taskRef = doc(db, 'tasks', taskId);
+            const taskRef = doc(db, 'tasks', taskId as string);
 
             const historyEntry = {
                 timestamp: new Date().toISOString(),
@@ -330,7 +356,7 @@ const DocumentUploadCard = ({
             };
 
             await updateDoc(taskRef, {
-                status: 'Assigned',
+                status: 'Assigned', // Revert status so VLE can continue
                 documents: arrayUnion(...newDocuments),
                 history: arrayUnion(historyEntry),
             });
@@ -355,92 +381,6 @@ const DocumentUploadCard = ({
             setIsUploading(false);
         }
     };
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Upload More Documents</CardTitle>
-                <CardDescription>The VLE has requested additional documents. Please upload them here.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="flex gap-2">
-                    <Button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        variant="secondary"
-                        className="bg-primary/20 text-primary hover:bg-primary/30"
-                    >
-                        <FileUp className="mr-2 h-4 w-4" /> Choose Files
-                    </Button>
-                </div>
-                <Input
-                    id="customer-documents"
-                    type="file"
-                    multiple
-                    onChange={handleFileChange}
-                    ref={fileInputRef}
-                    className="hidden"
-                />
-                {selectedFiles.length > 0 && (
-                    <div className="text-xs text-muted-foreground space-y-1 mt-2">
-                        <p className="font-medium">Selected files:</p>
-                        {selectedFiles.map((file, i) => (
-                            <div key={i} className="flex items-center gap-2">
-                                <FileText className="h-3 w-3" />
-                                <span>{file.name}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </CardContent>
-            <CardFooter>
-                <Button onClick={handleUpload} disabled={isUploading || selectedFiles.length === 0}>
-                    {isUploading ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                        <UploadCloud className="mr-2 h-4 w-4" />
-                    )}
-                    Upload Documents
-                </Button>
-            </CardFooter>
-        </Card>
-    );
-};
-
-
-export default function TaskDetailPage() {
-    const { taskId } = useParams();
-    const { user, userProfile, loading: authLoading } = useAuth();
-    const router = useRouter();
-    const { toast } = useToast();
-
-    const [task, setTask] = useState<any | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [isPaying, setIsPaying] = useState(false);
-
-    // State for VLE final certificate upload
-    const [selectedCertificate, setSelectedCertificate] = useState<File | null>(null);
-    const [isCertUploading, setIsCertUploading] = useState(false);
-    const vleFileInputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (!taskId) return;
-        const taskRef = doc(db, 'tasks', taskId as string);
-        const unsubscribe = onSnapshot(taskRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setTask({ id: docSnap.id, ...docSnap.data() });
-            } else {
-                console.error("Task not found");
-                setTask(null);
-            }
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching task:", error);
-            setLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [taskId]);
 
     const handleVleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -604,7 +544,12 @@ export default function TaskDetailPage() {
                             <div><Label>Service</Label><p>{task.service}</p></div>
                             <div><Label>Status</Label><div><Badge variant="outline">{task.status}</Badge></div></div>
                             <div><Label>Customer</Label><p>{task.customer}</p></div>
-                            <div><Label>Assigned VLE</Label><p>{task.assignedVleName || 'N/A'}</p></div>
+                            <div>
+                                <Label>Assigned VLE</Label>
+                                <p>
+                                    {isAdmin ? (task.assignedVleName || 'N/A') : (task.assignedVleId ? `VLE ID: ${task.assignedVleId.slice(-6).toUpperCase()}` : 'N/A')}
+                                </p>
+                            </div>
                              {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.rate?.toFixed(2)}</p></div>}
                             {task.acknowledgementNumber && (
                                 <div className="sm:col-span-2"><Label>Acknowledgement #</Label><p>{task.acknowledgementNumber}</p></div>
@@ -676,11 +621,8 @@ export default function TaskDetailPage() {
                                     <RequestInfoDialog taskId={task.id} vleName={userProfile.name} customerId={task.creatorId} />
                                     <CompleteTaskDialog taskId={task.id} vleName={userProfile.name} customerId={task.creatorId} />
                                 </div>
-                           ) : (
-                                <p className="text-sm text-muted-foreground">
-                                    {isAssignedVle ? "This task is not in a state where actions can be taken." : ""}
-                                </p>
-                           )}
+                           ) : null }
+                           
                            {isAssignedVle && task.status === 'Completed' && (
                                 <Card className="bg-muted/50">
                                     <CardHeader className="p-4">
@@ -710,13 +652,60 @@ export default function TaskDetailPage() {
                                 </Card>
                            )}
 
-                           {!isAssignedVle && !isAdmin && !canUploadMoreDocs && <p className="text-sm text-muted-foreground">You are viewing this task as the customer.</p>}
-                           {isAdmin && !isAssignedVle && !canUploadMoreDocs && <p className="text-sm text-muted-foreground">You are viewing this task as an admin.</p>}
+                           {((!isAssignedVle && !isAdmin) || (isAdmin && !canAdminSetPrice)) && !canUploadMoreDocs && task.status !== 'Completed' && (
+                             <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
+                           )}
                         </CardContent>
                     </Card>
                     
                      {canUploadMoreDocs && userProfile && (
-                        <DocumentUploadCard taskId={taskId as string} task={task} userProfile={userProfile} />
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Upload More Documents</CardTitle>
+                                <CardDescription>The VLE has requested additional documents. Please upload them here.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        variant="secondary"
+                                        className="bg-primary/20 text-primary hover:bg-primary/30"
+                                    >
+                                        <FileUp className="mr-2 h-4 w-4" /> Choose Files
+                                    </Button>
+                                </div>
+                                <Input
+                                    id="customer-documents"
+                                    type="file"
+                                    multiple
+                                    onChange={handleFileChange}
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                />
+                                {selectedFiles.length > 0 && (
+                                    <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                                        <p className="font-medium">Selected files:</p>
+                                        {selectedFiles.map((file, i) => (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <FileText className="h-3 w-3" />
+                                                <span>{file.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                            <CardFooter>
+                                <Button onClick={handleUpload} disabled={isUploading || selectedFiles.length === 0}>
+                                    {isUploading ? (
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <UploadCloud className="mr-2 h-4 w-4" />
+                                    )}
+                                    Upload Documents
+                                </Button>
+                            </CardFooter>
+                        </Card>
                     )}
 
                     <Card>

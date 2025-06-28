@@ -367,48 +367,56 @@ export default function CampManagementPage() {
         }
 
         setLoadingData(true);
-        let unsubCamps: () => void = () => {};
-        let unsubServices: () => void = () => {};
-        let unsubVles: () => void = () => {};
+        const unsubscribers: (() => void)[] = [];
 
+        // All users (VLEs & Admins) need to see upcoming camps
+        // Firestore security rules must allow this.
+        const upcomingCampsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'desc'));
+        const unsubUpcomingCamps = onSnapshot(upcomingCampsQuery, (snapshot) => {
+            setCamps(prev => {
+                const existingIds = new Set(prev.map(p => p.id));
+                const newCamps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const merged = [...prev.filter(p => !newCamps.some(nc => nc.id === p.id)), ...newCamps];
+                 return merged.filter((obj, index, self) => index === self.findIndex((t) => (t.id === obj.id)));
+            });
+            setLoadingData(false);
+        }, (err) => {
+            console.error(`Error fetching upcoming camps: `, err);
+            toast({ title: "Data Fetch Error", description: `Could not fetch upcoming camps.`, variant: "destructive" });
+            setLoadingData(false);
+        });
+        unsubscribers.push(unsubUpcomingCamps);
 
         if (userProfile.isAdmin) {
-            const q = query(collection(db, 'camps'), orderBy('date', 'desc'));
-            unsubCamps = onSnapshot(q, (snapshot) => {
-                setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                setLoadingData(false);
+            const allCampsQuery = query(collection(db, 'camps'), orderBy('date', 'desc'));
+            const unsubAllCamps = onSnapshot(allCampsQuery, (snapshot) => {
+                 setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                 setLoadingData(false);
             }, (error) => {
                 console.error("Error fetching admin camps: ", error);
                 toast({ title: "Error", description: "Could not fetch camps.", variant: "destructive" });
                 setLoadingData(false);
             });
+            unsubscribers.push(unsubAllCamps);
             
             const serviceQuery = query(collection(db, 'services'));
-            unsubServices = onSnapshot(serviceQuery, (snapshot) => {
+            const unsubServices = onSnapshot(serviceQuery, (snapshot) => {
                 setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
+            unsubscribers.push(unsubServices);
+
             const vleQuery = query(collection(db, 'vles'));
-            unsubVles = onSnapshot(vleQuery, (snapshot) => {
+            const unsubVles = onSnapshot(vleQuery, (snapshot) => {
                 setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
-        }
-
-        if (userProfile.role === 'vle') {
-            setLoadingData(true);
-            // NOTE: Firestore security rules must allow authenticated users to read the 'camps' collection.
-            const upcomingCampsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'desc'));
-            unsubCamps = onSnapshot(upcomingCampsQuery, (snapshot) => {
-                const fetchedCamps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setCamps(fetchedCamps);
-                setLoadingData(false);
-            }, (err) => {
-                console.error(`Error fetching VLE camps: `, err);
-                toast({ title: "Data Fetch Error", description: `Could not fetch upcoming camps.`, variant: "destructive" });
-                setLoadingData(false);
-            });
+            unsubscribers.push(unsubVles);
+        } else if (userProfile.role === 'vle') {
+             // VLE specific data, e.g., assigned camps can be fetched here if needed
+             // For now, they only see public upcoming camps.
+             setLoadingData(false);
         }
         
-        return () => { unsubCamps(); unsubServices(); unsubVles(); };
+        return () => { unsubscribers.forEach(unsub => unsub()); };
 
     }, [userProfile, authLoading, toast]);
     
@@ -453,7 +461,7 @@ export default function CampManagementPage() {
         return null;
     }
 
-    const CampTable = ({ data, title }: { data: any[], title: string }) => (
+    const AdminCampTable = ({ data, title }: { data: any[], title: string }) => (
         <Card>
             <CardHeader>
                 <CardTitle>{title}</CardTitle>
@@ -579,7 +587,7 @@ export default function CampManagementPage() {
                         <TabsTrigger value="past">Past</TabsTrigger>
                     </TabsList>
                     <TabsContent value="upcoming" className="mt-4">
-                        <CampTable data={upcomingCamps} title="Upcoming Camps" />
+                        <AdminCampTable data={upcomingCamps} title="Upcoming Camps" />
                     </TabsContent>
                     <TabsContent value="suggestions" className="mt-4">
                         <Card>
@@ -612,7 +620,7 @@ export default function CampManagementPage() {
                         </Card>
                     </TabsContent>
                     <TabsContent value="past" className="mt-4">
-                         <CampTable data={pastCamps} title="Past Camps" />
+                         <AdminCampTable data={pastCamps} title="Past Camps" />
                     </TabsContent>
                 </Tabs>
             </div>
@@ -636,7 +644,7 @@ export default function CampManagementPage() {
                     </Button>
                 </div>
                 
-                <VleCampTable data={camps} title="Upcoming Community Camps"/>
+                <VleCampTable data={upcomingCamps} title="Upcoming Community Camps"/>
              </div>
         )
     }

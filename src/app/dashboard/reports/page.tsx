@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Mail, BarChart2, Briefcase, CheckCircle, Clock, AlertTriangle, Wallet } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer, PieChart, Pie, Cell, Legend, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
@@ -48,31 +48,31 @@ const AdminReports = ({ tasks, vles }: { tasks: any[], vles: any[] }) => {
         },
         Completed: {
           label: "Completed",
-          color: "hsl(var(--chart-2))", // Green
+          color: "hsl(var(--chart-2))",
         },
         Assigned: {
           label: "Assigned",
-          color: "hsl(var(--chart-1))", // Blue
+          color: "hsl(var(--chart-1))",
         },
         Unassigned: {
           label: "Unassigned",
-          color: "hsl(var(--chart-3))", // Orange
+          color: "hsl(var(--destructive))",
+        },
+         'Awaiting Documents': {
+          label: "Awaiting Docs",
+          color: "hsl(var(--chart-3))",
         },
         'Awaiting Payment': {
           label: "Awaiting Payment",
-          color: "hsl(var(--chart-4))", // Yellow
+          color: "hsl(var(--chart-4))",
         },
          'Pending Price Approval': {
           label: "Pending Price",
-          color: "hsl(var(--chart-5))", // Purple
+          color: "hsl(var(--chart-5))",
         },
         'Complaint Raised': {
           label: "Complaint",
-          color: "hsl(var(--destructive))", // Red
-        },
-        'Awaiting Documents': {
-          label: "Awaiting Docs",
-          color: "hsl(210, 40%, 96.1%)", // Muted
+          color: "hsl(0, 100%, 30%)",
         },
       } satisfies ChartConfig
 
@@ -319,6 +319,19 @@ export default function ReportsPage() {
     }
     
     if (!userProfile) return null;
+
+    if (userProfile.role === 'customer') {
+        return (
+             <Card>
+                <CardHeader>
+                    <CardTitle>Reports</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p>Reporting features are available for VLEs and Admins.</p>
+                </CardContent>
+            </Card>
+        )
+    }
 
     return userProfile.isAdmin 
         ? <AdminReports tasks={tasks} vles={vles} /> 
