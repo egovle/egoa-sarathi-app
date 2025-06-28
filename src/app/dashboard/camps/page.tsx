@@ -14,11 +14,10 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Check, ChevronsUpDown, Tent, UserPlus, X } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Tent, UserPlus } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { DayPicker } from 'react-day-picker';
 import "react-day-picker/dist/style.css";
 import { createNotification, createNotificationForAdmins } from '@/app/dashboard/page';
@@ -26,124 +25,15 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-
-// --- Multi-Select Component ---
-type MultiSelectItem = {
-    value: string;
-    label: string;
-};
-
-const MultiSelect = ({
-  options,
-  selected,
-  onChange,
-  className,
-  placeholder = "Select options...",
-}: {
-  options: MultiSelectItem[];
-  selected: string[];
-  onChange: React.Dispatch<React.SetStateAction<string[]>>;
-  className?: string;
-  placeholder?: string;
-}) => {
-  const [open, setOpen] = useState(false);
-
-  const handleUnselect = (value: string) => {
-    onChange(selected.filter((s) => s !== value));
-  };
-
-  return (
-    <Popover open={open} onOpenChange={setOpen} modal={false}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={`w-full justify-between h-auto ${selected.length > 0 ? 'h-auto' : 'h-10'}`}
-          onClick={() => setOpen(!open)}
-        >
-            <div className="flex gap-1 flex-wrap">
-                {selected.length > 0 ? options
-                    .filter(option => selected.includes(option.value))
-                    .map(option => (
-                        <Badge
-                            variant="secondary"
-                            key={option.value}
-                            className="mr-1 mb-1"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleUnselect(option.value)
-                            }}
-                        >
-                        {option.label}
-                        <span className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                         onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              handleUnselect(option.value);
-                            }
-                          }}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                          onClick={() => handleUnselect(option.value)}
-                        >
-                            <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                        </span>
-                        </Badge>
-                    )) : placeholder }
-            </div>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
-        <Command className={className}>
-          <CommandInput placeholder="Search..." />
-          <CommandList>
-            <CommandEmpty>No options found.</CommandEmpty>
-            <CommandGroup>
-                {options.map((option) => (
-                    <CommandItem
-                    key={option.value}
-                    onSelect={() => {
-                        onChange(
-                        selected.includes(option.value)
-                            ? selected.filter((item) => item !== option.value)
-                            : [...selected, option.value]
-                        );
-                        setOpen(true);
-                    }}
-                    >
-                    <Check
-                        className={cn(
-                        "mr-2 h-4 w-4",
-                        selected.includes(option.value) ? "opacity-100" : "opacity-0"
-                        )}
-                    />
-                    {option.label}
-                    </CommandItem>
-                ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-};
-
-
 // --- Camp Dialog Components ---
 
-const CampFormDialog = ({ camp, services, onFinished }: { camp?: any; services: any[]; onFinished: () => void; }) => {
+const CampFormDialog = ({ camp, onFinished }: { camp?: any; onFinished: () => void; }) => {
     const { toast } = useToast();
     const [name, setName] = useState(camp?.name || '');
     const [location, setLocation] = useState(camp?.location || '');
     const [date, setDate] = useState<Date | undefined>(camp?.date ? new Date(camp.date) : undefined);
-    const [selectedServices, setSelectedServices] = useState<string[]>(camp?.servicesOffered || []);
     const [loading, setLoading] = useState(false);
     
-    const serviceOptions = useMemo(() => services.map(s => ({ value: s.name, label: s.name })), [services]);
-
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -158,7 +48,6 @@ const CampFormDialog = ({ camp, services, onFinished }: { camp?: any; services: 
             name,
             location,
             date: date.toISOString(),
-            servicesOffered: selectedServices,
             status: camp?.status || 'Upcoming',
         };
 
@@ -205,12 +94,6 @@ const CampFormDialog = ({ camp, services, onFinished }: { camp?: any; services: 
                         </PopoverContent>
                     </Popover>
                 </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">Services Offered</Label>
-                    <div className="col-span-3">
-                        <MultiSelect options={serviceOptions} selected={selectedServices} onChange={setSelectedServices} placeholder="Select services..."/>
-                    </div>
-                </div>
             </div>
             <DialogFooter>
                 <Button type="submit" disabled={loading}>
@@ -227,18 +110,8 @@ const SuggestCampDialog = ({ onFinished }: { onFinished: () => void; }) => {
     const { userProfile } = useAuth();
     const [location, setLocation] = useState('');
     const [date, setDate] = useState<Date | undefined>();
-    const [services, setServices] = useState<string[]>([]);
-    const [serviceOptions, setServiceOptions] = useState<MultiSelectItem[]>([]);
     const [loading, setLoading] = useState(false);
     
-    useEffect(() => {
-        const q = query(collection(db, 'services'));
-        const unsub = onSnapshot(q, (snapshot) => {
-            setServiceOptions(snapshot.docs.map(doc => ({ value: doc.data().name, label: doc.data().name })));
-        });
-        return () => unsub();
-    }, []);
-
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -253,7 +126,6 @@ const SuggestCampDialog = ({ onFinished }: { onFinished: () => void; }) => {
             name: `Suggested by ${userProfile.name}`,
             location,
             date: date.toISOString(),
-            servicesOffered: services,
             status: 'Suggested',
             suggestedBy: {
                 id: userProfile.id,
@@ -296,12 +168,6 @@ const SuggestCampDialog = ({ onFinished }: { onFinished: () => void; }) => {
                         </PopoverContent>
                     </Popover>
                 </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">Services</Label>
-                    <div className="col-span-3">
-                        <MultiSelect options={serviceOptions} selected={services} onChange={setServices} placeholder="Suggest services..."/>
-                    </div>
-                </div>
             </div>
             <DialogFooter>
                 <Button type="submit" disabled={loading}>
@@ -321,7 +187,6 @@ export default function CampManagementPage() {
     const { toast } = useToast();
     
     const [allCamps, setAllCamps] = useState<any[]>([]);
-    const [services, setServices] = useState<any[]>([]);
     const [loadingData, setLoadingData] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSuggestFormOpen, setIsSuggestFormOpen] = useState(false);
@@ -337,9 +202,9 @@ export default function CampManagementPage() {
 
     // Effect for fetching data
     useEffect(() => {
+        if (!userProfile) return;
+
         setLoadingData(true);
-        const unsubscribers: (() => void)[] = [];
-        
         const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
 
         const unsubCamps = onSnapshot(campsQuery, (snapshot) => {
@@ -351,15 +216,8 @@ export default function CampManagementPage() {
             // toast({ title: "Error", description: "Could not fetch camps. Check Firestore rules.", variant: "destructive" });
             setLoadingData(false);
         });
-        unsubscribers.push(unsubCamps);
         
-        const serviceQuery = query(collection(db, 'services'));
-        const unsubServices = onSnapshot(serviceQuery, (snapshot) => {
-            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        });
-        unsubscribers.push(unsubServices);
-        
-        return () => { unsubscribers.forEach(unsub => unsub()); };
+        return () => { unsubCamps() };
 
     }, [userProfile, toast]);
     
@@ -415,7 +273,6 @@ export default function CampManagementPage() {
                             <TableHead>Name</TableHead>
                             <TableHead>Location</TableHead>
                             <TableHead>Date</TableHead>
-                            <TableHead>Services Offered</TableHead>
                              {userProfile.isAdmin && <TableHead className="text-right">Actions</TableHead>}
                         </TableRow>
                     </TableHeader>
@@ -425,11 +282,6 @@ export default function CampManagementPage() {
                                 <TableCell className="font-medium">{camp.name}</TableCell>
                                 <TableCell>{camp.location}</TableCell>
                                 <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
-                                <TableCell className="max-w-xs">
-                                    <div className="flex flex-wrap gap-1">
-                                        {camp.servicesOffered?.map((s: string, i: number) => <Badge key={i} variant="secondary">{s}</Badge>)}
-                                    </div>
-                                </TableCell>
                                 {userProfile.isAdmin && (
                                     <TableCell className="text-right">
                                         <DropdownMenu>
@@ -446,7 +298,7 @@ export default function CampManagementPage() {
                             </TableRow>
                         )) : (
                             <TableRow>
-                                <TableCell colSpan={userProfile.isAdmin ? 5 : 4} className="h-24 text-center">No camps to display.</TableCell>
+                                <TableCell colSpan={userProfile.isAdmin ? 4 : 3} className="h-24 text-center">No camps to display.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
@@ -477,8 +329,15 @@ export default function CampManagementPage() {
             }}>
                 <DialogContent
                     className="sm:max-w-lg"
+                    onInteractOutside={(e) => {
+                      const target = e.target as HTMLElement;
+                      // Allow interaction with popover content
+                      if (target.closest('[data-radix-popper-content-wrapper]')) {
+                        e.preventDefault();
+                      }
+                    }}
                 >
-                    <CampFormDialog camp={selectedCamp} services={services} onFinished={handleFormFinished} />
+                    <CampFormDialog camp={selectedCamp} onFinished={handleFormFinished} />
                 </DialogContent>
             </Dialog>
 
@@ -544,6 +403,12 @@ export default function CampManagementPage() {
                         <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
                              <DialogContent
                                 className="sm:max-w-lg"
+                                onInteractOutside={(e) => {
+                                  const target = e.target as HTMLElement;
+                                  if (target.closest('[data-radix-popper-content-wrapper]')) {
+                                    e.preventDefault();
+                                  }
+                                }}
                             >
                                 <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} />
                             </DialogContent>
@@ -560,3 +425,5 @@ export default function CampManagementPage() {
 
     return userProfile.isAdmin ? <AdminView /> : <PublicView />;
 }
+
+    
