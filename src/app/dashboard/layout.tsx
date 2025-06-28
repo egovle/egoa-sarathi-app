@@ -16,7 +16,8 @@ import {
   Phone,
   Trash2,
   ListPlus,
-  BarChart
+  BarChart,
+  Tent
 } from "lucide-react"
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch, getDocs } from "firebase/firestore";
@@ -47,6 +48,7 @@ const ALL_NAV_ITEMS = [
     { href: "/dashboard", icon: Home, label: "Dashboard", adminOnly: false },
     { href: "/dashboard/extract", icon: BrainCircuit, label: "Smart Extractor", adminOnly: false },
     { href: "/dashboard/reports", icon: BarChart, label: "Reports", adminOnly: false },
+    { href: "/dashboard/camps", icon: Tent, label: "Camps", adminOnly: false },
     { href: "/dashboard/services", icon: ListPlus, label: "Service Management", adminOnly: true },
 ];
 
@@ -88,7 +90,12 @@ export default function DashboardLayout({
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
   
-  const navItems = ALL_NAV_ITEMS.filter(item => !item.adminOnly || userProfile?.isAdmin);
+  const navItems = ALL_NAV_ITEMS.filter(item => {
+    if (item.href === '/dashboard/camps') {
+      return userProfile?.isAdmin || userProfile?.role === 'vle';
+    }
+    return !item.adminOnly || userProfile?.isAdmin
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -114,6 +121,7 @@ export default function DashboardLayout({
     '/dashboard/extract': 'Smart Information Extractor',
     '/dashboard/services': 'Service Management',
     '/dashboard/reports': 'Reports & Analytics',
+    '/dashboard/camps': 'Camp Management',
   };
 
   const getPageTitle = (path: string) => {

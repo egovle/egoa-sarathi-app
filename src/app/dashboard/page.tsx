@@ -5,7 +5,7 @@
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
 import { db } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction, limit } from 'firebase/firestore';
-import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search } from 'lucide-react';
+import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
 
 
 // --- NOTIFICATION HELPERS ---
@@ -397,6 +398,22 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
     return services.filter(s => s.parentId === selectedCategory);
   }, [services, selectedCategory]);
 
+  const selectedService = useMemo(() => {
+    const finalServiceId = selectedSubCategory || selectedCategory;
+    return services.find(s => s.id === finalServiceId);
+  }, [services, selectedCategory, selectedSubCategory]);
+
+  const serviceFee = useMemo(() => {
+    if (!selectedService || selectedService.isVariable) return 0;
+    return parseFloat(selectedService.rate);
+  }, [selectedService]);
+
+  const remainingBalance = useMemo(() => {
+    const currentBalance = creatorProfile?.walletBalance || 0;
+    return currentBalance - serviceFee;
+  }, [creatorProfile, serviceFee]);
+
+
   useEffect(() => {
       setSelectedSubCategory('');
   }, [selectedCategory])
@@ -428,10 +445,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         return;
     }
 
-    const finalServiceId = selectedSubCategory || selectedCategory;
-    const finalService = services.find(s => s.id === finalServiceId);
-
-    if (!finalService) {
+    if (!selectedService) {
         toast({ title: 'Service Required', description: 'Please select a valid service.', variant: 'destructive'});
         setIsSubmitting(false);
         return;
@@ -442,15 +456,15 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         customerAddress: form.address.value,
         customerMobile: form.mobile.value,
         customerEmail: form.email.value,
-        service: finalService.name,
-        serviceId: finalService.id,
+        service: selectedService.name,
+        serviceId: selectedService.id,
         date: new Date().toISOString(),
         history: [{
             timestamp: new Date().toISOString(),
             actorName: creatorProfile?.name || form.name.value,
             actorRole: type === 'VLE Lead' ? 'VLE' : 'Customer',
             action: 'Task Created',
-            details: `Task created for service: ${finalService.name}.`
+            details: `Task created for service: ${selectedService.name}.`
         }],
         acknowledgementNumber: null,
         complaint: null,
@@ -463,7 +477,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
     };
 
     try {
-        await onTaskCreated(newTaskData, finalService);
+        await onTaskCreated(newTaskData, selectedService);
         setDialogOpen(false); // Close dialog on success
     } catch (error) {
         // Error toast is handled by the caller
@@ -540,7 +554,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Specific Service</Label>
                     <div className="col-span-3">
-                        <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory} >
+                        <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory} required>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select a specific service" />
                             </SelectTrigger>
@@ -552,6 +566,30 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                         </Select>
                     </div>
                 </div>
+              )}
+               {selectedService && (
+                 <Card className="col-span-4 bg-muted/50 p-4 mt-2">
+                    <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Current Wallet Balance</span>
+                        <span>₹{creatorProfile.walletBalance?.toFixed(2) || '0.00'}</span>
+                    </div>
+                    {!selectedService.isVariable && (
+                      <>
+                        <div className="flex justify-between text-sm text-destructive">
+                            <span className="text-muted-foreground">Service Fee</span>
+                            <span>- ₹{serviceFee.toFixed(2)}</span>
+                        </div>
+                        <Separator className="my-2" />
+                        <div className={`flex justify-between font-semibold ${remainingBalance < 0 ? 'text-destructive' : ''}`}>
+                            <span>Remaining Balance</span>
+                            <span>₹{remainingBalance.toFixed(2)}</span>
+                        </div>
+                      </>
+                    )}
+                    {selectedService.isVariable && (
+                        <p className="text-xs text-center text-muted-foreground pt-2">An admin will set the final price for this service after reviewing your request.</p>
+                    )}
+                 </Card>
               )}
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label className="text-right pt-2">
@@ -590,8 +628,74 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
   );
 };
 
+const AddBalanceRequestDialog = ({ trigger, onBalanceRequest }: { trigger: React.ReactNode, onBalanceRequest: (amount: number) => void }) => {
+    const { toast } = useToast();
+    const [open, setOpen] = useState(false);
+    const [amount, setAmount] = useState('');
 
-const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 'VLE', userId: string, profileData: any}) => {
+    const handleSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        const amountToAdd = parseFloat(amount);
+        if (isNaN(amountToAdd) || amountToAdd <= 0) {
+            toast({ title: 'Invalid Amount', description: 'Please enter a valid positive number.', variant: 'destructive' });
+            return;
+        }
+        onBalanceRequest(amountToAdd);
+        setOpen(false);
+    };
+
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            setAmount('');
+        }
+        setOpen(isOpen);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>{trigger}</DialogTrigger>
+            <DialogContent>
+                <form onSubmit={handleSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>Add Balance to Wallet</DialogTitle>
+                        <DialogDescription>
+                            Please transfer funds to the details below and then create a request here. An admin will verify and credit your wallet.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 grid gap-6">
+                        <Card className="bg-muted/50">
+                            <CardHeader className='p-4'>
+                                <CardTitle className="text-base">Payment Details</CardTitle>
+                            </CardHeader>
+                            <CardContent className='p-4 pt-0 text-sm space-y-2'>
+                                <p><b>UPI ID:</b> admin-upi@ybl</p>
+                                <p><b>Bank:</b> HDFC Bank</p>
+                                <p><b>Account:</b> 1234567890</p>
+                            </CardContent>
+                        </Card>
+                        <div className="grid gap-2">
+                            <Label htmlFor="amount">Amount Transferred (₹)</Label>
+                            <Input
+                                id="amount"
+                                type="number"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                placeholder="e.g., 500"
+                                required
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit">Submit Request</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
+const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userType: 'Customer' | 'VLE', userId: string, profileData: any, onBalanceRequest: (amount: number) => void}) => {
     const { toast } = useToast();
 
     type BankAccount = {
@@ -702,11 +806,15 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
         </AlertDialog>
 
         <Card>
-            <CardHeader>
+            <CardHeader className='flex-row items-center justify-between'>
                 <CardTitle className="flex items-center gap-2">
                     <Wallet className="h-5 w-5 text-muted-foreground" />
                     <span>Wallet Balance</span>
                 </CardTitle>
+                 <AddBalanceRequestDialog 
+                    trigger={<Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4"/>Add Balance</Button>}
+                    onBalanceRequest={onBalanceRequest}
+                />
             </CardHeader>
             <CardContent>
                 <div className="text-3xl font-bold">₹{userProfile.walletBalance?.toFixed(2) || '0.00'}</div>
@@ -815,7 +923,7 @@ const ProfileView = ({ userType, userId, profileData }: {userType: 'Customer' | 
 )};
 
 
-const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+const CustomerDashboard = ({ tasks, userId, userProfile, services, camps, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], camps: any[], onTaskCreated: (task: any, service: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -831,23 +939,23 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
       <Tabs defaultValue="tasks" className="w-full">
           <div className='flex items-center justify-between'>
             <TabsList>
-                <TabsTrigger value="tasks">My Tasks</TabsTrigger>
+                <TabsTrigger value="tasks">My Bookings</TabsTrigger>
                 <TabsTrigger value="complaints">My Complaints</TabsTrigger>
             </TabsList>
-             <TaskCreatorDialog services={services} creatorId={userId} creatorProfile={userProfile} type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />New Request</Button>} />
+             <TaskCreatorDialog services={services} creatorId={userId} creatorProfile={userProfile} type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />Create New Booking</Button>} />
           </div>
-            <TabsContent value="tasks" className="mt-4">
+            <TabsContent value="tasks" className="mt-4 space-y-6">
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle>My Service Requests</CardTitle>
-                                <CardDescription>Track your ongoing and completed service requests.</CardDescription>
+                                <CardTitle>My Service Bookings</CardTitle>
+                                <CardDescription>Track your ongoing and completed service bookings.</CardDescription>
                             </div>
                             <div className="relative">
                                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input 
-                                    placeholder="Search tasks by ID or service..." 
+                                    placeholder="Search by ID or service..." 
                                     className="pl-8 w-64"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -899,6 +1007,42 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
                     </Table>
                     </CardContent>
                 </Card>
+                {camps.length > 0 && (
+                     <Card>
+                        <CardHeader>
+                            <CardTitle className='flex items-center gap-2'><Tent className='h-5 w-5 text-primary'/>Upcoming Camps</CardTitle>
+                            <CardDescription>View details about upcoming service camps in your area.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Camp Name</TableHead>
+                                        <TableHead>Location</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Services Offered</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {camps.map(camp => (
+                                        <TableRow key={camp.id}>
+                                            <TableCell className="font-medium">{camp.name}</TableCell>
+                                            <TableCell>{camp.location}</TableCell>
+                                            <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
+                                            <TableCell className='max-w-sm'>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {camp.servicesOffered?.map((serviceName: string, index: number) => (
+                                                        <Badge key={index} variant="secondary">{serviceName}</Badge>
+                                                    ))}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                     </Card>
+                )}
             </TabsContent>
             <TabsContent value="complaints" className="mt-4">
                 <Card>
@@ -1146,7 +1290,7 @@ const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.R
 };
 
 
-const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance }: { allTasks: any[], vles: any[], allUsers: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void, onUpdateVleBalance: (vleId: string, amount: number) => void }) => {
+const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest }: { allTasks: any[], vles: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void }) => {
     const vlesForManagement = vles.filter(v => !v.isAdmin);
     const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
     const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
@@ -1231,7 +1375,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                     <StatCard title="Open Complaints" value={complaints.filter(c => c.status === 'Open').length.toString()} icon={AlertTriangle} description="Awaiting admin response" />
                     <StatCard title="Pending Pricing" value={pricingTasks.length.toString()} icon={Wallet} description="Tasks needing price approval" />
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     <Card>
                         <CardHeader>
                             <CardTitle>VLEs Pending Approval</CardTitle>
@@ -1297,6 +1441,39 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                 </Table>
                             ) : (
                                 <p className="text-sm text-muted-foreground">No tasks are currently pending pricing.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>Pending Balance Requests</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {paymentRequests.length > 0 ? (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>User</TableHead>
+                                            <TableHead>Amount</TableHead>
+                                            <TableHead className="text-right">Action</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {paymentRequests.map(req => (
+                                            <TableRow key={req.id}>
+                                                <TableCell>{req.userName}</TableCell>
+                                                <TableCell>₹{req.amount.toFixed(2)}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button variant="outline" size="sm" onClick={() => onApproveBalanceRequest(req)}>
+                                                        <CheckCircle2 className="mr-2 h-4 w-4" /> Approve
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No pending balance requests.</p>
                             )}
                         </CardContent>
                     </Card>
@@ -1554,6 +1731,8 @@ export default function DashboardPage() {
     const [vles, setVles] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [services, setServices] = useState<any[]>([]);
+    const [camps, setCamps] = useState<any[]>([]);
+    const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
     const [realtimeProfile, setRealtimeProfile] = useState<any | null>(null);
     
     const activeTab = useMemo(() => {
@@ -1610,6 +1789,8 @@ export default function DashboardPage() {
         let unsubscribeVles: () => void = () => {};
         let unsubscribeUsers: () => void = () => {};
         let unsubscribeServices: () => void = () => {};
+        let unsubscribeCamps: () => void = () => {};
+        let unsubscribePaymentRequests: () => void = () => {};
 
         const primaryRole = realtimeProfile.isAdmin ? 'admin' : realtimeProfile.role;
 
@@ -1639,6 +1820,11 @@ export default function DashboardPage() {
                 setAllUsers(fetchedUsers);
             });
 
+            const paymentRequestsQuery = query(collection(db, "paymentRequests"), where("status", "==", "pending"));
+            unsubscribePaymentRequests = onSnapshot(paymentRequestsQuery, (snapshot) => {
+                 setPaymentRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            });
+
         } else if (primaryRole === 'vle') {
             const tasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
             unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
@@ -1653,6 +1839,10 @@ export default function DashboardPage() {
                 fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                 setTasks(fetchedTasks);
             });
+             const campsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'asc'));
+             unsubscribeCamps = onSnapshot(campsQuery, (snapshot) => {
+                setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+             });
         }
         
         return () => {
@@ -1660,6 +1850,8 @@ export default function DashboardPage() {
             unsubscribeVles();
             unsubscribeUsers();
             unsubscribeServices();
+            unsubscribeCamps();
+            unsubscribePaymentRequests();
         };
     }, [user, realtimeProfile]);
 
@@ -1881,6 +2073,47 @@ export default function DashboardPage() {
         }
     };
     
+    const handleBalanceRequest = async (amount: number) => {
+        if (!user || !realtimeProfile) return;
+        
+        await addDoc(collection(db, "paymentRequests"), {
+            userId: user.uid,
+            userName: realtimeProfile.name,
+            userRole: realtimeProfile.role || 'customer',
+            amount,
+            status: 'pending',
+            date: new Date().toISOString()
+        });
+        
+        toast({ title: 'Request Submitted', description: 'Your request to add balance has been sent to an admin for verification.' });
+        
+        await createNotificationForAdmins('New Balance Request', `${realtimeProfile.name} has requested to add ₹${amount.toFixed(2)} to their wallet.`);
+    };
+    
+     const handleApproveBalanceRequest = async (req: any) => {
+        const userRef = doc(db, req.userRole === 'vle' ? 'vles' : 'users', req.userId);
+        const reqRef = doc(db, 'paymentRequests', req.id);
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                const userDoc = await transaction.get(userRef);
+                if (!userDoc.exists()) throw new Error("User document not found.");
+
+                const currentBalance = userDoc.data().walletBalance || 0;
+                const newBalance = currentBalance + req.amount;
+                
+                transaction.update(userRef, { walletBalance: newBalance });
+                transaction.update(reqRef, { status: 'approved', approvedBy: user?.uid, approvedAt: new Date().toISOString() });
+            });
+
+            toast({ title: 'Balance Added', description: `Successfully added ₹${req.amount.toFixed(2)} to ${req.userName}'s wallet.` });
+            await createNotification(req.userId, 'Wallet Balance Updated', `An admin has approved your request and added ₹${req.amount.toFixed(2)} to your wallet.`);
+        } catch (error: any) {
+            console.error("Failed to approve balance request:", error);
+            toast({ title: "Approval Failed", description: error.message || "Could not update the user's balance.", variant: 'destructive' });
+        }
+    };
+
     if (loading || !user || !realtimeProfile) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
@@ -1893,16 +2126,16 @@ export default function DashboardPage() {
     
     const renderContent = () => {
         if (activeTab === 'profile') {
-            return <ProfileView userType={primaryRole === 'vle' ? 'VLE' : 'Customer'} userId={user!.uid} profileData={realtimeProfile} />
+            return <ProfileView userType={primaryRole === 'vle' ? 'VLE' : 'Customer'} userId={user!.uid} profileData={realtimeProfile} onBalanceRequest={handleBalanceRequest} />
         }
 
         switch (primaryRole) {
             case 'admin':
-                return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} />;
+                return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} />;
             case 'vle':
                 return <VLEDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'customer':
-                return <CustomerDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
+                return <CustomerDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} camps={camps} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
             default:
                  return (
                     <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
