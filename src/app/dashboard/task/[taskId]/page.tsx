@@ -517,7 +517,7 @@ export default function TaskDetailPage() {
                         </CardHeader>
                         <CardContent className="grid sm:grid-cols-2 gap-4">
                             <div><Label>Service</Label><p>{task.service}</p></div>
-                            <div><Label>Status</Label><p><Badge variant="outline">{task.status}</Badge></p></div>
+                            <div><Label>Status</Label><div><Badge variant="outline">{task.status}</Badge></div></div>
                             <div><Label>Customer</Label><p>{task.customer}</p></div>
                             <div><Label>Assigned VLE</Label><p>{task.assignedVleName || 'N/A'}</p></div>
                              {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.rate?.toFixed(2)}</p></div>}
