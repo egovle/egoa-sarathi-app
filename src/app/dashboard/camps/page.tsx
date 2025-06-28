@@ -69,7 +69,7 @@ const MultiSelect = ({
                         <Badge
                             variant="secondary"
                             key={option.value}
-                            className="mr-1"
+                            className="mr-1 mb-1"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleUnselect(option.value)
@@ -99,8 +99,8 @@ const MultiSelect = ({
       <PopoverContent className="w-full p-0">
         <Command className={className}>
           <CommandInput placeholder="Search..." />
-          <CommandEmpty>No options found.</CommandEmpty>
           <CommandList>
+            <CommandEmpty>No options found.</CommandEmpty>
             <CommandGroup>
                 {options.map((option) => (
                     <CommandItem
@@ -143,8 +143,8 @@ const CampFormDialog = ({ camp, services, vles, onFinished }: { camp?: any; serv
     const [assignedVles, setAssignedVles] = useState<string[]>(camp?.assignedVleIds || []);
     const [loading, setLoading] = useState(false);
     
-    const serviceOptions = services.map(s => ({ value: s.name, label: s.name }));
-    const vleOptions = vles.filter(v => !v.isAdmin).map(v => ({ value: v.id, label: v.name }));
+    const serviceOptions = useMemo(() => services.map(s => ({ value: s.name, label: s.name })), [services]);
+    const vleOptions = useMemo(() => vles.filter(v => !v.isAdmin).map(v => ({ value: v.id, label: v.name })), [vles]);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -170,7 +170,15 @@ const CampFormDialog = ({ camp, services, vles, onFinished }: { camp?: any; serv
                 await updateDoc(doc(db, "camps", camp.id), campData);
                  toast({ title: 'Camp Updated', description: `${name} has been successfully updated.` });
             } else {
-                await addDoc(collection(db, "camps"), campData);
+                const docRef = await addDoc(collection(db, "camps"), campData);
+                await createNotificationForAdmins('New Camp Created', `A new camp "${name}" has been scheduled at ${location}.`, `/dashboard/camps`);
+                
+                // Notify assigned VLEs
+                const notificationPromises = assignedVles.map(vleId => 
+                    createNotification(vleId, 'You are assigned to a new camp!', `You have been assigned to the "${name}" camp.`, `/dashboard/camps`)
+                );
+                await Promise.all(notificationPromises);
+
                 toast({ title: 'Camp Created', description: `${name} has been successfully created.` });
             }
             onFinished();
@@ -359,10 +367,14 @@ export default function CampManagementPage() {
         }
 
         setLoadingData(true);
+        let unsubCamps: () => void = () => {};
+        let unsubServices: () => void = () => {};
+        let unsubVles: () => void = () => {};
+
 
         if (userProfile.isAdmin) {
             const q = query(collection(db, 'camps'), orderBy('date', 'desc'));
-            const unsubCamps = onSnapshot(q, (snapshot) => {
+            unsubCamps = onSnapshot(q, (snapshot) => {
                 setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
                 setLoadingData(false);
             }, (error) => {
@@ -372,39 +384,37 @@ export default function CampManagementPage() {
             });
             
             const serviceQuery = query(collection(db, 'services'));
-            const unsubServices = onSnapshot(serviceQuery, (snapshot) => {
+            unsubServices = onSnapshot(serviceQuery, (snapshot) => {
                 setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
             const vleQuery = query(collection(db, 'vles'));
-            const unsubVles = onSnapshot(vleQuery, (snapshot) => {
+            unsubVles = onSnapshot(vleQuery, (snapshot) => {
                 setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
-            return () => { unsubCamps(); unsubServices(); unsubVles(); };
         }
 
         if (userProfile.role === 'vle') {
             setLoadingData(true);
-            const assignedQuery = query(collection(db, 'camps'), where('assignedVleIds', 'array-contains', userProfile.id));
-            const unsubAssigned = onSnapshot(assignedQuery, (snapshot) => {
-                const assignedCamps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                assignedCamps.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setCamps(assignedCamps);
+            // NOTE: Firestore security rules must allow authenticated users to read the 'camps' collection.
+            const upcomingCampsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'desc'));
+            unsubCamps = onSnapshot(upcomingCampsQuery, (snapshot) => {
+                const fetchedCamps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setCamps(fetchedCamps);
                 setLoadingData(false);
             }, (err) => {
                 console.error(`Error fetching VLE camps: `, err);
-                toast({ title: "Data Fetch Error", description: `Could not fetch your assigned camps.`, variant: "destructive" });
+                toast({ title: "Data Fetch Error", description: `Could not fetch upcoming camps.`, variant: "destructive" });
                 setLoadingData(false);
             });
-            
-            return () => {
-                unsubAssigned();
-            };
         }
+        
+        return () => { unsubCamps(); unsubServices(); unsubVles(); };
+
     }, [userProfile, authLoading, toast]);
     
-    const upcomingCamps = camps.filter(c => c.status === 'Upcoming');
-    const pastCamps = camps.filter(c => c.status === 'Completed' || new Date(c.date) < new Date());
-    const suggestedCamps = camps.filter(c => c.status === 'Suggested');
+    const upcomingCamps = useMemo(() => camps.filter(c => c.status === 'Upcoming'), [camps]);
+    const pastCamps = useMemo(() => camps.filter(c => c.status === 'Completed' || (new Date(c.date) < new Date() && c.status !== 'Upcoming')), [camps]);
+    const suggestedCamps = useMemo(() => camps.filter(c => c.status === 'Suggested'), [camps]);
 
     const handleEdit = (camp: any) => {
         setSelectedCamp(camp);
@@ -517,7 +527,7 @@ export default function CampManagementPage() {
                                 <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
                                 <TableCell className="max-w-xs">
                                     <div className="flex flex-wrap gap-1">
-                                        {camp.servicesOffered.map((s: string, i: number) => <Badge key={i} variant="secondary">{s}</Badge>)}
+                                        {camp.servicesOffered?.map((s: string, i: number) => <Badge key={i} variant="secondary">{s}</Badge>)}
                                     </div>
                                 </TableCell>
                             </TableRow>
@@ -587,7 +597,7 @@ export default function CampManagementPage() {
                                     <TableBody>
                                         {suggestedCamps.length > 0 ? suggestedCamps.map(camp => (
                                             <TableRow key={camp.id}>
-                                                <TableCell>{camp.suggestedBy.name}</TableCell>
+                                                <TableCell>{camp.suggestedBy?.name}</TableCell>
                                                 <TableCell>{camp.location}</TableCell>
                                                 <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
                                                 <TableCell className="text-right space-x-2">
@@ -619,13 +629,14 @@ export default function CampManagementPage() {
                     </DialogContent>
                 </Dialog>
 
-                 <div className="flex justify-end">
+                 <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-bold tracking-tight">Camps</h2>
                     <Button onClick={() => setIsSuggestFormOpen(true)}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
                     </Button>
                 </div>
                 
-                <VleCampTable data={camps} title="Your Assigned Camps"/>
+                <VleCampTable data={camps} title="Upcoming Community Camps"/>
              </div>
         )
     }

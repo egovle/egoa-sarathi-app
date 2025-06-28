@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Mail, BarChart2, Briefcase, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { Loader2, Mail, BarChart2, Briefcase, CheckCircle, Clock, AlertTriangle, Wallet } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -42,29 +42,37 @@ const AdminReports = ({ tasks, vles }: { tasks: any[], vles: any[] }) => {
         });
     }, [tasks, vles]);
 
-    const chartConfig: ChartConfig = {
+     const chartConfig: ChartConfig = {
         count: {
           label: "Tasks",
         },
-        Assigned: {
-          label: "Assigned",
-          color: "hsl(var(--chart-1))",
-        },
         Completed: {
           label: "Completed",
-          color: "hsl(var(--chart-2))",
+          color: "hsl(var(--chart-2))", // Green
+        },
+        Assigned: {
+          label: "Assigned",
+          color: "hsl(var(--chart-1))", // Blue
         },
         Unassigned: {
           label: "Unassigned",
-          color: "hsl(var(--chart-3))",
+          color: "hsl(var(--chart-3))", // Orange
         },
         'Awaiting Payment': {
           label: "Awaiting Payment",
-          color: "hsl(var(--chart-4))",
+          color: "hsl(var(--chart-4))", // Yellow
         },
          'Pending Price Approval': {
           label: "Pending Price",
-          color: "hsl(var(--chart-5))",
+          color: "hsl(var(--chart-5))", // Purple
+        },
+        'Complaint Raised': {
+          label: "Complaint",
+          color: "hsl(var(--destructive))", // Red
+        },
+        'Awaiting Documents': {
+          label: "Awaiting Docs",
+          color: "hsl(210, 40%, 96.1%)", // Muted
         },
       } satisfies ChartConfig
 
@@ -100,11 +108,28 @@ eGoa Sarathi Admin Team
                     </CardHeader>
                     <CardContent>
                         <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-                            <BarChart accessibilityLayer data={taskStatusData}>
-                                <CartesianGrid vertical={false} />
-                                <XAxis dataKey="status" tickLine={false} tickMargin={10} axisLine={false} />
-                                <ChartTooltip content={<ChartTooltipContent />} />
-                                <Bar dataKey="count" fill="var(--color-Assigned)" radius={4} />
+                            <BarChart accessibilityLayer data={taskStatusData} layout="vertical">
+                                <CartesianGrid horizontal={false} />
+                                <XAxis type="number" hide />
+                                 <YAxis
+                                    dataKey="status"
+                                    type="category"
+                                    tickLine={false}
+                                    tickMargin={10}
+                                    axisLine={false}
+                                />
+                                <ChartTooltip 
+                                    cursor={false}
+                                    content={<ChartTooltipContent 
+                                        labelKey="count"
+                                        indicator="dot"
+                                    />} 
+                                />
+                                <Bar dataKey="count" radius={5}>
+                                    {taskStatusData.map((entry) => (
+                                        <Cell key={entry.status} fill={chartConfig[entry.status]?.color || 'hsl(var(--muted))'} />
+                                    ))}
+                                </Bar>
                             </BarChart>
                         </ChartContainer>
                     </CardContent>

@@ -26,6 +26,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
+import { format } from 'date-fns';
 
 
 // --- NOTIFICATION HELPERS ---
@@ -438,7 +439,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
     const form = e.target as HTMLFormElement;
 
-    // If sub-categories exist, one must be selected.
     if (subServices.length > 0 && !selectedSubCategory) {
         toast({ title: 'Specific Service Required', description: 'Please select an option from the "Specific Service" dropdown.', variant: 'destructive'});
         setIsSubmitting(false);
@@ -567,7 +567,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                     </div>
                 </div>
               )}
-               {selectedService && (
+               {selectedService && creatorProfile && (
                  <Card className="col-span-4 bg-muted/50 p-4 mt-2">
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Current Wallet Balance</span>
@@ -922,6 +922,75 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
     </div>
 )};
 
+const UpcomingCamps = () => {
+    const [camps, setCamps] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        // NOTE: This requires Firestore security rules to allow global reads on 'camps' for any authenticated user.
+        const q = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'asc'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setLoading(false);
+        }, (error) => {
+            console.error("Could not fetch upcoming camps:", error);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    if (loading) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Upcoming Camps</CardTitle>
+                </CardHeader>
+                <CardContent className="flex justify-center items-center h-24">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                </CardContent>
+            </Card>
+        );
+    }
+    
+    if (camps.length === 0) {
+        return null; // Don't show the card if there are no upcoming camps
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Tent className="h-5 w-5 text-primary"/>Upcoming Camps</CardTitle>
+                <CardDescription>Find out about service camps happening near you.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Location</TableHead>
+                            <TableHead>Services Offered</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {camps.map(camp => (
+                            <TableRow key={camp.id}>
+                                <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
+                                <TableCell>{camp.location}</TableCell>
+                                <TableCell className="max-w-sm">
+                                     <div className="flex flex-wrap gap-1">
+                                        {camp.servicesOffered?.map((s: string, i: number) => <Badge key={i} variant="secondary">{s}</Badge>)}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+};
+
 
 const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
@@ -945,6 +1014,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
              <TaskCreatorDialog services={services} creatorId={userId} creatorProfile={userProfile} type="Customer Request" onTaskCreated={onTaskCreated} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />Create New Booking</Button>} />
           </div>
             <TabsContent value="tasks" className="mt-4 space-y-6">
+                <UpcomingCamps />
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -1156,15 +1226,21 @@ const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger
     const [open, setOpen] = useState(false);
     const [selectedVleId, setSelectedVleId] = useState('');
 
-    const handleAssign = () => {
+    const handleAssign = async () => {
         if (!selectedVleId) {
             toast({ title: 'Select a VLE', description: 'Please select a VLE to assign the task.', variant: 'destructive' });
             return;
         }
         const vle = availableVles.find(v => v.id === selectedVleId);
-        onAssign(taskId, selectedVleId, vle.name);
-        toast({ title: 'Task Assigned', description: `Task ${taskId.slice(-6).toUpperCase()} has been assigned.`});
-        setOpen(false);
+        
+        try {
+            await onAssign(taskId, selectedVleId, vle.name);
+            toast({ title: 'Task Assigned', description: `Task ${taskId.slice(-6).toUpperCase()} has been assigned.`});
+            setOpen(false);
+        } catch (error) {
+            // Error toast is handled by the caller
+            console.error("Assignment failed, dialog will remain open.");
+        }
     }
 
     const handleOpenChange = (isOpen: boolean) => {
@@ -1254,7 +1330,7 @@ const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.R
 };
 
 
-const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest }: { allTasks: any[], vles: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void }) => {
+const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest }: { allTasks: any[], vles: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void }) => {
     const vlesForManagement = vles.filter(v => !v.isAdmin);
     const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
     const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
@@ -1600,7 +1676,11 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
                             </TableHeader>
                             <TableBody>
                                 {filteredTasks.map(task => {
-                                    const availableVles = vles.filter(v => v.status === 'Approved' && v.available && v.id !== task.creatorId);
+                                    const availableVles = vles.filter(vle => 
+                                        vle.status === 'Approved' && 
+                                        vle.available && 
+                                        vle.id !== task.creatorId // Exclude the VLE who created the task
+                                    );
                                     return (
                                         <TableRow key={task.id}>
                                             <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
@@ -1752,7 +1832,6 @@ export default function DashboardPage() {
         let unsubscribeVles: () => void = () => {};
         let unsubscribeUsers: () => void = () => {};
         let unsubscribeServices: () => void = () => {};
-        let unsubscribeCamps: () => void = () => {};
         let unsubscribePaymentRequests: () => void = () => {};
 
         const primaryRole = realtimeProfile.isAdmin ? 'admin' : realtimeProfile.role;
@@ -1809,7 +1888,6 @@ export default function DashboardPage() {
             unsubscribeVles();
             unsubscribeUsers();
             unsubscribeServices();
-            unsubscribeCamps();
             unsubscribePaymentRequests();
         };
     }, [user, realtimeProfile]);
