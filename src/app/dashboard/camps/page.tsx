@@ -383,54 +383,21 @@ export default function CampManagementPage() {
         }
 
         if (userProfile.role === 'vle') {
-            // Parallel listeners for VLE to prevent permission errors
+            setLoadingData(true);
             const assignedQuery = query(collection(db, 'camps'), where('assignedVleIds', 'array-contains', userProfile.id));
-            const upcomingQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'));
-
-            let assignedCamps: any[] = [];
-            let upcomingCamps: any[] = [];
-            let assignedListenerFired = false;
-            let upcomingListenerFired = false;
-
-            const mergeAndSetState = () => {
-                if (!assignedListenerFired || !upcomingListenerFired) return;
-
-                const allCampsById = new Map();
-                assignedCamps.forEach(camp => allCampsById.set(camp.id, camp));
-                upcomingCamps.forEach(camp => {
-                    if (!allCampsById.has(camp.id)) {
-                        allCampsById.set(camp.id, camp);
-                    }
-                });
-
-                const mergedCamps = Array.from(allCampsById.values());
-                mergedCamps.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                
-                setCamps(mergedCamps);
-                setLoadingData(false);
-            };
-            
-            const handleError = (error: Error, type: string) => {
-                console.error(`Error fetching VLE camps (${type}): `, error);
-                toast({ title: "Data Fetch Error", description: `Could not fetch ${type} camps.`, variant: "destructive" });
-                setLoadingData(false);
-            };
-
             const unsubAssigned = onSnapshot(assignedQuery, (snapshot) => {
-                assignedCamps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                assignedListenerFired = true;
-                mergeAndSetState();
-            }, (err) => handleError(err, 'assigned'));
+                const assignedCamps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                assignedCamps.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setCamps(assignedCamps);
+                setLoadingData(false);
+            }, (err) => {
+                console.error(`Error fetching VLE camps: `, err);
+                toast({ title: "Data Fetch Error", description: `Could not fetch your assigned camps.`, variant: "destructive" });
+                setLoadingData(false);
+            });
             
-            const unsubUpcoming = onSnapshot(upcomingQuery, (snapshot) => {
-                upcomingCamps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                upcomingListenerFired = true;
-                mergeAndSetState();
-            }, (err) => handleError(err, 'upcoming'));
-
             return () => {
                 unsubAssigned();
-                unsubUpcoming();
             };
         }
     }, [userProfile, authLoading, toast]);
@@ -644,9 +611,6 @@ export default function CampManagementPage() {
     
     // VLE VIEW
     if (userProfile.role === 'vle') {
-        const myCamps = camps.filter(c => c.assignedVleIds?.includes(userProfile.id));
-        const otherUpcomingCamps = camps.filter(c => c.status === 'Upcoming' && !c.assignedVleIds?.includes(userProfile.id));
-
         return (
              <div className="space-y-6">
                 <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
@@ -661,8 +625,7 @@ export default function CampManagementPage() {
                     </Button>
                 </div>
                 
-                <VleCampTable data={myCamps} title="Your Assigned Camps"/>
-                <VleCampTable data={otherUpcomingCamps} title="Other Upcoming Camps"/>
+                <VleCampTable data={camps} title="Your Assigned Camps"/>
              </div>
         )
     }

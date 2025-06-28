@@ -29,7 +29,7 @@ import { Separator } from '@/components/ui/separator';
 
 
 // --- NOTIFICATION HELPERS ---
-async function createNotification(userId: string, title: string, description: string, link?: string) {
+export async function createNotification(userId: string, title: string, description: string, link?: string) {
     if (!userId) return;
     await addDoc(collection(db, "notifications"), {
         userId,
@@ -41,7 +41,7 @@ async function createNotification(userId: string, title: string, description: st
     });
 }
 
-async function createNotificationForAdmins(title: string, description: string, link?: string) {
+export async function createNotificationForAdmins(title: string, description: string, link?: string) {
     try {
         const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true));
         const adminSnapshot = await getDocs(adminsQuery);
@@ -923,7 +923,7 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
 )};
 
 
-const CustomerDashboard = ({ tasks, userId, userProfile, services, camps, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], camps: any[], onTaskCreated: (task: any, service: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -1007,42 +1007,6 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, camps, onTask
                     </Table>
                     </CardContent>
                 </Card>
-                {camps.length > 0 && (
-                     <Card>
-                        <CardHeader>
-                            <CardTitle className='flex items-center gap-2'><Tent className='h-5 w-5 text-primary'/>Upcoming Camps</CardTitle>
-                            <CardDescription>View details about upcoming service camps in your area.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Camp Name</TableHead>
-                                        <TableHead>Location</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Services Offered</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {camps.map(camp => (
-                                        <TableRow key={camp.id}>
-                                            <TableCell className="font-medium">{camp.name}</TableCell>
-                                            <TableCell>{camp.location}</TableCell>
-                                            <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
-                                            <TableCell className='max-w-sm'>
-                                                <div className="flex flex-wrap gap-1">
-                                                    {camp.servicesOffered?.map((serviceName: string, index: number) => (
-                                                        <Badge key={index} variant="secondary">{serviceName}</Badge>
-                                                    ))}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </CardContent>
-                     </Card>
-                )}
             </TabsContent>
             <TabsContent value="complaints" className="mt-4">
                 <Card>
@@ -1731,7 +1695,6 @@ export default function DashboardPage() {
     const [vles, setVles] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [services, setServices] = useState<any[]>([]);
-    const [camps, setCamps] = useState<any[]>([]);
     const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
     const [realtimeProfile, setRealtimeProfile] = useState<any | null>(null);
     
@@ -1839,10 +1802,6 @@ export default function DashboardPage() {
                 fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                 setTasks(fetchedTasks);
             });
-             const campsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'asc'));
-             unsubscribeCamps = onSnapshot(campsQuery, (snapshot) => {
-                setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-             });
         }
         
         return () => {
@@ -2135,7 +2094,7 @@ export default function DashboardPage() {
             case 'vle':
                 return <VLEDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'customer':
-                return <CustomerDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} camps={camps} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
+                return <CustomerDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
             default:
                  return (
                     <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
