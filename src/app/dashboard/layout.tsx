@@ -15,7 +15,8 @@ import {
   Mail,
   Phone,
   Trash2,
-  ListPlus
+  ListPlus,
+  BarChart
 } from "lucide-react"
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch, getDocs } from "firebase/firestore";
@@ -45,6 +46,7 @@ import { cn } from "@/lib/utils";
 const ALL_NAV_ITEMS = [
     { href: "/dashboard", icon: Home, label: "Dashboard", adminOnly: false },
     { href: "/dashboard/extract", icon: BrainCircuit, label: "Smart Extractor", adminOnly: false },
+    { href: "/dashboard/reports", icon: BarChart, label: "Reports", adminOnly: false },
     { href: "/dashboard/services", icon: ListPlus, label: "Service Management", adminOnly: true },
 ];
 
@@ -111,6 +113,7 @@ export default function DashboardLayout({
     '/dashboard': 'Dashboard',
     '/dashboard/extract': 'Smart Information Extractor',
     '/dashboard/services': 'Service Management',
+    '/dashboard/reports': 'Reports & Analytics',
   };
 
   const getPageTitle = (path: string) => {

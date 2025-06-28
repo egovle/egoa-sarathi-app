@@ -1148,7 +1148,6 @@ const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.R
 
 const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance }: { allTasks: any[], vles: any[], allUsers: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => void, onUpdateVleBalance: (vleId: string, amount: number) => void }) => {
     const vlesForManagement = vles.filter(v => !v.isAdmin);
-    const availableVles = vlesForManagement.filter(v => v.status === 'Approved' && v.available);
     const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
     const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
@@ -1459,34 +1458,37 @@ const AdminDashboard = ({ allTasks, vles, allUsers, onComplaintResponse, onVleAp
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredTasks.map(task => (
-                                    <TableRow key={task.id}>
-                                        <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
-                                        <TableCell>{task.customer}</TableCell>
-                                        <TableCell>{task.service}</TableCell>
-                                        <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                                        <TableCell>{task.assignedVleName || 'N/A'}</TableCell>
-                                        <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center w-full"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
-                                                    {task.status === 'Unassigned' && (
-                                                        <AssignVleDialog 
-                                                            trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><GitFork className="mr-2 h-4 w-4"/>Assign VLE</DropdownMenuItem>}
-                                                            taskId={task.id}
-                                                            availableVles={availableVles}
-                                                            onAssign={onVleAssign}
-                                                        />
-                                                    )}
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
+                                {filteredTasks.map(task => {
+                                    const availableVles = vles.filter(v => v.status === 'Approved' && v.available && v.id !== task.creatorId);
+                                    return (
+                                        <TableRow key={task.id}>
+                                            <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
+                                            <TableCell>{task.customer}</TableCell>
+                                            <TableCell>{task.service}</TableCell>
+                                            <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
+                                            <TableCell>{task.assignedVleName || 'N/A'}</TableCell>
+                                            <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center w-full"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
+                                                        {task.status === 'Unassigned' && (
+                                                            <AssignVleDialog 
+                                                                trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><GitFork className="mr-2 h-4 w-4"/>Assign VLE</DropdownMenuItem>}
+                                                                taskId={task.id}
+                                                                availableVles={availableVles}
+                                                                onAssign={onVleAssign}
+                                                            />
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    )
+                                })}
                             </TableBody>
                         </Table>
                     </CardContent>
