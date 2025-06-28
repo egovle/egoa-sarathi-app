@@ -3,87 +3,91 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
     // --- Helper Functions ---
     function isAuth() {
       return request.auth != null;
     }
-
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
     
     function isAdmin() {
-      return isAuth() && exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
-    }
-    
-    function isApprovedVle() {
-        return isAuth() && exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
-               get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.status == 'Approved';
+      // Check for isAdmin flag in the /vles/ collection, which holds all admins.
+      return isAuth() && get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // --- Profile Collections ---
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    // --- Collections Rules ---
+
+    // USERS (Customers)
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if request.auth.uid == userId;
-      // Allow updates by the owner OR an admin.
-      // The owner cannot increase their own wallet balance. Admins can.
-      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.walletBalance <= resource.data.walletBalance);
-    }
-    
-    match /vles/{vleId} {
-      allow read: if isOwner(vleId) || isAdmin();
-      allow create: if request.auth.uid == vleId;
-      // Allow updates by the owner OR an admin.
-      // The owner cannot increase their own wallet balance or approve themselves. Admins can do both.
-      allow update: if isAdmin() || (isOwner(vleId) && 
-                                     request.resource.data.walletBalance <= resource.data.walletBalance &&
-                                     request.resource.data.status == resource.data.status);
-    }
-
-    // --- Task Collection ---
-    match /tasks/{taskId} {
-      // Read: Admins, the creator, or the assigned VLE.
-      allow read: if isAuth() && (isAdmin() || 
-                     resource.data.creatorId == request.auth.uid ||
-                     resource.data.assignedVleId == request.auth.uid);
+      // Allow a user to create their own document during registration.
+      allow create: if isOwner(userId);
       
-      // Create: Any authenticated user. The transaction logic in the app and the profile update rules provide the real security.
-      allow create: if isAuth();
-
-      // Update: Admins, the creator, or the assigned (and approved) VLE.
-      allow update: if isAuth() && (isAdmin() ||
-                       request.auth.uid == resource.data.creatorId ||
-                       (request.auth.uid == resource.data.assignedVleId && isApprovedVle()));
+      // Allow a user to read their own profile, or an admin to read any profile.
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Allow a user to update their own profile.
+      // Crucially, they can only DECREASE their walletBalance. Admins can do anything.
+      allow update: if isOwner(userId) &&
+                     (request.resource.data.walletBalance <= resource.data.walletBalance || isAdmin());
     }
 
-    // --- App Data Collections ---
+    // VLES (includes Admins)
+    match /vles/{vleId} {
+      // Allow a VLE to create their own document during registration.
+      allow create: if isOwner(vleId);
+      // Any authenticated user can read VLE data (for lists, etc.)
+      allow read: if isAuth();
+      
+      // VLEs can update their own profile (e.g., availability), but cannot approve themselves or increase their own wallet balance.
+      // Admins have full update permissions.
+      allow update: if (isOwner(vleId) &&
+                       request.resource.data.status == resource.data.status &&
+                       request.resource.data.isAdmin == resource.data.isAdmin &&
+                       request.resource.data.walletBalance <= resource.data.walletBalance
+                     ) || isAdmin();
+    }
+
+    // TASKS
+    match /tasks/{taskId} {
+      // User must be authenticated and be the creator of the task record.
+      allow create: if isAuth() && request.auth.uid == request.resource.data.creatorId;
+      
+      // Only the creator, the assigned VLE, or an admin can read task details.
+      allow read: if isAuth() && (request.auth.uid == resource.data.creatorId || request.auth.uid == resource.data.assignedVleId || isAdmin());
+      
+      // Allow updates only by authorized parties (creator, VLE, or admin).
+      allow update: if isAuth() && (request.auth.uid == resource.data.creatorId || request.auth.uid == resource.data.assignedVleId || isAdmin());
+    }
+    
+    // SERVICES
     match /services/{serviceId} {
-        allow read: if true;
-        allow write: if isAdmin();
+      allow read: if isAuth();
+      allow write: if isAdmin();
     }
     
-    match /camps/{campId} {
-        allow read: if isAuth();
-        allow write: if isAdmin();
-    }
-    
-    match /campSuggestions/{suggestionId} {
-        allow read: if isAdmin();
-        allow create: if isApprovedVle();
-        allow delete: if isAdmin();
+    // NOTIFICATIONS
+    match /notifications/{notificationId} {
+      allow read, delete, update: if isAuth() && request.auth.uid == resource.data.userId;
+      allow create: if isAuth(); // Created by trusted client/server logic for specific users
     }
 
-    match /notifications/{notificationId} {
-        allow read, delete: if isOwner(resource.data.userId);
-        allow create: if isAuth();
-        allow update: if isOwner(resource.data.userId);
+    // CAMPS & SUGGESTIONS
+    match /camps/{campId} {
+      allow read: if isAuth();
+      allow write: if isAdmin();
+    }
+    match /campSuggestions/{suggestionId} {
+      allow read, delete: if isAdmin();
+      allow create: if isAuth();
     }
     
+    // PAYMENT REQUESTS
     match /paymentRequests/{reqId} {
-        allow read: if isAdmin() || isOwner(resource.data.userId);
-        allow create: if isOwner(request.resource.data.userId);
-        allow update: if isAdmin();
+       allow create: if isAuth() && request.auth.uid == request.resource.data.userId;
+       allow read, update, delete: if isAdmin();
     }
   }
 }

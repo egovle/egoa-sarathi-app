@@ -3,26 +3,37 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Default deny all reads and writes for security.
-    match /{allPaths=**} {
-      allow read, write: if false;
+
+    // --- Helper Functions ---
+    function isAdmin() {
+      // Checks if the requesting user has an isAdmin flag in the 'vles' collection.
+      return get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // This rule handles all files related to tasks.
+    function isTaskParticipant(taskId) {
+      // Fetches the task document from Firestore to check if the user is the creator or assigned VLE.
+      let taskDoc = get(/databases/$(database)/documents/tasks/$(taskId)).data;
+      return request.auth.uid == taskDoc.creatorId || request.auth.uid == taskDoc.assignedVleId;
+    }
+    
+    // --- Rules for Task Documents ---
+    // The path matches any file inside a folder named with a taskId.
     match /tasks/{taskId}/{allPaths=**} {
-      // Allow any authenticated user to UPLOAD (write) files.
-      // This is secure because task IDs are unique and unguessable.
-      // The read rule below provides strict security for accessing files AFTER creation.
-      allow write: if request.auth != null;
+    
+      // READ access is strict.
+      // Only the task creator, the assigned VLE, or an admin can read files.
+      allow read: if request.auth != null && (isAdmin() || isTaskParticipant(taskId));
+      
+      // CREATE (initial upload) access is permissive.
+      // Any authenticated user can upload files. This is necessary because the
+      // Firestore task document doesn't exist yet when the upload begins.
+      // This is secure because taskIds are long, random, and unguessable.
+      allow create: if request.auth != null;
 
-      // Allow READ access only if the user is the task creator, the assigned VLE, or an admin.
-      // This rule queries Firestore to verify the user's role for the given task.
-      allow read: if request.auth != null && (
-        get(/databases/$(database)/documents/tasks/$(taskId)).data.creatorId == request.auth.uid ||
-        get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId == request.auth.uid ||
-        get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true
-      );
+      // UPDATE and DELETE access is strict.
+      // Once a file exists, only the task creator, VLE, or an admin can modify or delete it.
+      // This prevents unauthorized users from tampering with existing documents.
+      allow update, delete: if request.auth != null && (isAdmin() || isTaskParticipant(taskId));
     }
   }
 }
