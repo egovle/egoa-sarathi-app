@@ -54,7 +54,7 @@ const SetPriceDialog = ({ taskId, customerId, onPriceSet }: { taskId: string, cu
         const taskRef = doc(db, "tasks", taskId);
         const historyEntry = {
             timestamp: new Date().toISOString(),
-            actorName: userProfile.name,
+            actorName: userProfile?.name || 'Admin',
             actorRole: 'Admin',
             action: 'Final Price Set',
             details: `Final price set to ₹${finalRate.toFixed(2)}.`,
@@ -63,7 +63,7 @@ const SetPriceDialog = ({ taskId, customerId, onPriceSet }: { taskId: string, cu
         try {
             await updateDoc(taskRef, {
                 status: 'Awaiting Payment',
-                finalRate: finalRate,
+                rate: finalRate,
                 history: arrayUnion(historyEntry)
             });
             await createNotification(
@@ -334,7 +334,7 @@ export default function TaskDetailPage() {
             const taskRef = doc(db, 'tasks', taskId as string);
             const historyEntry = {
                 timestamp: new Date().toISOString(),
-                actorName: userProfile.name,
+                actorName: userProfile?.name || 'Customer',
                 actorRole: 'Customer',
                 action: 'Documents Uploaded',
                 details: `${newDocuments.length} new document(s) were uploaded.`,
@@ -380,7 +380,7 @@ export default function TaskDetailPage() {
             const taskRef = doc(db, 'tasks', taskId as string);
             const historyEntry = {
                 timestamp: new Date().toISOString(),
-                actorName: userProfile.name,
+                actorName: userProfile?.name || 'VLE',
                 actorRole: 'VLE',
                 action: 'Final Certificate Uploaded',
                 details: `Uploaded: ${finalCertificate.name}`,
@@ -410,6 +410,11 @@ export default function TaskDetailPage() {
     };
     
     const handlePayment = async () => {
+        if (!userProfile) {
+            toast({ title: 'Error', description: 'User profile not loaded. Please try again.', variant: 'destructive' });
+            setIsPaying(false);
+            return;
+        }
         setIsPaying(true);
 
         const adminQuery = query(collection(db, 'vles'), where('isAdmin', '==', true), limit(1));
@@ -432,10 +437,10 @@ export default function TaskDetailPage() {
                 if (!customerDoc.exists() || !adminDoc.exists()) throw new Error("User or admin not found.");
 
                 const customerBalance = customerDoc.data().walletBalance || 0;
-                if (customerBalance < task.finalRate) throw new Error("Insufficient wallet balance.");
+                if (customerBalance < task.rate) throw new Error("Insufficient wallet balance.");
 
-                const newCustomerBalance = customerBalance - task.finalRate;
-                const newAdminBalance = (adminDoc.data().walletBalance || 0) + task.finalRate;
+                const newCustomerBalance = customerBalance - task.rate;
+                const newAdminBalance = (adminDoc.data().walletBalance || 0) + task.rate;
 
                 transaction.update(customerRef, { walletBalance: newCustomerBalance });
                 transaction.update(adminRef, { walletBalance: newAdminBalance });
@@ -445,7 +450,7 @@ export default function TaskDetailPage() {
                     actorName: userProfile.name,
                     actorRole: userProfile.role,
                     action: 'Payment Completed',
-                    details: `Paid ₹${task.finalRate.toFixed(2)}.`,
+                    details: `Paid ₹${task.rate.toFixed(2)}.`,
                 };
                 transaction.update(taskRef, {
                     status: 'Unassigned',
@@ -453,7 +458,7 @@ export default function TaskDetailPage() {
                 });
             });
 
-            toast({ title: 'Payment Successful!', description: `₹${task.finalRate.toFixed(2)} has been deducted from your wallet.` });
+            toast({ title: 'Payment Successful!', description: `₹${task.rate.toFixed(2)} has been deducted from your wallet.` });
 
         } catch (error: any) {
             console.error("Payment transaction failed: ", error);
@@ -515,7 +520,7 @@ export default function TaskDetailPage() {
                             <div><Label>Status</Label><p><Badge variant="outline">{task.status}</Badge></p></div>
                             <div><Label>Customer</Label><p>{task.customer}</p></div>
                             <div><Label>Assigned VLE</Label><p>{task.assignedVleName || 'N/A'}</p></div>
-                             {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.finalRate?.toFixed(2) || task.rate?.toFixed(2)}</p></div>}
+                             {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.rate?.toFixed(2)}</p></div>}
                             {task.acknowledgementNumber && (
                                 <div className="sm:col-span-2"><Label>Acknowledgement #</Label><p>{task.acknowledgementNumber}</p></div>
                             )}
@@ -528,10 +533,10 @@ export default function TaskDetailPage() {
                                 <CardTitle>Action Required: Complete Payment</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="mb-4">The final price for this service has been set to <strong>₹{task.finalRate.toFixed(2)}</strong>. Please approve and pay to proceed.</p>
+                                <p className="mb-4">The final price for this service has been set to <strong>₹{task.rate.toFixed(2)}</strong>. Please approve and pay to proceed.</p>
                                  <Button onClick={handlePayment} disabled={isPaying}>
                                     {isPaying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wallet className="mr-2 h-4 w-4" />}
-                                    Approve & Pay ₹{task.finalRate.toFixed(2)}
+                                    Approve & Pay ₹{task.rate.toFixed(2)}
                                 </Button>
                             </CardContent>
                         </Card>
@@ -581,14 +586,14 @@ export default function TaskDetailPage() {
                            {canAdminSetPrice && (
                                 <SetPriceDialog taskId={task.id} customerId={task.creatorId} onPriceSet={() => {}} />
                            )}
-                           {canVleTakeAction ? (
+                           {canVleTakeAction && userProfile ? (
                                 <div className='flex flex-col gap-2'>
                                     <RequestInfoDialog taskId={task.id} vleName={userProfile.name} customerId={task.creatorId} />
                                     <CompleteTaskDialog taskId={task.id} vleName={userProfile.name} customerId={task.creatorId} />
                                 </div>
                            ) : (
                                 <p className="text-sm text-muted-foreground">
-                                    {isAssignedVle ? "This task is not in a state where actions can be taken." : "You are not the assigned VLE for this task."}
+                                    {isAssignedVle ? "This task is not in a state where actions can be taken." : ""}
                                 </p>
                            )}
                            {isAssignedVle && task.status === 'Completed' && (

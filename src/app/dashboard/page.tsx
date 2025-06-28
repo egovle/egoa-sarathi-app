@@ -1658,6 +1658,15 @@ export default function DashboardPage() {
 
 
     const handleCreateTask = async (newTaskData: any, service: any) => {
+        if (!realtimeProfile) {
+            toast({
+                title: 'Error',
+                description: 'User profile not fully loaded. Please wait a moment and try again.',
+                variant: 'destructive',
+            });
+            throw new Error("Profile not loaded");
+        }
+
         if (service.isVariable) {
             // --- Variable Rate Flow ---
             const taskWithStatus = { ...newTaskData, status: 'Pending Price Approval', rate: service.rate };
