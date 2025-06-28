@@ -4,7 +4,7 @@
 import { useState, useEffect, type FormEvent, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Check, ChevronsUpDown, Tent, UserPlus } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Check, ChevronsUpDown, Tent, UserPlus, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -341,39 +341,33 @@ export default function CampManagementPage() {
         const unsubscribers: (() => void)[] = [];
         
         let campsQuery;
-        if (userProfile?.isAdmin) {
-             campsQuery = query(collection(db, 'camps'), orderBy('date', 'desc'));
-        } else {
-            // For customers and VLEs, only show upcoming camps.
-            // THIS REQUIRES FIRESTORE RULES TO ALLOW.
-            campsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'asc'));
-        }
+        // Public query for all users
+        campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
 
         const unsubCamps = onSnapshot(campsQuery, (snapshot) => {
              setAllCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
              setLoadingData(false);
         }, (error) => {
             console.error("Error fetching camps: ", error);
-            toast({ title: "Error", description: "Could not fetch camps. You may not have permission.", variant: "destructive" });
+            // This toast is helpful for debugging permissions, but can be annoying.
+            // toast({ title: "Error", description: "Could not fetch camps. Check Firestore rules.", variant: "destructive" });
             setLoadingData(false);
         });
         unsubscribers.push(unsubCamps);
         
         // Admins need services for the creation dialog
-        if (userProfile?.isAdmin) {
-            const serviceQuery = query(collection(db, 'services'));
-            const unsubServices = onSnapshot(serviceQuery, (snapshot) => {
-                setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            });
-            unsubscribers.push(unsubServices);
-        }
+        const serviceQuery = query(collection(db, 'services'));
+        const unsubServices = onSnapshot(serviceQuery, (snapshot) => {
+            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        unsubscribers.push(unsubServices);
         
         return () => { unsubscribers.forEach(unsub => unsub()); };
 
     }, [userProfile, toast]);
     
-    const upcomingCamps = useMemo(() => allCamps.filter(c => c.status === 'Upcoming'), [allCamps]);
-    const pastCamps = useMemo(() => allCamps.filter(c => c.status === 'Completed'), [allCamps]);
+    const upcomingCamps = useMemo(() => allCamps.filter(c => new Date(c.date) >= new Date() && c.status !== 'Suggested'), [allCamps]);
+    const pastCamps = useMemo(() => allCamps.filter(c => new Date(c.date) < new Date()), [allCamps]);
     const suggestedCamps = useMemo(() => allCamps.filter(c => c.status === 'Suggested'), [allCamps]);
 
 
@@ -413,6 +407,56 @@ export default function CampManagementPage() {
     if (!userProfile) {
         return null; // Redirect logic in useEffect handles this
     }
+    
+    const CampTable = ({ data, title }: { data: any[], title: string }) => (
+        <Card>
+            {title && <CardHeader><CardTitle>{title}</CardTitle></CardHeader>}
+            <CardContent className={cn(!title && 'pt-6')}>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Location</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Services Offered</TableHead>
+                             {userProfile.isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {data.length > 0 ? data.map((camp) => (
+                            <TableRow key={camp.id}>
+                                <TableCell className="font-medium">{camp.name}</TableCell>
+                                <TableCell>{camp.location}</TableCell>
+                                <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
+                                <TableCell className="max-w-xs">
+                                    <div className="flex flex-wrap gap-1">
+                                        {camp.servicesOffered?.map((s: string, i: number) => <Badge key={i} variant="secondary">{s}</Badge>)}
+                                    </div>
+                                </TableCell>
+                                {userProfile.isAdmin && (
+                                    <TableCell className="text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => handleEdit(camp)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleDelete(camp)} className="text-destructive"><Trash className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                )}
+                            </TableRow>
+                        )) : (
+                            <TableRow>
+                                <TableCell colSpan={userProfile.isAdmin ? 5 : 4} className="h-24 text-center">No camps to display.</TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
 
     const AdminView = () => (
         <div className="space-y-4">
@@ -436,11 +480,8 @@ export default function CampManagementPage() {
             }}>
                 <DialogContent
                     className="sm:max-w-lg"
-                    onPointerDownOutside={(e) => {
-                        const target = e.target as HTMLElement;
-                        if (target.closest('[data-radix-popper-content-wrapper]')) {
-                            e.preventDefault();
-                        }
+                    onInteractOutside={(e) => {
+                        e.preventDefault();
                     }}
                 >
                     <CampFormDialog camp={selectedCamp} services={services} onFinished={handleFormFinished} />
@@ -507,13 +548,10 @@ export default function CampManagementPage() {
                 {userProfile.role === 'vle' && (
                     <>
                         <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
-                            <DialogContent
+                             <DialogContent
                                 className="sm:max-w-lg"
-                                onPointerDownOutside={(e) => {
-                                    const target = e.target as HTMLElement;
-                                    if (target.closest('[data-radix-popper-content-wrapper]')) {
-                                        e.preventDefault();
-                                    }
+                                onInteractOutside={(e) => {
+                                   e.preventDefault();
                                 }}
                             >
                                 <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} />
@@ -529,57 +567,5 @@ export default function CampManagementPage() {
          </div>
     );
 
-    const CampTable = ({ data, title }: { data: any[], title: string }) => (
-        <Card>
-            {title && <CardHeader><CardTitle>{title}</CardTitle></CardHeader>}
-            <CardContent className={cn(!title && 'pt-6')}>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Location</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Services Offered</TableHead>
-                             {userProfile.isAdmin && <TableHead className="text-right">Actions</TableHead>}
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {data.length > 0 ? data.map((camp) => (
-                            <TableRow key={camp.id}>
-                                <TableCell className="font-medium">{camp.name}</TableCell>
-                                <TableCell>{camp.location}</TableCell>
-                                <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
-                                <TableCell className="max-w-xs">
-                                    <div className="flex flex-wrap gap-1">
-                                        {camp.servicesOffered?.map((s: string, i: number) => <Badge key={i} variant="secondary">{s}</Badge>)}
-                                    </div>
-                                </TableCell>
-                                {userProfile.isAdmin && (
-                                    <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleEdit(camp)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleDelete(camp)} className="text-destructive"><Trash className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
-                                )}
-                            </TableRow>
-                        )) : (
-                            <TableRow>
-                                <TableCell colSpan={userProfile.isAdmin ? 5 : 4} className="h-24 text-center">No camps to display.</TableCell>
-                            </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
-    );
-
     return userProfile.isAdmin ? <AdminView /> : <PublicView />;
 }
-
-    
