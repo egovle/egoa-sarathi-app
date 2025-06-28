@@ -501,6 +501,11 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         setDialogOpen(false); 
     } catch (error) {
         console.error("Error creating task:", error);
+        toast({
+            title: 'Task Creation Failed',
+            description: 'There was an error creating your task. Please check your balance and try again.',
+            variant: 'destructive',
+        });
     } finally {
         setIsSubmitting(false);
     }
@@ -1958,7 +1963,7 @@ export default function DashboardPage() {
                 console.error("Task creation transaction failed: ", error);
                 toast({
                     title: 'Payment Failed',
-                    description: error.message || 'Could not process the payment. Please try again.',
+                    description: error.message || 'Could not process payment. Please ensure you have sufficient wallet balance.',
                     variant: 'destructive',
                 });
                 throw error;
