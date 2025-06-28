@@ -1,10 +1,11 @@
+
 'use client';
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, LogIn, Mail, Lock, Phone, Loader2 } from 'lucide-react';
+import { ShieldCheck, LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -20,6 +21,7 @@ const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -89,13 +91,23 @@ export default function LoginPage() {
                   <Lock className="absolute left-3.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
+                   <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:bg-transparent"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                    </Button>
                 </div>
               </div>
               <Button type="submit" disabled={loading} className="w-full mt-4">
@@ -126,3 +138,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

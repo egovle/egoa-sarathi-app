@@ -402,6 +402,10 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
   const handleCreateTask = async (e: FormEvent) => {
     e.preventDefault();
+    if (!creatorProfile) {
+        toast({ title: "Error", description: "Your profile is still loading, please wait a moment.", variant: 'destructive' });
+        return;
+    }
     setIsSubmitting(true);
 
     if(selectedFiles.length === 0) {
@@ -413,8 +417,18 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         setIsSubmitting(false);
         return;
     }
+
     const form = e.target as HTMLFormElement;
-    const finalService = services.find(s => s.id === selectedSubCategory);
+
+    // If sub-categories exist, one must be selected.
+    if (subServices.length > 0 && !selectedSubCategory) {
+        toast({ title: 'Specific Service Required', description: 'Please select an option from the "Specific Service" dropdown.', variant: 'destructive'});
+        setIsSubmitting(false);
+        return;
+    }
+
+    const finalServiceId = selectedSubCategory || selectedCategory;
+    const finalService = services.find(s => s.id === finalServiceId);
 
     if (!finalService) {
         toast({ title: 'Service Required', description: 'Please select a valid service.', variant: 'destructive'});
@@ -429,7 +443,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         customerEmail: form.email.value,
         service: finalService.name,
         serviceId: finalService.id,
-        // Status and rate will be handled by the parent component
         date: new Date().toISOString(),
         history: [{
             timestamp: new Date().toISOString(),
@@ -526,13 +539,13 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Specific Service</Label>
                     <div className="col-span-3">
-                        <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory} required>
+                        <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory}>
                             <SelectTrigger disabled={subServices.length === 0}>
                                 <SelectValue placeholder="Select a specific service" />
                             </SelectTrigger>
                             <SelectContent>
                                 {subServices?.map(s => (
-                                    <SelectItem key={s.id} value={s.id}>{s.name} - {s.isVariable ? `From ₹${s.rate}` : `₹${s.rate}`}</SelectItem>
+                                    <SelectItem key={s.id} value={s.id}>{s.name} - {s.isVariable ? s.rate : `₹${s.rate}`}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
@@ -1534,28 +1547,19 @@ export default function DashboardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     
-    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'tasks');
-
     const [tasks, setTasks] = useState<any[]>([]);
     const [vles, setVles] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [services, setServices] = useState<any[]>([]);
     const [realtimeProfile, setRealtimeProfile] = useState<any | null>(null);
     
-    // This effect keeps the activeTab state in sync with the URL's search params.
-    useEffect(() => {
+    const activeTab = useMemo(() => {
         const tabFromUrl = searchParams.get('tab');
-        const defaultTab = userProfile?.isAdmin ? 'overview' : (userProfile?.role === 'vle' ? 'tasks' : 'tasks');
-
-        if (tabFromUrl && tabFromUrl !== activeTab) {
-            setActiveTab(tabFromUrl);
-        } else if (!tabFromUrl) {
-            // If there's no tab in URL, reset to default based on role
-            // This handles clicking the "Home" icon
-            setActiveTab(defaultTab);
-        }
-    }, [searchParams, userProfile, activeTab]);
-
+        if (tabFromUrl) return tabFromUrl;
+        if (userProfile?.isAdmin) return 'overview';
+        if (userProfile?.role) return 'tasks';
+        return 'tasks'; // default fallback
+    }, [searchParams, userProfile]);
 
     useEffect(() => {
         if (!loading && !user) {
@@ -1706,9 +1710,10 @@ export default function DashboardPage() {
                     const adminRef = doc(db, 'vles', adminUser.id);
 
                     const creatorDoc = await transaction.get(creatorRef);
+                    if (!creatorDoc.exists()) throw new Error("User performing transaction not found.");
+                    
                     const adminDoc = await transaction.get(adminRef);
-
-                    if (!creatorDoc.exists() || !adminDoc.exists()) throw new Error("User or admin not found during transaction.");
+                    if (!adminDoc.exists()) throw new Error("Admin user not found for transaction.");
                     
                     const creatorBalance = creatorDoc.data().walletBalance || 0;
                     if (creatorBalance < rate) throw new Error("Insufficient wallet balance.");
@@ -1854,13 +1859,17 @@ export default function DashboardPage() {
     const primaryRole = realtimeProfile.isAdmin ? 'admin' : realtimeProfile.role;
     
     const renderContent = () => {
+        if (activeTab === 'profile') {
+            return <ProfileView userType={primaryRole === 'vle' ? 'VLE' : 'Customer'} userId={user!.uid} profileData={realtimeProfile} />
+        }
+
         switch (primaryRole) {
             case 'admin':
                 return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} />;
             case 'vle':
-                return <VLEDashboard tasks={tasks} userId={user.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
+                return <VLEDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'customer':
-                return <CustomerDashboard tasks={tasks} userId={user.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
+                return <CustomerDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
             default:
                  return (
                     <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
@@ -1870,10 +1879,7 @@ export default function DashboardPage() {
         }
     }
 
-    if(activeTab === 'profile') {
-        return <ProfileView userType={primaryRole === 'vle' ? 'VLE' : 'Customer'} userId={user.uid} profileData={realtimeProfile} />
-    }
-
     return renderContent();
 }
+
 
