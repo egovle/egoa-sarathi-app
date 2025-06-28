@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Check, ChevronsUpDown, Tent, UserPlus } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Check, ChevronsUpDown, Tent, UserPlus, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -24,6 +24,8 @@ import "react-day-picker/dist/style.css";
 import { createNotification, createNotificationForAdmins } from '@/app/dashboard/page';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
 
 // --- Multi-Select Component ---
 type MultiSelectItem = {
@@ -346,24 +348,29 @@ export default function CampManagementPage() {
 
     // Effect for fetching data
     useEffect(() => {
-        if (authLoading || !userProfile || userProfile.role === 'customer') {
-            if(!authLoading) setLoadingData(false);
+        if (authLoading || !userProfile) {
+            if (!authLoading) setLoadingData(false);
+            return;
+        }
+
+        if (userProfile.role === 'customer') {
+            setLoadingData(false);
             return;
         }
 
         setLoadingData(true);
-        const q = query(collection(db, 'camps'), orderBy('date', 'desc'));
-        const unsubCamps = onSnapshot(q, (snapshot) => {
-            setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            setLoadingData(false);
-        }, (error) => {
-            console.error("Error fetching camps: ", error);
-            toast({ title: "Error", description: "Could not fetch camps.", variant: "destructive" });
-            setLoadingData(false);
-        });
-        
-        // Admins need services and VLEs for the form
+
         if (userProfile.isAdmin) {
+            const q = query(collection(db, 'camps'), orderBy('date', 'desc'));
+            const unsubCamps = onSnapshot(q, (snapshot) => {
+                setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setLoadingData(false);
+            }, (error) => {
+                console.error("Error fetching admin camps: ", error);
+                toast({ title: "Error", description: "Could not fetch camps.", variant: "destructive" });
+                setLoadingData(false);
+            });
+            
             const serviceQuery = query(collection(db, 'services'));
             const unsubServices = onSnapshot(serviceQuery, (snapshot) => {
                 setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -375,7 +382,57 @@ export default function CampManagementPage() {
             return () => { unsubCamps(); unsubServices(); unsubVles(); };
         }
 
-        return () => unsubCamps();
+        if (userProfile.role === 'vle') {
+            // Parallel listeners for VLE to prevent permission errors
+            const assignedQuery = query(collection(db, 'camps'), where('assignedVleIds', 'array-contains', userProfile.id));
+            const upcomingQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'));
+
+            let assignedCamps: any[] = [];
+            let upcomingCamps: any[] = [];
+            let assignedListenerFired = false;
+            let upcomingListenerFired = false;
+
+            const mergeAndSetState = () => {
+                if (!assignedListenerFired || !upcomingListenerFired) return;
+
+                const allCampsById = new Map();
+                assignedCamps.forEach(camp => allCampsById.set(camp.id, camp));
+                upcomingCamps.forEach(camp => {
+                    if (!allCampsById.has(camp.id)) {
+                        allCampsById.set(camp.id, camp);
+                    }
+                });
+
+                const mergedCamps = Array.from(allCampsById.values());
+                mergedCamps.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                
+                setCamps(mergedCamps);
+                setLoadingData(false);
+            };
+            
+            const handleError = (error: Error, type: string) => {
+                console.error(`Error fetching VLE camps (${type}): `, error);
+                toast({ title: "Data Fetch Error", description: `Could not fetch ${type} camps.`, variant: "destructive" });
+                setLoadingData(false);
+            };
+
+            const unsubAssigned = onSnapshot(assignedQuery, (snapshot) => {
+                assignedCamps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                assignedListenerFired = true;
+                mergeAndSetState();
+            }, (err) => handleError(err, 'assigned'));
+            
+            const unsubUpcoming = onSnapshot(upcomingQuery, (snapshot) => {
+                upcomingCamps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                upcomingListenerFired = true;
+                mergeAndSetState();
+            }, (err) => handleError(err, 'upcoming'));
+
+            return () => {
+                unsubAssigned();
+                unsubUpcoming();
+            };
+        }
     }, [userProfile, authLoading, toast]);
     
     const upcomingCamps = camps.filter(c => c.status === 'Upcoming');
