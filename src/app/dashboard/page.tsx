@@ -1892,6 +1892,16 @@ export default function DashboardPage() {
         } else {
             // --- Fixed Rate Flow ---
             const rate = parseFloat(service.rate);
+
+            if (!service.isVariable && rate <= 0) {
+                toast({
+                    title: 'Invalid Service Selection',
+                    description: 'This appears to be a category. Please select a specific sub-service to proceed.',
+                    variant: 'destructive',
+                });
+                throw new Error("Cannot book a category service.");
+            }
+
             if ((realtimeProfile?.walletBalance || 0) < rate) {
                 toast({
                     title: 'Insufficient Balance',
