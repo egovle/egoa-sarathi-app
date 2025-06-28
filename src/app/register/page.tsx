@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -9,12 +10,13 @@ import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useState, type FormEvent, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Loader2, ShieldCheck, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type PostOffice = {
   Name: string;
@@ -43,6 +45,14 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [isPincodeLoading, setIsPincodeLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [isConfigMissing, setIsConfigMissing] = useState(false);
+
+  useEffect(() => {
+    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    if (!apiKey || apiKey === 'your_api_key_here') {
+      setIsConfigMissing(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (pincode.length !== 6) {
@@ -192,6 +202,15 @@ export default function RegisterPage() {
           <CardDescription className="text-center">Enter your details below to create an account</CardDescription>
         </CardHeader>
         <CardContent>
+          {isConfigMissing && (
+            <Alert variant="destructive" className="mb-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Configuration Error</AlertTitle>
+                <AlertDescription>
+                Your Firebase API Key is missing. Please ask the administrator to configure the application before you can register.
+                </AlertDescription>
+            </Alert>
+          )}
           <form onSubmit={handleFormSubmit} className="grid gap-4">
             <div className="grid gap-2 text-left">
               <Label>Register as</Label>
@@ -286,7 +305,7 @@ export default function RegisterPage() {
               <Label htmlFor="address">Address (House No, Street)</Label>
               <Input id="address" name="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123, Main Street" required />
             </div>
-            <Button type="submit" disabled={loading || isPincodeLoading} className="w-full mt-2">
+            <Button type="submit" disabled={loading || isPincodeLoading || isConfigMissing} className="w-full mt-2">
               {loading ? <Loader2 className="animate-spin" /> : 'Create an account'}
             </Button>
             {role === 'vle' && (
@@ -297,7 +316,7 @@ export default function RegisterPage() {
           </form>
           <div className="mt-4 text-center text-sm">
             <span className="text-muted-foreground">Already have an account?{' '}</span>
-            <Link href="/" className="underline font-semibold text-primary" prefetch={false}>
+            <Link href="/" className={cn("underline font-semibold text-primary", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>
               Log in
             </Link>
           </div>
@@ -306,3 +325,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+
