@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -13,103 +14,103 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Check for a custom claim `isAdmin` on the user's auth token.
-      // This is more secure than checking a document field.
-      // You can set this using the Firebase Admin SDK.
-      // For now, we will check the document, but this is the recommended path.
+      // Check if the user document exists in 'vles' and has the isAdmin flag set to true.
       return isAuth() && get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
     
     function isVle() {
+      // Check if a user exists in the 'vles' collection.
       return isAuth() && exists(/databases/$(database)/documents/vles/$(request.auth.uid));
+    }
+
+    function isCreator(taskId) {
+      return isOwner(get(/databases/$(database)/documents/tasks/$(taskId)).data.creatorId);
+    }
+    
+    function isAssignedVle(taskId) {
+      let taskData = get(/databases/$(database)/documents/tasks/$(taskId)).data;
+      // Check if assignedVleId exists and if the user is the owner of it.
+      return 'assignedVleId' in taskData && taskData.assignedVleId != null && isOwner(taskData.assignedVleId);
     }
     
     // --- Global Admin Override ---
-    // A simplified rule to grant admins full access to everything.
-    // This helps with batch operations like the "Reset Data" feature.
+    // This allows administrators full read/write access to the entire database. This
+    // is crucial for batch operations like the 'Reset Data' function to work reliably.
     match /{path=**} {
       allow read, write: if isAdmin();
     }
 
-    // --- Collection-Specific Rules ---
+    // --- Collection Rules ---
 
-    // Users (Customers)
+    // Users (Customers) collection
     match /users/{userId} {
-      // Users can create their own account.
-      allow create: if isOwner(userId);
-      // Users can read their own profile.
-      allow read: if isOwner(userId);
-      // Users can update their own profile. The transaction logic in the app
-      // is responsible for ensuring wallet debits are legitimate. 
-      // All wallet *credits* are handled by a secure admin-only process.
-      allow update: if isOwner(userId);
-      // Only admins can delete user accounts.
-      allow delete: if isAdmin();
+      allow read, create: if isOwner(userId);
+      // A user can update their own profile.
+      // They can DECREASE their wallet balance (for payments), but not increase it.
+      // They cannot change their role or admin status.
+      allow update: if isOwner(userId)
+                    && !('isAdmin' in request.resource.data)
+                    && !('role' in request.resource.data)
+                    && (
+                         !('walletBalance' in request.resource.data) || 
+                         request.resource.data.walletBalance <= resource.data.walletBalance
+                       );
     }
     
-    // Village-Level Entrepreneurs (VLEs)
+    // VLEs collection
     match /vles/{vleId} {
-      // VLEs can create their own account.
-      allow create: if isOwner(vleId);
-      // VLEs can read their own profile.
-      allow read: if isOwner(vleId);
-      // VLEs can update their own profile.
-      allow update: if isOwner(vleId);
-      // Only admins can delete VLE accounts.
-      allow delete: if isAdmin();
+      allow read, create: if isOwner(vleId);
+      // A VLE can update their own profile.
+      // They can DECREASE their wallet balance (for payments).
+      // They cannot change their role, admin status, or approval status.
+      allow update: if isOwner(vleId)
+                    && !('isAdmin' in request.resource.data)
+                    && !('role' in request.resource.data)
+                    && !('status' in request.resource.data)
+                    && (
+                         !('walletBalance' in request.resource.data) || 
+                         request.resource.data.walletBalance <= resource.data.walletBalance
+                       );
     }
     
-    // Services can be read by any logged-in user, but only modified by admins.
+    // Services collection - Readable by all authenticated users.
     match /services/{serviceId} {
       allow read: if isAuth();
-      allow create, update, delete: if isAdmin();
     }
     
-    // Notifications
+    // Notifications collection - Readable by the owner.
     match /notifications/{notificationId} {
-       // Any authenticated user can receive a notification.
        allow create: if isAuth();
-       // You can only read or update your own notifications.
        allow read, update, delete: if isOwner(resource.data.userId);
     }
     
-    // Tasks are the core of the app and have detailed rules.
+    // Tasks collection
     match /tasks/{taskId} {
-      // Any authenticated user can create a task.
       allow create: if isAuth();
-      
-      // You can read a task if you created it, are assigned to it, or are an admin.
-      allow read: if isOwner(resource.data.creatorId) || 
-                   isOwner(resource.data.assignedVleId);
-                   
-      // Updating a task has several conditions.
-      allow update: if 
-        // The creator can update it to add a complaint, feedback, or more documents.
-        (isOwner(resource.data.creatorId) && (
-            request.resource.data.complaint != resource.data.complaint ||
-            request.resource.data.feedback != resource.data.feedback ||
-            request.resource.data.documents != resource.data.documents
-        )) ||
-        // The assigned VLE can update it with an acknowledgement number or final certificate.
-        (isOwner(resource.data.assignedVleId));
+      allow read: if isOwner(resource.data.creatorId) || isOwner(resource.data.assignedVleId);
+      // Allow updates by the assigned VLE, or by the creator for specific fields like complaint/feedback.
+      allow update: if isOwner(resource.data.assignedVleId) || 
+                       (isOwner(resource.data.creatorId) && 
+                         (
+                           request.resource.data.keys().hasAny(['complaint', 'feedback', 'documents']) ||
+                           request.resource.data.status == 'Awaiting Payment'
+                         )
+                       );
     }
 
-    // Camps can be read by anyone logged in, but only managed by admins.
+    // Camps collection
     match /camps/{campId} {
       allow read: if isAuth();
-      allow create, update, delete: if isAdmin();
     }
     
-    // VLEs can suggest camps.
+    // Camp Suggestions collection
     match /campSuggestions/{suggestionId} {
       allow create: if isVle();
-      allow read, delete: if isAdmin();
     }
 
-    // Payment requests can be created by any user but only managed by admins.
+    // Payment Requests collection
     match /paymentRequests/{reqId} {
       allow create: if isAuth();
-      allow read, update, delete: if isAdmin();
     }
   }
 }

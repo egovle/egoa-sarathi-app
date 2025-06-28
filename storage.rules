@@ -1,40 +1,40 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
   
-    // Helper function to check if a user is authenticated
+    // --- Helper Functions ---
     function isAuth() {
       return request.auth != null;
     }
-    
-    // Helper function to check if the user is an admin by reading their Firestore document
-    function isAdmin() {
-      return isAuth() && get(/databases/(default)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
 
-    // Main rule for all files within the /tasks/ path
-    match /tasks/{taskId}/{allPaths=**} {
+    function isAdmin() {
+      // Check if the user document exists in 'vles' and has the isAdmin flag set to true.
+      return isAuth() && get(/databases/(default)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
+    }
     
-      // Helper function to get the task document from Firestore
-      function getTask() {
-        return get(/databases/(default)/documents/tasks/$(taskId)).data;
-      }
-      
-      // Helper function to check if the user created the task
-      function isCreator() {
-        return request.auth.uid == getTask().creatorId;
-      }
-      
-      // Helper function to check if the user is the VLE assigned to the task
-      function isAssignedVle() {
-        // Ensure assignedVleId exists before trying to access it
-        return "assignedVleId" in getTask() && request.auth.uid == getTask().assignedVleId;
-      }
+    function isCreator(taskId) {
+      return isOwner(get(/databases/(default)/documents/tasks/$(taskId)).data.creatorId);
+    }
+    
+    function isAssignedVle(taskId) {
+      let taskData = get(/databases/(default)/documents/tasks/$(taskId)).data;
+      // Check if assignedVleId exists and if the user is the owner of it.
+      return 'assignedVleId' in taskData && taskData.assignedVleId != null && isOwner(taskData.assignedVleId);
+    }
 
-      // Allow read/write access only if the user is authenticated AND
-      // they are an admin, the creator of the task, or the assigned VLE.
-      allow read, write: if isAuth() && (isAdmin() || isCreator() || isAssignedVle());
+    // --- Storage Rules ---
+
+    // The 'tasks' folder contains all user-uploaded documents, organized by taskId.
+    match /tasks/{taskId}/{allPaths=**} {
+      // Only allow access if the user is authenticated.
+      // Then, grant access if the user is an admin, the creator of the task, or the VLE assigned to the task.
+      allow read, write: if isAuth() && (isAdmin() || isCreator(taskId) || isAssignedVle(taskId));
     }
   }
 }
