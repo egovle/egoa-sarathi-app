@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
@@ -535,12 +536,12 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                       </Select>
                   </div>
               </div>
-              {selectedCategory && (
+              {selectedCategory && subServices.length > 0 && (
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Specific Service</Label>
                     <div className="col-span-3">
                         <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory}>
-                            <SelectTrigger disabled={subServices.length === 0}>
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select a specific service" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1662,7 +1663,7 @@ export default function DashboardPage() {
 
 
     const handleCreateTask = async (newTaskData: any, service: any) => {
-        if (!realtimeProfile) {
+        if (!user || !realtimeProfile) {
             toast({
                 title: 'Error',
                 description: 'User profile not fully loaded. Please wait a moment and try again.',
@@ -1695,39 +1696,32 @@ export default function DashboardPage() {
                 });
                 throw new Error("Insufficient balance"); // Abort submission
             }
-
-            const adminQuery = query(collection(db, 'vles'), where('isAdmin', '==', true), limit(1));
-            const adminSnapshot = await getDocs(adminQuery);
-            if (adminSnapshot.empty) {
-                toast({ title: 'Error', description: 'Could not find an admin account to process payment.', variant: 'destructive' });
-                throw new Error("No admin account found");
-            }
-            const adminUser = { id: adminSnapshot.docs[0].id, ...adminSnapshot.docs[0].data() };
-
+            
             try {
-                await runTransaction(db, async (transaction) => {
-                    const creatorRef = doc(db, realtimeProfile.role === 'vle' ? 'vles' : 'users', user!.uid);
-                    const adminRef = doc(db, 'vles', adminUser.id);
+                 await runTransaction(db, async (transaction) => {
+                    const creatorCollection = realtimeProfile.role === 'vle' ? 'vles' : 'users';
+                    const creatorRef = doc(db, creatorCollection, user.uid);
 
                     const creatorDoc = await transaction.get(creatorRef);
-                    if (!creatorDoc.exists()) throw new Error("User performing transaction not found.");
-                    
-                    const adminDoc = await transaction.get(adminRef);
-                    if (!adminDoc.exists()) throw new Error("Admin user not found for transaction.");
+                    if (!creatorDoc.exists()) throw new Error("Could not find your user profile to process payment.");
                     
                     const creatorBalance = creatorDoc.data().walletBalance || 0;
                     if (creatorBalance < rate) throw new Error("Insufficient wallet balance.");
 
+                    // 1. Debit the creator's wallet
                     const newCreatorBalance = creatorBalance - rate;
-                    const newAdminBalance = (adminDoc.data().walletBalance || 0) + rate;
-                    
                     transaction.update(creatorRef, { walletBalance: newCreatorBalance });
-                    transaction.update(adminRef, { walletBalance: newAdminBalance });
+
+                    // 2. Create the task document within the same transaction
+                    const taskRef = doc(collection(db, "tasks")); // get a ref to a new document
+                    const taskWithStatus = { ...newTaskData, status: 'Unassigned', rate: rate };
+                    transaction.set(taskRef, taskWithStatus);
+                    
+                    // We don't credit the admin here to avoid permission issues.
+                    // This must be handled by a secure backend process or reconciled later.
                 });
 
-                // --- If transaction succeeds, create the task ---
-                const taskWithStatus = { ...newTaskData, status: 'Unassigned', rate: rate };
-                const docRef = await addDoc(collection(db, "tasks"), taskWithStatus);
+                // If transaction succeeds:
                 toast({
                     title: 'Task Created & Paid!',
                     description: `₹${rate.toFixed(2)} has been deducted from your wallet.`,
@@ -1735,7 +1729,7 @@ export default function DashboardPage() {
                 await createNotificationForAdmins(
                     'New Task Created',
                     `A new task '${service.name}' has been created by ${newTaskData.customer}.`,
-                    `/dashboard/task/${docRef.id}`
+                    `/dashboard` // Linking to dashboard as we don't get the new ID from the transaction
                 );
 
             } catch (error: any) {
@@ -1881,5 +1875,6 @@ export default function DashboardPage() {
 
     return renderContent();
 }
+
 
 
