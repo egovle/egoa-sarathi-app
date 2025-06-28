@@ -1,13 +1,21 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow any authenticated user to read/write files in the tasks folder.
-    // This allows customers and VLEs to upload documents and certificates.
-    // For production apps, you might want to tighten these rules further.
+    // Grant access to task-related files for the task creator, assigned VLE, or an admin.
     match /tasks/{taskId}/{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
+      function isOwner() {
+        let task = get(/databases/$(database)/documents/tasks/$(taskId)).data;
+        return request.auth.uid == task.creatorId || request.auth.uid == task.assignedVleId;
+      }
+      
+      function isAdmin() {
+        return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+               get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
+      }
+      
+      allow read, write: if request.auth != null && (isOwner() || isAdmin());
     }
   }
 }

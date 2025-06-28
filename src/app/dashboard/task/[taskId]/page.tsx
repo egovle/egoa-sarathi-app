@@ -245,7 +245,7 @@ const SubmitAcknowledgementDialog = ({ taskId, vleId, customerId }: { taskId: st
             setAckNumber('');
             setOpen(false);
         } catch (error) {
-            console.error("Error completing task:", error);
+            console.error("Error submitting acknowledgement:", error);
             toast({ title: "Error", description: "Failed to update task.", variant: "destructive" });
         }
     };
@@ -329,8 +329,11 @@ export default function TaskDetailPage() {
 
     const handleUpload = async () => {
         if (selectedFiles.length === 0 || !user || !userProfile || !task) {
-            if (selectedFiles.length === 0) toast({ title: "No files selected", variant: "destructive" });
-            else toast({ title: "User or task data not loaded", description: "Please wait a moment and try again.", variant: "destructive" });
+            toast({ 
+                title: "Cannot Upload", 
+                description: selectedFiles.length === 0 ? "Please select at least one file." : "User or task data not loaded.",
+                variant: "destructive"
+            });
             return;
         }
         setIsUploading(true);
@@ -352,22 +355,20 @@ export default function TaskDetailPage() {
                 actorId: user.uid,
                 actorRole: userProfile.isAdmin ? 'Admin' : (userProfile.role === 'vle' ? 'VLE' : 'Customer'),
                 action: 'Additional Documents Uploaded',
-                details: `${newDocuments.length} new document(s) uploaded as requested.`,
+                details: `${newDocuments.length} new document(s) uploaded.`,
             };
             
-            // Revert status to 'Assigned' so the VLE can continue working.
             await updateDoc(taskRef, {
                 status: 'Assigned', 
                 documents: arrayUnion(...newDocuments),
                 history: arrayUnion(historyEntry),
             });
     
-            // Notify the assigned VLE that the documents are ready.
             if (task.assignedVleId) {
                  await createNotification(
                     task.assignedVleId,
                     'Documents Uploaded by Customer',
-                    `The customer has uploaded the requested documents for task ${taskId.slice(-6).toUpperCase()}.`,
+                    `The customer has uploaded the requested documents for task ${String(taskId).slice(-6).toUpperCase()}.`,
                     `/dashboard/task/${taskId}`
                 );
             }
@@ -392,12 +393,8 @@ export default function TaskDetailPage() {
     };
 
     const handleCertificateUpload = async () => {
-        if (!selectedCertificate) {
-            toast({ title: "No file selected", description: "Please choose a certificate to upload.", variant: "destructive" });
-            return;
-        }
-        if (!userProfile || !user) {
-            toast({ title: "Profile not loaded", description: "Please wait a moment and try again.", variant: "destructive" });
+        if (!selectedCertificate || !user || !userProfile) {
+            toast({ title: "Cannot Upload", description: "Please select a certificate file and ensure you are logged in.", variant: "destructive" });
             return;
         }
         setIsCertUploading(true);
@@ -426,11 +423,11 @@ export default function TaskDetailPage() {
             await createNotification(
                 task.creatorId,
                 'Your Certificate is Ready!',
-                `The final certificate for task ${taskId.slice(-6).toUpperCase()} is available.`,
+                `The final certificate for task ${String(taskId).slice(-6).toUpperCase()} is available.`,
                 `/dashboard/task/${taskId}`
             );
             
-            toast({ title: "Certificate Uploaded", description: "The customer has been notified." });
+            toast({ title: "Certificate Uploaded", description: "The customer has been notified and the task is now complete." });
             setSelectedCertificate(null);
 
         } catch (error) {
@@ -466,11 +463,9 @@ export default function TaskDetailPage() {
                     throw new Error("Insufficient wallet balance.");
                 }
 
-                // 1. Debit customer's wallet
                 const newCustomerBalance = customerBalance - task.rate;
                 transaction.update(customerRef, { walletBalance: newCustomerBalance });
 
-                // 2. Update task status, ready for assignment
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
                     actorId: user.uid,
@@ -479,7 +474,7 @@ export default function TaskDetailPage() {
                     details: `Paid ₹${task.rate.toFixed(2)}.`,
                 };
                 transaction.update(taskRef, {
-                    status: 'Unassigned', // Task is now paid and ready for assignment
+                    status: 'Unassigned',
                     history: arrayUnion(historyEntry)
                 });
             });
