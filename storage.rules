@@ -3,19 +3,36 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Grant access to task-related files for the task creator, assigned VLE, or an admin.
+    
+    // --- Helper Functions ---
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuth() && 
+             exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    function getTask(taskId) {
+      return get(/databases/$(database)/documents/tasks/$(taskId)).data;
+    }
+
+    function isCreator(taskId) {
+      return request.auth.uid == getTask(taskId).creatorId;
+    }
+
+    function isAssignedVle(taskId) {
+      // Check if assignedVleId exists before trying to access it
+      return 'assignedVleId' in getTask(taskId) && request.auth.uid == getTask(taskId).assignedVleId;
+    }
+
+    // Match all files within any task's folder structure.
     match /tasks/{taskId}/{allPaths=**} {
-      function isOwner() {
-        let task = get(/databases/$(database)/documents/tasks/$(taskId)).data;
-        return request.auth.uid == task.creatorId || request.auth.uid == task.assignedVleId;
-      }
-      
-      function isAdmin() {
-        return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
-               get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
-      }
-      
-      allow read, write: if request.auth != null && (isOwner() || isAdmin());
+      // Allow access if the user is authenticated AND they are the creator, the assigned VLE, or an admin.
+      // This single rule covers both reading and writing (uploading/deleting) files.
+      allow read, write: if isAuth() && (isCreator(taskId) || isAssignedVle(taskId) || isAdmin());
     }
   }
 }
