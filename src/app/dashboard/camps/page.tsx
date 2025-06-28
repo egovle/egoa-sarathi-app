@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -399,24 +399,24 @@ export default function CampManagementPage() {
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold tracking-tight">Upcoming Camps</h1>
                 {userProfile.role === 'vle' && (
-                    <>
-                        <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
-                             <DialogContent
-                                className="sm:max-w-lg"
-                                onInteractOutside={(e) => {
-                                  const target = e.target as HTMLElement;
-                                  if (target.closest('[data-radix-popper-content-wrapper]')) {
-                                    e.preventDefault();
-                                  }
-                                }}
-                            >
-                                <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} />
-                            </DialogContent>
-                        </Dialog>
-                        <Button onClick={() => setIsSuggestFormOpen(true)}>
-                            <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
-                        </Button>
-                    </>
+                    <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
+                            </Button>
+                        </DialogTrigger>
+                         <DialogContent
+                            className="sm:max-w-lg"
+                            onInteractOutside={(e) => {
+                              const target = e.target as HTMLElement;
+                              if (target.closest('[data-radix-popper-content-wrapper]')) {
+                                e.preventDefault();
+                              }
+                            }}
+                        >
+                            <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} />
+                        </DialogContent>
+                    </Dialog>
                 )}
             </div>
             <CampTable data={upcomingCamps} title="" />
