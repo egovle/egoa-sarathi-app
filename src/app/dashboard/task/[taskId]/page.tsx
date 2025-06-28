@@ -328,71 +328,60 @@ export default function TaskDetailPage() {
     };
 
     const handleUpload = async () => {
-        if (selectedFiles.length === 0) {
-            toast({ title: "No files selected", variant: "destructive" });
-            return;
-        }
-        if (!userProfile || !user) {
-            toast({ title: "Profile not loaded", description: "Please wait a moment and try again.", variant: "destructive" });
+        if (selectedFiles.length === 0 || !user || !userProfile || !task) {
+            if (selectedFiles.length === 0) toast({ title: "No files selected", variant: "destructive" });
+            else toast({ title: "User or task data not loaded", description: "Please wait a moment and try again.", variant: "destructive" });
             return;
         }
         setIsUploading(true);
-
+    
         try {
             const uploadPromises = selectedFiles.map(async (file) => {
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
                 await uploadBytes(storageRef, file);
-                const downloadURL = await getDownloadURL(storageRef);
-                return { name: file.name, url: downloadURL };
+                return getDownloadURL(storageRef);
             });
-
-            const newDocuments = await Promise.all(uploadPromises);
+    
+            const downloadURLs = await Promise.all(uploadPromises);
+            const newDocuments = selectedFiles.map((file, index) => ({ name: file.name, url: downloadURLs[index] }));
+    
             const taskRef = doc(db, 'tasks', taskId as string);
             
-            const actorRole = userProfile.isAdmin ? 'Admin' : (userProfile.role === 'vle' ? 'VLE' : 'Customer');
-
             const historyEntry = {
                 timestamp: new Date().toISOString(),
                 actorId: user.uid,
-                actorRole: actorRole,
-                action: 'Documents Uploaded',
-                details: `${newDocuments.length} new document(s) uploaded.`,
+                actorRole: userProfile.isAdmin ? 'Admin' : (userProfile.role === 'vle' ? 'VLE' : 'Customer'),
+                action: 'Additional Documents Uploaded',
+                details: `${newDocuments.length} new document(s) uploaded as requested.`,
             };
             
-            // Revert status so VLE can continue, unless it's a new task created by admin/vle
-            const currentStatus = task.status;
-            let nextStatus = 'Assigned'; // Default status after doc upload
-            if(currentStatus === 'Awaiting Documents'){
-                nextStatus = task.assignedVleId ? 'Assigned' : 'Unassigned';
-            }
-
-
+            // Revert status to 'Assigned' so the VLE can continue working.
             await updateDoc(taskRef, {
-                status: nextStatus, 
+                status: 'Assigned', 
                 documents: arrayUnion(...newDocuments),
                 history: arrayUnion(historyEntry),
             });
-
-            const notificationRecipient = actorRole === 'Customer' ? task.assignedVleId : task.creatorId;
-            if (notificationRecipient) {
+    
+            // Notify the assigned VLE that the documents are ready.
+            if (task.assignedVleId) {
                  await createNotification(
-                    notificationRecipient,
-                    'New Documents Uploaded',
-                    `${userProfile.name} uploaded new documents for task ${taskId.slice(-6).toUpperCase()}.`,
+                    task.assignedVleId,
+                    'Documents Uploaded by Customer',
+                    `The customer has uploaded the requested documents for task ${taskId.slice(-6).toUpperCase()}.`,
                     `/dashboard/task/${taskId}`
                 );
             }
            
-            toast({ title: "Upload Complete", description: "Files uploaded successfully." });
+            toast({ title: "Upload Complete", description: "The VLE has been notified." });
             setSelectedFiles([]);
-        } catch (error) {
-            console.error("Error uploading files:", error);
-            toast({ title: "Upload Failed", variant: "destructive" });
-        } finally {
-            setIsUploading(false);
             if(fileInputRef.current) {
                 fileInputRef.current.value = "";
             }
+        } catch (error) {
+            console.error("Error uploading files:", error);
+            toast({ title: "Upload Failed", description: "Could not upload documents. Please check permissions and try again.", variant: "destructive" });
+        } finally {
+            setIsUploading(false);
         }
     };
 
@@ -567,7 +556,7 @@ export default function TaskDetailPage() {
                              <div>
                                 <Label>Assigned VLE</Label>
                                 <p>
-                                    {task.assignedVleId ? `VLE ID: ${task.assignedVleId.slice(-6).toUpperCase()}` : 'N/A'}
+                                    {task.assignedVleName ? `${task.assignedVleName} (ID: ${task.assignedVleId.slice(-6).toUpperCase()})` : 'N/A'}
                                 </p>
                             </div>
                              {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.rate?.toFixed(2)}</p></div>}
