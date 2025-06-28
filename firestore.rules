@@ -5,83 +5,94 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // --- Helper Functions ---
-    function isAuth() {
-      return request.auth != null;
-    }
-
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
-    
+
     function isAdmin() {
-      return isAuth() && 
-             exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+      return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
+    
+    function isVle() {
+      // Any user with a document in the 'vles' collection is a VLE.
+      return exists(/databases/$(database)/documents/vles/$(request.auth.uid));
+    }
+    
+    // --- Collection Rules ---
 
-    // --- User & VLE Profiles ---
-    // Users can read/write their own profile. Admins can read/write any profile.
-    // Crucially, wallet balances can only be updated by admins.
+    // USERS: Customers can manage their own profile, but not their wallet. Admins can do anything.
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuth(); // For registration
-      allow update: if (isOwner(userId) && request.resource.data.walletBalance == resource.data.walletBalance) || isAdmin();
+      
+      // Allow user to update their own profile, but NOT their wallet.
+      allow update: if isOwner(userId) && !("walletBalance" in request.resource.data);
+      
+      // Allow admin to update anything on a user's profile.
+      allow update: if isAdmin();
+      
+      // Allow creation during registration.
+      allow create: if request.auth != null;
+      allow delete: if isAdmin();
     }
     
+    // VLES: VLEs can manage their own profile, but not their wallet or approval status. Admins can do anything.
     match /vles/{vleId} {
       allow read: if isOwner(vleId) || isAdmin();
-      allow create: if isAuth(); // For registration
-      allow update: if (isOwner(vleId) && request.resource.data.walletBalance == resource.data.walletBalance) || isAdmin();
+      
+      // Allow VLE to update their own profile, but NOT wallet or status.
+      allow update: if isOwner(vleId) && !("walletBalance" in request.resource.data) && !("status" in request.resource.data);
+      
+      // Allow admin to update anything on a VLE's profile.
+      allow update: if isAdmin();
+
+      // Allow creation during registration.
+      allow create: if request.auth != null;
+      allow delete: if isAdmin();
     }
     
-    // --- Public & Semi-Public Collections ---
-    
-    // Services: Any logged-in user can read services. Only admins can write.
+    // SERVICES: Publicly readable, but only writable by admins.
     match /services/{serviceId} {
-      allow read: if isAuth();
+      allow read: if request.auth != null;
       allow write: if isAdmin();
     }
     
-    // Camps: Any logged-in user can read camps. Only admins can write.
-    match /camps/{campId} {
-      allow read: if isAuth();
-      allow write: if isAdmin();
-    }
-    
-    // Notifications: Users can only manage their own notifications.
+    // NOTIFICATIONS: Users can manage their own notifications.
     match /notifications/{notificationId} {
-       allow create: if isAuth();
+       allow create: if request.auth != null; // Created by server logic/actions
        allow read, update, delete: if isOwner(resource.data.userId);
     }
-    
-    // Payment Requests: Users can create their own requests. Admins can read/update all.
-    match /paymentRequests/{requestId} {
-      allow create: if isOwner(request.resource.data.userId);
-      allow read, update: if isAdmin();
-    }
 
-    // --- Core Business Logic ---
-    
-    // Tasks: Complex rules for tasks.
+    // TASKS: Permissions based on role (creator, assigned VLE, admin).
     match /tasks/{taskId} {
-      // Any authenticated user can create a task.
-      allow create: if isAuth();
+      allow create: if request.auth != null;
       
-      // Read access: For task creator, assigned VLE, or admin.
-      allow read: if isOwner(resource.data.creatorId) || 
-                     isOwner(resource.data.assignedVleId) || 
-                     isAdmin();
+      allow read: if isOwner(resource.data.creatorId) 
+                     || isOwner(resource.data.assignedVleId) 
+                     || isAdmin();
                      
-      // Update access: 
-      // Admins can always update.
-      // Assigned VLE can update.
-      // The creator can only update specific fields like complaint, feedback, or documents.
-      allow update: if isAdmin() || isOwner(resource.data.assignedVleId) ||
-                       (isOwner(resource.data.creatorId) && 
-                         (request.resource.data.complaint != resource.data.complaint || 
-                          request.resource.data.feedback != resource.data.feedback ||
-                          request.resource.data.documents != resource.data.documents)
-                       );
+      allow update: if isOwner(resource.data.assignedVleId) 
+                       || isAdmin()
+                       || isOwner(resource.data.creatorId); // App logic should control which fields can be updated by customer.
+    }
+    
+    // CAMPS: Publicly readable. Writable by admins. VLEs can suggest.
+    match /camps/{campId} {
+        // Any authenticated user can see camp details.
+        allow read: if request.auth != null;
+        
+        // Allow VLEs to CREATE camps, but only if they are suggestions.
+        // Allow Admins to create any camp.
+        allow create: if (isVle() && request.resource.data.status == 'Suggested') || isAdmin();
+        
+        // Only admins can update and delete camps.
+        allow update, delete: if isAdmin();
+    }
+    
+    // PAYMENT REQUESTS: Users create their own, admins manage them.
+    match /paymentRequests/{reqId} {
+      allow create: if isOwner(request.resource.data.userId);
+      allow read, update, delete: if isAdmin();
     }
   }
 }
