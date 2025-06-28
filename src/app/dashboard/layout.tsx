@@ -35,7 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge"
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { auth, db } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
@@ -46,7 +46,6 @@ import { cn } from "@/lib/utils";
 
 const ALL_NAV_ITEMS = [
     { href: "/dashboard", icon: Home, label: "Dashboard", roles: ['admin', 'vle', 'customer'] },
-    { href: "/dashboard/extract", icon: BrainCircuit, label: "Smart Extractor", roles: ['admin', 'vle'] },
     { href: "/dashboard/reports", icon: BarChart, label: "Reports", roles: ['admin', 'vle'] },
     { href: "/dashboard/camps", icon: Tent, label: "Camps", roles: ['admin', 'vle', 'customer'] },
     { href: "/dashboard/services", icon: ListPlus, label: "Service Management", roles: ['admin'] },
@@ -116,7 +115,6 @@ export default function DashboardLayout({
   
   const pageTitles: { [key: string]: string } = {
     '/dashboard': 'Dashboard',
-    '/dashboard/extract': 'Smart Information Extractor',
     '/dashboard/services': 'Service Management',
     '/dashboard/reports': 'Reports & Analytics',
     '/dashboard/camps': 'Camp Management',

@@ -451,6 +451,16 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         return;
     }
 
+    if (!selectedService.isVariable && (!selectedService.rate || selectedService.rate <= 0)) {
+        toast({
+            title: 'Invalid Service Selection',
+            description: 'This appears to be a category. Please select a specific sub-service to proceed.',
+            variant: 'destructive',
+        });
+        setIsSubmitting(false);
+        return;
+    }
+
     const newTaskData = {
         customer: form.name.value,
         customerAddress: form.address.value,
@@ -1893,15 +1903,6 @@ export default function DashboardPage() {
             // --- Fixed Rate Flow ---
             const rate = parseFloat(service.rate);
 
-            if (!service.isVariable && rate <= 0) {
-                toast({
-                    title: 'Invalid Service Selection',
-                    description: 'This appears to be a category. Please select a specific sub-service to proceed.',
-                    variant: 'destructive',
-                });
-                throw new Error("Cannot book a category service.");
-            }
-
             if ((realtimeProfile?.walletBalance || 0) < rate) {
                 toast({
                     title: 'Insufficient Balance',
@@ -2137,36 +2138,75 @@ export default function DashboardPage() {
     const handleResetData = async () => {
         toast({ title: 'Resetting Data...', description: 'Please wait, this may take a moment.' });
         try {
-            const batch = writeBatch(db);
-
-            // Collections to clear
             const collectionsToClear = ['tasks', 'camps', 'notifications', 'paymentRequests', 'services'];
             
             for (const collectionName of collectionsToClear) {
+                // Batch delete collections in chunks of 499
                 const snapshot = await getDocs(collection(db, collectionName));
-                snapshot.docs.forEach(doc => batch.delete(doc.ref));
+                if (snapshot.size > 0) {
+                    let batch = writeBatch(db);
+                    let count = 0;
+                    for (const doc of snapshot.docs) {
+                        batch.delete(doc.ref);
+                        count++;
+                        if (count === 499) {
+                            await batch.commit();
+                            batch = writeBatch(db);
+                            count = 0;
+                        }
+                    }
+                    if (count > 0) {
+                        await batch.commit();
+                    }
+                }
             }
 
-            // Reset user wallets
+            // Batch update user wallets
             const usersSnapshot = await getDocs(collection(db, 'users'));
-            usersSnapshot.docs.forEach(userDoc => {
-                batch.update(userDoc.ref, { walletBalance: 0 });
-            });
+            if(usersSnapshot.size > 0) {
+                let batch = writeBatch(db);
+                let count = 0;
+                for (const userDoc of usersSnapshot.docs) {
+                    batch.update(userDoc.ref, { walletBalance: 0 });
+                    count++;
+                    if (count === 499) {
+                        await batch.commit();
+                        batch = writeBatch(db);
+                        count = 0;
+                    }
+                }
+                 if (count > 0) {
+                    await batch.commit();
+                }
+            }
 
-            // Reset VLE wallets (non-admins)
+            // Batch update VLE wallets
             const vlesSnapshot = await getDocs(query(collection(db, 'vles'), where('isAdmin', '==', false)));
-            vlesSnapshot.docs.forEach(vleDoc => {
-                batch.update(vleDoc.ref, { walletBalance: 0 });
-            });
+             if(vlesSnapshot.size > 0) {
+                let batch = writeBatch(db);
+                let count = 0;
+                for (const vleDoc of vlesSnapshot.docs) {
+                    batch.update(vleDoc.ref, { walletBalance: 0 });
+                     count++;
+                    if (count === 499) {
+                        await batch.commit();
+                        batch = writeBatch(db);
+                        count = 0;
+                    }
+                }
+                if (count > 0) {
+                    await batch.commit();
+                }
+            }
 
-            // Re-seed services
+            // Batch re-seed services
+            let seedBatch = writeBatch(db);
             seedServices.forEach(service => {
-                const { id, ...serviceData } = service; // Exclude hardcoded ID from seed data
+                const { id, ...serviceData } = service;
                 const docRef = id ? doc(db, "services", id) : doc(collection(db, "services"));
-                batch.set(docRef, serviceData);
+                seedBatch.set(docRef, serviceData);
             });
-
-            await batch.commit();
+            await seedBatch.commit();
 
             toast({ title: 'Application Reset', description: 'All data has been cleared and default services have been seeded.' });
         } catch (error: any) {

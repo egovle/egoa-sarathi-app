@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAdmin() {
+      // Check if the requesting user is an admin.
+      return request.auth != null &&
+             exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Rules for task-related documents.
+    match /tasks/{taskId}/{allPaths=**} {
+      function isTaskParticipant() {
+        // Check if user is the creator or the assigned VLE for the task.
+        let task = get(/databases/$(database)/documents/tasks/$(taskId)).data;
+        return request.auth.uid == task.creatorId || 
+               request.auth.uid == task.assignedVleId;
+      }
+
+      // Allow read/write access to task participants or admins.
+      // This covers both general documents and the final certificate in subfolders.
+      allow read, write: if request.auth != null && (isTaskParticipant() || isAdmin());
+    }
+  }
+}
