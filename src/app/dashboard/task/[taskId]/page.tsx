@@ -439,7 +439,8 @@ export default function TaskDetailPage() {
 
         try {
             await runTransaction(db, async (transaction) => {
-                const customerRef = doc(db, userProfile.role === 'vle' ? 'vles' : 'users', user.uid);
+                const customerCollection = userProfile.role === 'vle' ? 'vles' : 'users';
+                const customerRef = doc(db, customerCollection, user.uid);
                 const taskRef = doc(db, 'tasks', taskId as string);
 
                 const customerDoc = await transaction.get(customerRef);
@@ -453,18 +454,20 @@ export default function TaskDetailPage() {
                     throw new Error("Insufficient wallet balance.");
                 }
 
+                // 1. Debit customer's wallet
                 const newCustomerBalance = customerBalance - task.rate;
                 transaction.update(customerRef, { walletBalance: newCustomerBalance });
 
+                // 2. Update task status, ready for assignment
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
                     actorName: userProfile.name,
-                    actorRole: userProfile.role,
+                    actorRole: userProfile.role === 'vle' ? 'VLE' : 'Customer',
                     action: 'Payment Completed',
                     details: `Paid ₹${task.rate.toFixed(2)}.`,
                 };
                 transaction.update(taskRef, {
-                    status: 'Unassigned',
+                    status: 'Unassigned', // Task is now paid and ready for assignment
                     history: arrayUnion(historyEntry)
                 });
             });

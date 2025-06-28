@@ -540,7 +540,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Specific Service</Label>
                     <div className="col-span-3">
-                        <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory} required>
+                        <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory} >
                             <SelectTrigger>
                                 <SelectValue placeholder="Select a specific service" />
                             </SelectTrigger>
@@ -1726,8 +1726,8 @@ export default function DashboardPage() {
                     description: `₹${rate.toFixed(2)} has been deducted from your wallet.`,
                 });
                 await createNotificationForAdmins(
-                    'New Task Created',
-                    `A new task '${service.name}' has been created by ${newTaskData.customer} and is ready for assignment.`,
+                    'New Task Ready for Assignment',
+                    `A new task '${service.name}' by ${newTaskData.customer} is paid and ready for assignment.`,
                     `/dashboard`
                 );
 
@@ -1801,7 +1801,7 @@ export default function DashboardPage() {
         }
 
         const taskRef = doc(db, "tasks", taskId);
-        const adminRef = doc(db, "vles", user.uid);
+        const adminRef = doc(db, "vles", user.uid); // The currently logged-in admin
 
         try {
             await runTransaction(db, async (transaction) => {
@@ -1809,29 +1809,24 @@ export default function DashboardPage() {
                 if (!taskDoc.exists()) throw new Error("Task does not exist!");
                 
                 const taskData = taskDoc.data();
-                if (taskData.status !== 'Unassigned') {
-                    // Task is not in a state to be assigned, or payment hasn't been made.
-                    // Silently ignore or show a toast. For now, we just update the task.
+                if (taskData.status !== 'Unassigned' || !taskData.rate || taskData.rate <= 0) {
+                     throw new Error("Task cannot be assigned or has no fee to process.");
                 }
 
-                // Credit the admin's wallet ONLY if the task has a rate and is Unassigned.
-                // This prevents crediting multiple times.
-                if (taskData.rate > 0 && taskData.status === 'Unassigned') {
-                    const adminDoc = await transaction.get(adminRef);
-                    if (!adminDoc.exists()) throw new Error("Admin profile not found!");
-
-                    const adminBalance = adminDoc.data().walletBalance || 0;
-                    const newAdminBalance = adminBalance + parseFloat(taskData.rate);
-                    transaction.update(adminRef, { walletBalance: newAdminBalance });
-                }
-
+                // Credit the admin's wallet for the task fee.
+                const adminDoc = await transaction.get(adminRef);
+                if (!adminDoc.exists()) throw new Error("Admin profile not found!");
+                const adminBalance = adminDoc.data().walletBalance || 0;
+                const newAdminBalance = adminBalance + parseFloat(taskData.rate);
+                transaction.update(adminRef, { walletBalance: newAdminBalance });
+                
                 // Finally, update the task to be assigned.
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
                     actorName: realtimeProfile.name,
                     actorRole: 'Admin',
                     action: 'Task Assigned',
-                    details: `Task assigned to VLE: ${vleName}.`
+                    details: `Task assigned to VLE: ${vleName}. Fee of ₹${taskData.rate.toFixed(2)} processed.`
                 };
 
                 transaction.update(taskRef, { 
