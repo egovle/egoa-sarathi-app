@@ -540,7 +540,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Specific Service</Label>
                     <div className="col-span-3">
-                        <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory}>
+                        <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory} required>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select a specific service" />
                             </SelectTrigger>
@@ -1687,7 +1687,7 @@ export default function DashboardPage() {
             );
         } else {
             // --- Fixed Rate Flow ---
-            const rate = service.rate;
+            const rate = parseFloat(service.rate);
             if ((realtimeProfile?.walletBalance || 0) < rate) {
                 toast({
                     title: 'Insufficient Balance',
@@ -1716,9 +1716,6 @@ export default function DashboardPage() {
                     const taskRef = doc(collection(db, "tasks")); // get a ref to a new document
                     const taskWithStatus = { ...newTaskData, status: 'Unassigned', rate: rate };
                     transaction.set(taskRef, taskWithStatus);
-                    
-                    // We don't credit the admin here to avoid permission issues.
-                    // This must be handled by a secure backend process or reconciled later.
                 });
 
                 // If transaction succeeds:
@@ -1728,8 +1725,8 @@ export default function DashboardPage() {
                 });
                 await createNotificationForAdmins(
                     'New Task Created',
-                    `A new task '${service.name}' has been created by ${newTaskData.customer}.`,
-                    `/dashboard` // Linking to dashboard as we don't get the new ID from the transaction
+                    `A new task '${service.name}' has been created by ${newTaskData.customer} and is ready for assignment.`,
+                    `/dashboard`
                 );
 
             } catch (error: any) {
@@ -1796,26 +1793,71 @@ export default function DashboardPage() {
     }
 
     const handleAssignVle = async (taskId: string, vleId: string, vleName: string) => {
+        if (!user || !realtimeProfile?.isAdmin) {
+            toast({ title: 'Permission Denied', description: 'Only admins can assign tasks.', variant: 'destructive' });
+            return;
+        }
+
         const taskRef = doc(db, "tasks", taskId);
-        const historyEntry = {
-            timestamp: new Date().toISOString(),
-            actorName: realtimeProfile?.name || 'Admin',
-            actorRole: 'Admin',
-            action: 'Task Assigned',
-            details: `Task assigned to VLE: ${vleName}.`
-        };
-        await updateDoc(taskRef, { 
-            status: 'Assigned', 
-            assignedVleId: vleId, 
-            assignedVleName: vleName,
-            history: arrayUnion(historyEntry)
-        });
-        await createNotification(
-            vleId,
-            'New Task Assigned',
-            `You have been assigned a new task: ${taskId.slice(-6).toUpperCase()}.`,
-            `/dashboard/task/${taskId}`
-        );
+        const adminRef = doc(db, "vles", user.uid);
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                const taskDoc = await transaction.get(taskRef);
+                if (!taskDoc.exists()) throw new Error("Task does not exist!");
+                
+                const taskData = taskDoc.data();
+                if (taskData.status !== 'Unassigned') {
+                    // Task is not in a state to be assigned, or payment hasn't been made.
+                    // Silently ignore or show a toast. For now, we just update the task.
+                }
+
+                // Credit the admin's wallet ONLY if the task has a rate and is Unassigned.
+                // This prevents crediting multiple times.
+                if (taskData.rate > 0 && taskData.status === 'Unassigned') {
+                    const adminDoc = await transaction.get(adminRef);
+                    if (!adminDoc.exists()) throw new Error("Admin profile not found!");
+
+                    const adminBalance = adminDoc.data().walletBalance || 0;
+                    const newAdminBalance = adminBalance + parseFloat(taskData.rate);
+                    transaction.update(adminRef, { walletBalance: newAdminBalance });
+                }
+
+                // Finally, update the task to be assigned.
+                const historyEntry = {
+                    timestamp: new Date().toISOString(),
+                    actorName: realtimeProfile.name,
+                    actorRole: 'Admin',
+                    action: 'Task Assigned',
+                    details: `Task assigned to VLE: ${vleName}.`
+                };
+
+                transaction.update(taskRef, { 
+                    status: 'Assigned', 
+                    assignedVleId: vleId, 
+                    assignedVleName: vleName,
+                    history: arrayUnion(historyEntry)
+                });
+            });
+
+            // If transaction is successful, notify the VLE
+            await createNotification(
+                vleId,
+                'New Task Assigned',
+                `You have been assigned a new task: ${taskId.slice(-6).toUpperCase()}.`,
+                `/dashboard/task/${taskId}`
+            );
+            // The success toast is handled in the calling dialog.
+        } catch (error: any) {
+            console.error("Task assignment transaction failed:", error);
+            toast({
+                title: 'Assignment Failed',
+                description: error.message || 'Could not assign the task.',
+                variant: 'destructive',
+            });
+            // Re-throw to prevent dialog from closing
+            throw error;
+        }
     }
     
     const handleUpdateVleBalance = async (vleId: string, amountToAdd: number) => {
@@ -1875,6 +1917,3 @@ export default function DashboardPage() {
 
     return renderContent();
 }
-
-
-

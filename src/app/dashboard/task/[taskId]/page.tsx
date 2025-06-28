@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// --- NOTIFICATION HELPER ---
+// --- NOTIFICATION HELPERS ---
 async function createNotification(userId: string, title: string, description: string, link?: string) {
     if (!userId) return;
     await addDoc(collection(db, "notifications"), {
@@ -32,6 +32,26 @@ async function createNotification(userId: string, title: string, description: st
         read: false,
         date: new Date().toISOString(),
     });
+}
+
+async function createNotificationForAdmins(title: string, description: string, link?: string) {
+    try {
+        const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true));
+        const adminSnapshot = await getDocs(adminsQuery);
+        
+        if (adminSnapshot.empty) {
+            console.log("No admin users found to notify.");
+            return;
+        }
+
+        const notificationPromises = adminSnapshot.docs.map(adminDoc => {
+            return createNotification(adminDoc.id, title, description, link);
+        });
+
+        await Promise.all(notificationPromises);
+    } catch (error) {
+        console.error("Error creating notifications for admins:", error);
+    }
 }
 
 
@@ -410,40 +430,31 @@ export default function TaskDetailPage() {
     };
     
     const handlePayment = async () => {
-        if (!userProfile) {
+        if (!userProfile || !user) {
             toast({ title: 'Error', description: 'User profile not loaded. Please try again.', variant: 'destructive' });
             setIsPaying(false);
             return;
         }
         setIsPaying(true);
 
-        const adminQuery = query(collection(db, 'vles'), where('isAdmin', '==', true), limit(1));
-        const adminSnapshot = await getDocs(adminQuery);
-        if (adminSnapshot.empty) {
-            toast({ title: 'Error', description: 'Could not find an admin account to process payment.', variant: 'destructive' });
-            setIsPaying(false);
-            return;
-        }
-        const adminUser = { id: adminSnapshot.docs[0].id, ...adminSnapshot.docs[0].data() };
-
         try {
             await runTransaction(db, async (transaction) => {
-                const customerRef = doc(db, userProfile.role === 'vle' ? 'vles' : 'users', user!.uid);
-                const adminRef = doc(db, 'vles', adminUser.id);
+                const customerRef = doc(db, userProfile.role === 'vle' ? 'vles' : 'users', user.uid);
                 const taskRef = doc(db, 'tasks', taskId as string);
 
-                const [customerDoc, adminDoc] = await Promise.all([transaction.get(customerRef), transaction.get(adminRef)]);
+                const customerDoc = await transaction.get(customerRef);
 
-                if (!customerDoc.exists() || !adminDoc.exists()) throw new Error("User or admin not found.");
+                if (!customerDoc.exists()) {
+                    throw new Error("User profile not found.");
+                }
 
                 const customerBalance = customerDoc.data().walletBalance || 0;
-                if (customerBalance < task.rate) throw new Error("Insufficient wallet balance.");
+                if (customerBalance < task.rate) {
+                    throw new Error("Insufficient wallet balance.");
+                }
 
                 const newCustomerBalance = customerBalance - task.rate;
-                const newAdminBalance = (adminDoc.data().walletBalance || 0) + task.rate;
-
                 transaction.update(customerRef, { walletBalance: newCustomerBalance });
-                transaction.update(adminRef, { walletBalance: newAdminBalance });
 
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
@@ -459,6 +470,12 @@ export default function TaskDetailPage() {
             });
 
             toast({ title: 'Payment Successful!', description: `₹${task.rate.toFixed(2)} has been deducted from your wallet.` });
+            
+            await createNotificationForAdmins(
+                'Task Paid & Ready for Assignment',
+                `Task ${task.id.slice(-6).toUpperCase()} is now paid and awaits assignment.`,
+                `/dashboard/task/${task.id}`
+            );
 
         } catch (error: any) {
             console.error("Payment transaction failed: ", error);
