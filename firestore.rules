@@ -4,95 +4,85 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // --- Helper Functions ---
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-
+    // --- HELPER FUNCTIONS ---
     function isAdmin() {
+      // Check if the requesting user is an admin by looking at their VLE profile.
       return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
-    
+
     function isVle() {
-      // Any user with a document in the 'vles' collection is a VLE.
+      // Check if the requesting user is a VLE by their existence in the 'vles' collection.
       return exists(/databases/$(database)/documents/vles/$(request.auth.uid));
     }
     
-    // --- Collection Rules ---
+    function isOwner(userId) {
+      // Check if the requesting user is the owner of the document.
+      return request.auth.uid == userId;
+    }
 
-    // USERS: Customers can manage their own profile, but not their wallet. Admins can do anything.
+    // --- COLLECTION RULES ---
+
+    // Users can read/update their own profile. Admins can read any.
+    // Users cannot change their own wallet balance.
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      
-      // Allow user to update their own profile, but NOT their wallet.
-      allow update: if isOwner(userId) && !("walletBalance" in request.resource.data);
-      
-      // Allow admin to update anything on a user's profile.
-      allow update: if isAdmin();
-      
-      // Allow creation during registration.
       allow create: if request.auth != null;
-      allow delete: if isAdmin();
+      allow update: if isOwner(userId) && request.resource.data.walletBalance == resource.data.walletBalance;
     }
     
-    // VLES: VLEs can manage their own profile, but not their wallet or approval status. Admins can do anything.
+    // VLEs can read/update their own profile. Admins can read any.
+    // VLEs cannot change their own wallet balance.
     match /vles/{vleId} {
       allow read: if isOwner(vleId) || isAdmin();
-      
-      // Allow VLE to update their own profile, but NOT wallet or status.
-      allow update: if isOwner(vleId) && !("walletBalance" in request.resource.data) && !("status" in request.resource.data);
-      
-      // Allow admin to update anything on a VLE's profile.
-      allow update: if isAdmin();
-
-      // Allow creation during registration.
       allow create: if request.auth != null;
-      allow delete: if isAdmin();
+      allow update: if isOwner(vleId) && request.resource.data.walletBalance == resource.data.walletBalance;
     }
     
-    // SERVICES: Publicly readable, but only writable by admins.
+    // Any authenticated user can read services. Only admins can write.
     match /services/{serviceId} {
       allow read: if request.auth != null;
       allow write: if isAdmin();
     }
     
-    // NOTIFICATIONS: Users can manage their own notifications.
+    // Users can manage their own notifications.
     match /notifications/{notificationId} {
-       allow create: if request.auth != null; // Created by server logic/actions
+       allow create: if request.auth != null;
        allow read, update, delete: if isOwner(resource.data.userId);
     }
 
-    // TASKS: Permissions based on role (creator, assigned VLE, admin).
+    // Camps are public to all authenticated users.
+    // Admins can manage them. VLEs can ONLY create 'Suggested' camps.
+    match /camps/{campId} {
+      allow read: if request.auth != null;
+      allow create: if isAdmin() || 
+                       (isVle() && request.resource.data.status == 'Suggested');
+      allow update, delete: if isAdmin();
+    }
+    
+    // Users can create their own payment requests. Admins manage them.
+    match /paymentRequests/{reqId} {
+        allow create: if isOwner(request.resource.data.userId);
+        allow read, update: if isAdmin();
+    }
+
+    // Tasks have granular permissions based on role.
     match /tasks/{taskId} {
       allow create: if request.auth != null;
       
-      allow read: if isOwner(resource.data.creatorId) 
-                     || isOwner(resource.data.assignedVleId) 
-                     || isAdmin();
+      allow read: if isOwner(resource.data.creatorId) || 
+                     isOwner(resource.data.assignedVleId) || 
+                     isAdmin();
                      
-      allow update: if isOwner(resource.data.assignedVleId) 
-                       || isAdmin()
-                       || isOwner(resource.data.creatorId); // App logic should control which fields can be updated by customer.
-    }
-    
-    // CAMPS: Publicly readable. Writable by admins. VLEs can suggest.
-    match /camps/{campId} {
-        // Any authenticated user can see camp details.
-        allow read: if request.auth != null;
-        
-        // Allow VLEs to CREATE camps, but only if they are suggestions.
-        // Allow Admins to create any camp.
-        allow create: if (isVle() && request.resource.data.status == 'Suggested') || isAdmin();
-        
-        // Only admins can update and delete camps.
-        allow update, delete: if isAdmin();
-    }
-    
-    // PAYMENT REQUESTS: Users create their own, admins manage them.
-    match /paymentRequests/{reqId} {
-      allow create: if isOwner(request.resource.data.userId);
-      allow read, update, delete: if isAdmin();
+      allow update: if (isOwner(resource.data.assignedVleId) || isAdmin()) ||
+                       (isOwner(resource.data.creatorId) && 
+                         (request.resource.data.complaint != resource.data.complaint || 
+                          request.resource.data.feedback != resource.data.feedback ||
+                          // Allow document list to change
+                          request.resource.data.documents.size() != resource.data.documents.size() ||
+                          // Allow customer to pay for the task
+                          request.resource.data.status == 'Unassigned')
+                       );
     }
   }
 }
