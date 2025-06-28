@@ -372,20 +372,18 @@ export default function CampManagementPage() {
         // All users (VLEs & Admins) need to see upcoming camps
         // Firestore security rules must allow this.
         const upcomingCampsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'desc'));
-        const unsubUpcomingCamps = onSnapshot(upcomingCampsQuery, (snapshot) => {
-            setCamps(prev => {
-                const existingIds = new Set(prev.map(p => p.id));
-                const newCamps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const merged = [...prev.filter(p => !newCamps.some(nc => nc.id === p.id)), ...newCamps];
-                 return merged.filter((obj, index, self) => index === self.findIndex((t) => (t.id === obj.id)));
-            });
-            setLoadingData(false);
+        unsubscribers.push(onSnapshot(upcomingCampsQuery, (snapshot) => {
+             const upcoming = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+             setCamps(prev => {
+                const existingIds = new Set(upcoming.map(c => c.id));
+                const others = prev.filter(c => !existingIds.has(c.id));
+                return [...others, ...upcoming];
+             });
         }, (err) => {
             console.error(`Error fetching upcoming camps: `, err);
             toast({ title: "Data Fetch Error", description: `Could not fetch upcoming camps.`, variant: "destructive" });
-            setLoadingData(false);
-        });
-        unsubscribers.push(unsubUpcomingCamps);
+        }));
+
 
         if (userProfile.isAdmin) {
             const allCampsQuery = query(collection(db, 'camps'), orderBy('date', 'desc'));
@@ -411,8 +409,16 @@ export default function CampManagementPage() {
             });
             unsubscribers.push(unsubVles);
         } else if (userProfile.role === 'vle') {
-             // VLE specific data, e.g., assigned camps can be fetched here if needed
-             // For now, they only see public upcoming camps.
+             // For VLEs, we also need to see assigned camps, even if they are not "upcoming"
+             const assignedCampsQuery = query(collection(db, 'camps'), where('assignedVleIds', 'array-contains', userProfile.id));
+             unsubscribers.push(onSnapshot(assignedCampsQuery, snapshot => {
+                 const assigned = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                 setCamps(prev => {
+                    const existingIds = new Set(assigned.map(c => c.id));
+                    const others = prev.filter(c => !existingIds.has(c.id));
+                    return [...others, ...assigned];
+                 });
+             }));
              setLoadingData(false);
         }
         
@@ -420,9 +426,18 @@ export default function CampManagementPage() {
 
     }, [userProfile, authLoading, toast]);
     
-    const upcomingCamps = useMemo(() => camps.filter(c => c.status === 'Upcoming'), [camps]);
-    const pastCamps = useMemo(() => camps.filter(c => c.status === 'Completed' || (new Date(c.date) < new Date() && c.status !== 'Upcoming')), [camps]);
-    const suggestedCamps = useMemo(() => camps.filter(c => c.status === 'Suggested'), [camps]);
+    const uniqueCamps = useMemo(() => {
+        const seen = new Set();
+        return camps.filter(camp => {
+            const duplicate = seen.has(camp.id);
+            seen.add(camp.id);
+            return !duplicate;
+        });
+    }, [camps]);
+
+    const upcomingCamps = useMemo(() => uniqueCamps.filter(c => c.status === 'Upcoming'), [uniqueCamps]);
+    const pastCamps = useMemo(() => uniqueCamps.filter(c => c.status === 'Completed' || (new Date(c.date) < new Date() && c.status !== 'Upcoming' && c.status !== 'Suggested')), [uniqueCamps]);
+    const suggestedCamps = useMemo(() => uniqueCamps.filter(c => c.status === 'Suggested'), [uniqueCamps]);
 
     const handleEdit = (camp: any) => {
         setSelectedCamp(camp);
@@ -569,7 +584,15 @@ export default function CampManagementPage() {
                     if (!open) setSelectedCamp(null);
                     setIsFormOpen(open);
                 }}>
-                    <DialogContent className="sm:max-w-lg">
+                    <DialogContent
+                        className="sm:max-w-lg"
+                        onPointerDownOutside={(e) => {
+                            const target = e.target as HTMLElement;
+                            if (target.closest('[data-radix-popper-content-wrapper]')) {
+                                e.preventDefault();
+                            }
+                        }}
+                    >
                         <CampFormDialog camp={selectedCamp} services={services} vles={vles} onFinished={handleFormFinished} />
                     </DialogContent>
                 </Dialog>
@@ -632,7 +655,15 @@ export default function CampManagementPage() {
         return (
              <div className="space-y-6">
                 <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
-                    <DialogContent className="sm:max-w-lg">
+                    <DialogContent
+                        className="sm:max-w-lg"
+                        onPointerDownOutside={(e) => {
+                            const target = e.target as HTMLElement;
+                            if (target.closest('[data-radix-popper-content-wrapper]')) {
+                                e.preventDefault();
+                            }
+                        }}
+                    >
                         <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} />
                     </DialogContent>
                 </Dialog>
