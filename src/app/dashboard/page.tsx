@@ -422,46 +422,33 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
   const handleDialogSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+
     if (!creatorProfile || !creatorId) {
         toast({ title: "Error", description: "Your profile is still loading, please wait a moment.", variant: 'destructive' });
+        setIsSubmitting(false);
         return;
     }
     
     if(selectedFiles.length === 0) {
-        toast({
-            title: 'Document Required',
-            description: 'Please upload at least one document.',
-            variant: 'destructive'
-        });
+        toast({ title: 'Document Required', description: 'Please upload at least one document.', variant: 'destructive' });
+        setIsSubmitting(false);
         return;
     }
 
     const form = e.target as HTMLFormElement;
 
-    if (subServices.length > 0 && !selectedSubCategory) {
-        toast({ title: 'Specific Service Required', description: 'Please select an option from the "Specific Service" dropdown.', variant: 'destructive'});
+    if (!selectedService || (!selectedService.isVariable && (!selectedService.rate || selectedService.rate <= 0))) {
+        toast({ title: 'Specific Service Required', description: 'This appears to be a category. Please select a specific sub-service to proceed.', variant: 'destructive' });
+        setIsSubmitting(false);
         return;
     }
-
-    if (!selectedService) {
-        toast({ title: 'Service Required', description: 'Please select a valid service.', variant: 'destructive'});
-        return;
-    }
-    
-    if (!selectedService.isVariable && (!selectedService.rate || selectedService.rate <= 0)) {
-        toast({
-            title: 'Invalid Service Selection',
-            description: 'This appears to be a category. Please select a specific sub-service to proceed.',
-            variant: 'destructive',
-        });
-        return;
-    }
-    
-    setIsSubmitting(true);
     
     try {
+        // Generate a consistent ID for both storage and Firestore
         const taskId = doc(collection(db, "tasks")).id;
         
+        // 1. Upload files to storage first
         const uploadPromises = selectedFiles.map(async (file) => {
             const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
             await uploadBytes(storageRef, file);
@@ -471,6 +458,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
         const uploadedDocuments = await Promise.all(uploadPromises);
 
+        // 2. Prepare the task data with the uploaded document URLs
         const newTaskData = {
             customer: form.name.value,
             customerAddress: form.address.value,
@@ -497,13 +485,14 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             finalCertificate: null,
         };
 
+        // 3. Call the parent handler to perform the DB transaction
         await onTaskCreated(taskId, newTaskData, selectedService, uploadedDocuments);
         setDialogOpen(false); 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error creating task:", error);
         toast({
             title: 'Task Creation Failed',
-            description: 'There was an error creating your task. Please check your balance and try again.',
+            description: error.message || 'There was an error creating your task. Please check your balance and try again.',
             variant: 'destructive',
         });
     } finally {
@@ -1897,11 +1886,6 @@ export default function DashboardPage() {
 
     const handleCreateTask = async (taskId: string, newTaskData: any, service: any, uploadedDocs: any[]) => {
         if (!user || !realtimeProfile) {
-            toast({
-                title: 'Error',
-                description: 'User profile not fully loaded. Please wait a moment and try again.',
-                variant: 'destructive',
-            });
             throw new Error("Profile not loaded");
         }
         
@@ -1921,53 +1905,33 @@ export default function DashboardPage() {
             );
         } else {
             const rate = parseFloat(service.rate);
-
-            if ((realtimeProfile?.walletBalance || 0) < rate) {
-                toast({
-                    title: 'Insufficient Balance',
-                    description: `Your wallet balance is too low to book this service. Please add funds.`,
-                    variant: 'destructive',
-                });
-                throw new Error("Insufficient balance");
-            }
             
-            try {
-                 await runTransaction(db, async (transaction) => {
-                    const creatorCollection = realtimeProfile.role === 'vle' ? 'vles' : 'users';
-                    const creatorRef = doc(db, creatorCollection, user.uid);
+            await runTransaction(db, async (transaction) => {
+                const creatorCollection = realtimeProfile.role === 'vle' ? 'vles' : 'users';
+                const creatorRef = doc(db, creatorCollection, user.uid);
 
-                    const creatorDoc = await transaction.get(creatorRef);
-                    if (!creatorDoc.exists()) throw new Error("Could not find your user profile to process payment.");
-                    
-                    const creatorBalance = creatorDoc.data().walletBalance || 0;
-                    if (creatorBalance < rate) throw new Error("Insufficient wallet balance.");
+                const creatorDoc = await transaction.get(creatorRef);
+                if (!creatorDoc.exists()) throw new Error("Could not find your user profile to process payment.");
+                
+                const creatorBalance = creatorDoc.data().walletBalance || 0;
+                if (creatorBalance < rate) throw new Error("Insufficient wallet balance.");
 
-                    const newCreatorBalance = creatorBalance - rate;
-                    transaction.update(creatorRef, { walletBalance: newCreatorBalance });
+                const newCreatorBalance = creatorBalance - rate;
+                transaction.update(creatorRef, { walletBalance: newCreatorBalance });
 
-                    const taskWithStatus = { ...taskWithDocs, status: 'Unassigned', rate: rate };
-                    transaction.set(doc(db, "tasks", taskId), taskWithStatus);
-                });
+                const taskWithStatus = { ...taskWithDocs, status: 'Unassigned', rate: rate };
+                transaction.set(doc(db, "tasks", taskId), taskWithStatus);
+            });
 
-                toast({
-                    title: 'Task Created & Paid!',
-                    description: `₹${rate.toFixed(2)} has been deducted from your wallet.`,
-                });
-                await createNotificationForAdmins(
-                    'New Task Ready for Assignment',
-                    `A new task '${service.name}' by ${newTaskData.customer} is paid and ready for assignment.`,
-                    `/dashboard`
-                );
-
-            } catch (error: any) {
-                console.error("Task creation transaction failed: ", error);
-                toast({
-                    title: 'Payment Failed',
-                    description: error.message || 'Could not process payment. Please ensure you have sufficient wallet balance.',
-                    variant: 'destructive',
-                });
-                throw error;
-            }
+            toast({
+                title: 'Task Created & Paid!',
+                description: `₹${rate.toFixed(2)} has been deducted from your wallet.`,
+            });
+            await createNotificationForAdmins(
+                'New Task Ready for Assignment',
+                `A new task '${service.name}' by ${newTaskData.customer} is paid and ready for assignment.`,
+                `/dashboard`
+            );
         }
     }
 
@@ -2054,7 +2018,7 @@ export default function DashboardPage() {
                     actorId: user.uid,
                     actorRole: 'Admin',
                     action: 'Task Assigned',
-                    details: `Task assigned to VLE: ${vleName}. Fee of ₹${taskData.rate.toFixed(2)} processed.`
+                    details: `Task assigned to VLE ID: ${vleId}. Fee of ₹${taskData.rate.toFixed(2)} processed.`
                 };
 
                 transaction.update(taskRef, { 
@@ -2158,12 +2122,13 @@ export default function DashboardPage() {
             operation: 'delete' | 'update',
             updateData?: object
         ) => {
+            const BATCH_SIZE = 499; // Firestore batch limit is 500
             const snapshot = await getDocs(query(collectionRef));
             if (snapshot.size === 0) return;
-    
+
             let batch = writeBatch(db);
             let count = 0;
-    
+
             for (const doc of snapshot.docs) {
                 if (operation === 'delete') {
                     batch.delete(doc.ref);
@@ -2171,7 +2136,7 @@ export default function DashboardPage() {
                     batch.update(doc.ref, updateData);
                 }
                 count++;
-                if (count === 499) {
+                if (count === BATCH_SIZE) {
                     await batch.commit();
                     batch = writeBatch(db);
                     count = 0;
@@ -2197,7 +2162,8 @@ export default function DashboardPage() {
             let seedBatch = writeBatch(db);
             seedServices.forEach(service => {
                 const docRef = service.id ? doc(db, "services", service.id) : doc(collection(db, "services"));
-                seedBatch.set(docRef, { ...service, id: undefined }); // Remove id from data
+                const { id, ...serviceData } = service;
+                seedBatch.set(docRef, serviceData);
             });
             await seedBatch.commit();
 
