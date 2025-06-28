@@ -4,17 +4,17 @@
 import { useState, useEffect, type FormEvent, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Check, ChevronsUpDown, Tent, UserPlus, X } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Check, ChevronsUpDown, Tent, UserPlus } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -134,17 +134,15 @@ const MultiSelect = ({
 
 // --- Camp Dialog Components ---
 
-const CampFormDialog = ({ camp, services, vles, onFinished }: { camp?: any; services: any[]; vles: any[]; onFinished: () => void; }) => {
+const CampFormDialog = ({ camp, services, onFinished }: { camp?: any; services: any[]; onFinished: () => void; }) => {
     const { toast } = useToast();
     const [name, setName] = useState(camp?.name || '');
     const [location, setLocation] = useState(camp?.location || '');
     const [date, setDate] = useState<Date | undefined>(camp?.date ? new Date(camp.date) : undefined);
     const [selectedServices, setSelectedServices] = useState<string[]>(camp?.servicesOffered || []);
-    const [assignedVles, setAssignedVles] = useState<string[]>(camp?.assignedVleIds || []);
     const [loading, setLoading] = useState(false);
     
     const serviceOptions = useMemo(() => services.map(s => ({ value: s.name, label: s.name })), [services]);
-    const vleOptions = useMemo(() => vles.filter(v => !v.isAdmin).map(v => ({ value: v.id, label: v.name })), [vles]);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -161,8 +159,7 @@ const CampFormDialog = ({ camp, services, vles, onFinished }: { camp?: any; serv
             location,
             date: date.toISOString(),
             servicesOffered: selectedServices,
-            assignedVleIds: assignedVles,
-            status: camp?.status || 'Upcoming', // Default to Upcoming if new
+            status: camp?.status || 'Upcoming',
         };
 
         try {
@@ -170,15 +167,8 @@ const CampFormDialog = ({ camp, services, vles, onFinished }: { camp?: any; serv
                 await updateDoc(doc(db, "camps", camp.id), campData);
                  toast({ title: 'Camp Updated', description: `${name} has been successfully updated.` });
             } else {
-                const docRef = await addDoc(collection(db, "camps"), campData);
+                await addDoc(collection(db, "camps"), campData);
                 await createNotificationForAdmins('New Camp Created', `A new camp "${name}" has been scheduled at ${location}.`, `/dashboard/camps`);
-                
-                // Notify assigned VLEs
-                const notificationPromises = assignedVles.map(vleId => 
-                    createNotification(vleId, 'You are assigned to a new camp!', `You have been assigned to the "${name}" camp.`, `/dashboard/camps`)
-                );
-                await Promise.all(notificationPromises);
-
                 toast({ title: 'Camp Created', description: `${name} has been successfully created.` });
             }
             onFinished();
@@ -219,12 +209,6 @@ const CampFormDialog = ({ camp, services, vles, onFinished }: { camp?: any; serv
                     <Label className="text-right">Services Offered</Label>
                     <div className="col-span-3">
                         <MultiSelect options={serviceOptions} selected={selectedServices} onChange={setSelectedServices} placeholder="Select services..."/>
-                    </div>
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">Assign VLEs</Label>
-                    <div className="col-span-3">
-                         <MultiSelect options={vleOptions} selected={assignedVles} onChange={setAssignedVles} placeholder="Select VLEs..." />
                     </div>
                 </div>
             </div>
@@ -275,7 +259,6 @@ const SuggestCampDialog = ({ onFinished }: { onFinished: () => void; }) => {
                 id: userProfile.id,
                 name: userProfile.name,
             },
-            assignedVleIds: [],
         };
 
         try {
@@ -337,9 +320,8 @@ export default function CampManagementPage() {
     const router = useRouter();
     const { toast } = useToast();
     
-    const [camps, setCamps] = useState<any[]>([]);
+    const [allCamps, setAllCamps] = useState<any[]>([]);
     const [services, setServices] = useState<any[]>([]);
-    const [vles, setVles] = useState<any[]>([]);
     const [loadingData, setLoadingData] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSuggestFormOpen, setIsSuggestFormOpen] = useState(false);
@@ -348,85 +330,52 @@ export default function CampManagementPage() {
 
     // Effect for authorization
     useEffect(() => {
-        if (!authLoading && userProfile && userProfile.role === 'customer') {
-            toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
-            router.push('/dashboard');
+        if (!authLoading && !userProfile) {
+            router.push('/');
         }
-    }, [userProfile, authLoading, router, toast]);
+    }, [userProfile, authLoading, router]);
 
     // Effect for fetching data
     useEffect(() => {
-        if (authLoading || !userProfile) {
-            if (!authLoading) setLoadingData(false);
-            return;
-        }
-
-        if (userProfile.role === 'customer') {
-            setLoadingData(false);
-            return;
-        }
-
         setLoadingData(true);
         const unsubscribers: (() => void)[] = [];
+        
+        let campsQuery;
+        if (userProfile?.isAdmin) {
+             campsQuery = query(collection(db, 'camps'), orderBy('date', 'desc'));
+        } else {
+            // For customers and VLEs, only show upcoming camps.
+            // THIS REQUIRES FIRESTORE RULES TO ALLOW.
+            campsQuery = query(collection(db, 'camps'), where('status', '==', 'Upcoming'), orderBy('date', 'asc'));
+        }
 
-        if (userProfile.isAdmin) {
-            // Admin gets all camps
-            const allCampsQuery = query(collection(db, 'camps'), orderBy('date', 'desc'));
-            const unsubAllCamps = onSnapshot(allCampsQuery, (snapshot) => {
-                 setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                 setLoadingData(false);
-            }, (error) => {
-                console.error("Error fetching admin camps: ", error);
-                toast({ title: "Error", description: "Could not fetch camps.", variant: "destructive" });
-                setLoadingData(false);
-            });
-            unsubscribers.push(unsubAllCamps);
-            
-            // Admin needs services and VLEs for the creation dialog
+        const unsubCamps = onSnapshot(campsQuery, (snapshot) => {
+             setAllCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+             setLoadingData(false);
+        }, (error) => {
+            console.error("Error fetching camps: ", error);
+            toast({ title: "Error", description: "Could not fetch camps. You may not have permission.", variant: "destructive" });
+            setLoadingData(false);
+        });
+        unsubscribers.push(unsubCamps);
+        
+        // Admins need services for the creation dialog
+        if (userProfile?.isAdmin) {
             const serviceQuery = query(collection(db, 'services'));
             const unsubServices = onSnapshot(serviceQuery, (snapshot) => {
                 setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             });
             unsubscribers.push(unsubServices);
-
-            const vleQuery = query(collection(db, 'vles'));
-            const unsubVles = onSnapshot(vleQuery, (snapshot) => {
-                setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            });
-            unsubscribers.push(unsubVles);
-
-        } else if (userProfile.role === 'vle') {
-             // For VLEs, we can ONLY query for their assigned camps to prevent permission errors.
-             // Public browsing of camps would require changing Firestore security rules.
-             const assignedCampsQuery = query(collection(db, 'camps'), where('assignedVleIds', 'array-contains', userProfile.id));
-             unsubscribers.push(onSnapshot(assignedCampsQuery, snapshot => {
-                 const assigned = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-                 setCamps(assigned);
-             }, (error) => {
-                console.error("Error fetching VLE assigned camps", error);
-                // Don't toast here as it might be an expected error if rules are strict and they have no camps.
-             }));
-             setLoadingData(false);
-        } else {
-            setLoadingData(false);
         }
         
         return () => { unsubscribers.forEach(unsub => unsub()); };
 
-    }, [userProfile, authLoading, toast]);
+    }, [userProfile, toast]);
     
-    const uniqueCamps = useMemo(() => {
-        const seen = new Set();
-        return camps.filter(camp => {
-            const duplicate = seen.has(camp.id);
-            seen.add(camp.id);
-            return !duplicate;
-        });
-    }, [camps]);
+    const upcomingCamps = useMemo(() => allCamps.filter(c => c.status === 'Upcoming'), [allCamps]);
+    const pastCamps = useMemo(() => allCamps.filter(c => c.status === 'Completed'), [allCamps]);
+    const suggestedCamps = useMemo(() => allCamps.filter(c => c.status === 'Suggested'), [allCamps]);
 
-    const upcomingCamps = useMemo(() => uniqueCamps.filter(c => c.status === 'Upcoming'), [uniqueCamps]);
-    const pastCamps = useMemo(() => uniqueCamps.filter(c => c.status === 'Completed' || (new Date(c.date) < new Date() && c.status !== 'Upcoming' && c.status !== 'Suggested')), [uniqueCamps]);
-    const suggestedCamps = useMemo(() => uniqueCamps.filter(c => c.status === 'Suggested'), [uniqueCamps]);
 
     const handleEdit = (camp: any) => {
         setSelectedCamp(camp);
@@ -461,39 +410,151 @@ export default function CampManagementPage() {
         return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     }
     
-    if (!userProfile || userProfile.role === 'customer') {
-        return null;
+    if (!userProfile) {
+        return null; // Redirect logic in useEffect handles this
     }
 
-    const AdminCampTable = ({ data, title }: { data: any[], title: string }) => (
+    const AdminView = () => (
+        <div className="space-y-4">
+            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action will permanently delete the "{selectedCamp?.name}" camp.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setSelectedCamp(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <Dialog open={isFormOpen} onOpenChange={(open) => {
+                if (!open) setSelectedCamp(null);
+                setIsFormOpen(open);
+            }}>
+                <DialogContent
+                    className="sm:max-w-lg"
+                    onPointerDownOutside={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('[data-radix-popper-content-wrapper]')) {
+                            e.preventDefault();
+                        }
+                    }}
+                >
+                    <CampFormDialog camp={selectedCamp} services={services} onFinished={handleFormFinished} />
+                </DialogContent>
+            </Dialog>
+
+            <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-bold tracking-tight">Camp Management</h1>
+                <Button onClick={() => { setSelectedCamp(null); setIsFormOpen(true); }}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Create New Camp
+                </Button>
+            </div>
+            
+            <Tabs defaultValue='upcoming' className="w-full">
+                <TabsList>
+                    <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                    <TabsTrigger value="suggestions">VLE Suggestions <Badge className="ml-2">{suggestedCamps.length}</Badge></TabsTrigger>
+                    <TabsTrigger value="past">Past</TabsTrigger>
+                </TabsList>
+                <TabsContent value="upcoming" className="mt-4">
+                    <CampTable data={upcomingCamps} title="Upcoming Camps" />
+                </TabsContent>
+                <TabsContent value="suggestions" className="mt-4">
+                    <Card>
+                        <CardHeader><CardTitle>VLE Camp Suggestions</CardTitle></CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Suggested By</TableHead>
+                                        <TableHead>Location</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {suggestedCamps.length > 0 ? suggestedCamps.map(camp => (
+                                        <TableRow key={camp.id}>
+                                            <TableCell>{camp.suggestedBy?.name}</TableCell>
+                                            <TableCell>{camp.location}</TableCell>
+                                            <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
+                                            <TableCell className="text-right space-x-2">
+                                                <Button size="sm" variant="outline" onClick={() => handleApproveSuggestion(camp)}><UserPlus className="mr-2 h-4 w-4" />Approve</Button>
+                                                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(camp)}><Trash className="mr-2 h-4 w-4" />Reject</Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new suggestions.</TableCell></TableRow>}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="past" className="mt-4">
+                     <CampTable data={pastCamps} title="Past Camps" />
+                </TabsContent>
+            </Tabs>
+        </div>
+    );
+    
+    const PublicView = () => (
+         <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-bold tracking-tight">Upcoming Camps</h1>
+                {userProfile.role === 'vle' && (
+                    <>
+                        <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
+                            <DialogContent
+                                className="sm:max-w-lg"
+                                onPointerDownOutside={(e) => {
+                                    const target = e.target as HTMLElement;
+                                    if (target.closest('[data-radix-popper-content-wrapper]')) {
+                                        e.preventDefault();
+                                    }
+                                }}
+                            >
+                                <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} />
+                            </DialogContent>
+                        </Dialog>
+                        <Button onClick={() => setIsSuggestFormOpen(true)}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
+                        </Button>
+                    </>
+                )}
+            </div>
+            <CampTable data={upcomingCamps} title="" />
+         </div>
+    );
+
+    const CampTable = ({ data, title }: { data: any[], title: string }) => (
         <Card>
-            <CardHeader>
-                <CardTitle>{title}</CardTitle>
-            </CardHeader>
-            <CardContent>
+            {title && <CardHeader><CardTitle>{title}</CardTitle></CardHeader>}
+            <CardContent className={cn(!title && 'pt-6')}>
                 <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>Name</TableHead>
                             <TableHead>Location</TableHead>
                             <TableHead>Date</TableHead>
-                            <TableHead>Assigned VLEs</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead>Services Offered</TableHead>
+                             {userProfile.isAdmin && <TableHead className="text-right">Actions</TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {data.length > 0 ? data.map((camp) => {
-                             const assignedVleNames = vles
-                                .filter(v => camp.assignedVleIds?.includes(v.id))
-                                .map(v => v.name)
-                                .join(', ');
-
-                            return (
-                                <TableRow key={camp.id}>
-                                    <TableCell className="font-medium">{camp.name}</TableCell>
-                                    <TableCell>{camp.location}</TableCell>
-                                    <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
-                                     <TableCell>{assignedVleNames || 'N/A'}</TableCell>
+                        {data.length > 0 ? data.map((camp) => (
+                            <TableRow key={camp.id}>
+                                <TableCell className="font-medium">{camp.name}</TableCell>
+                                <TableCell>{camp.location}</TableCell>
+                                <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
+                                <TableCell className="max-w-xs">
+                                    <div className="flex flex-wrap gap-1">
+                                        {camp.servicesOffered?.map((s: string, i: number) => <Badge key={i} variant="secondary">{s}</Badge>)}
+                                    </div>
+                                </TableCell>
+                                {userProfile.isAdmin && (
                                     <TableCell className="text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -505,11 +566,11 @@ export default function CampManagementPage() {
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
-                                </TableRow>
-                            );
-                        }) : (
+                                )}
+                            </TableRow>
+                        )) : (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">No camps to display.</TableCell>
+                                <TableCell colSpan={userProfile.isAdmin ? 5 : 4} className="h-24 text-center">No camps to display.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
@@ -517,159 +578,8 @@ export default function CampManagementPage() {
             </CardContent>
         </Card>
     );
-    
-    const VleCampTable = ({ data, title }: { data: any[], title: string }) => (
-        <Card>
-            <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
-            <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Name</TableHead>
-                            <TableHead>Location</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Services</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                         {data.length > 0 ? data.map(camp => (
-                            <TableRow key={camp.id}>
-                                <TableCell className="font-medium">{camp.name}</TableCell>
-                                <TableCell>{camp.location}</TableCell>
-                                <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
-                                <TableCell className="max-w-xs">
-                                    <div className="flex flex-wrap gap-1">
-                                        {camp.servicesOffered?.map((s: string, i: number) => <Badge key={i} variant="secondary">{s}</Badge>)}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                         )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No camps found.</TableCell></TableRow>}
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
-    )
 
-
-    // ADMIN VIEW
-    if (userProfile.isAdmin) {
-         return (
-            <div className="space-y-4">
-                <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This action will permanently delete the "{selectedCamp?.name}" camp.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel onClick={() => setSelectedCamp(null)}>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-                <Dialog open={isFormOpen} onOpenChange={(open) => {
-                    if (!open) setSelectedCamp(null);
-                    setIsFormOpen(open);
-                }}>
-                    <DialogContent
-                        className="sm:max-w-lg"
-                        onPointerDownOutside={(e) => {
-                            const target = e.target as HTMLElement;
-                            if (target.closest('[data-radix-popper-content-wrapper]')) {
-                                e.preventDefault();
-                            }
-                        }}
-                    >
-                        <CampFormDialog camp={selectedCamp} services={services} vles={vles} onFinished={handleFormFinished} />
-                    </DialogContent>
-                </Dialog>
-
-                <div className="flex justify-end">
-                    <Button onClick={() => { setSelectedCamp(null); setIsFormOpen(true); }}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Create New Camp
-                    </Button>
-                </div>
-                
-                <Tabs defaultValue='upcoming' className="w-full">
-                    <TabsList>
-                        <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                        <TabsTrigger value="suggestions">VLE Suggestions <Badge className="ml-2">{suggestedCamps.length}</Badge></TabsTrigger>
-                        <TabsTrigger value="past">Past</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="upcoming" className="mt-4">
-                        <AdminCampTable data={upcomingCamps} title="Upcoming Camps" />
-                    </TabsContent>
-                    <TabsContent value="suggestions" className="mt-4">
-                        <Card>
-                            <CardHeader><CardTitle>VLE Camp Suggestions</CardTitle></CardHeader>
-                            <CardContent>
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Suggested By</TableHead>
-                                            <TableHead>Location</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {suggestedCamps.length > 0 ? suggestedCamps.map(camp => (
-                                            <TableRow key={camp.id}>
-                                                <TableCell>{camp.suggestedBy?.name}</TableCell>
-                                                <TableCell>{camp.location}</TableCell>
-                                                <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
-                                                <TableCell className="text-right space-x-2">
-                                                    <Button size="sm" variant="outline" onClick={() => handleApproveSuggestion(camp)}><UserPlus className="mr-2 h-4 w-4" />Approve</Button>
-                                                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(camp)}><Trash className="mr-2 h-4 w-4" />Reject</Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new suggestions.</TableCell></TableRow>}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    <TabsContent value="past" className="mt-4">
-                         <AdminCampTable data={pastCamps} title="Past Camps" />
-                    </TabsContent>
-                </Tabs>
-            </div>
-        );
-    }
-    
-    // VLE VIEW
-    if (userProfile.role === 'vle') {
-        const assignedUpcoming = uniqueCamps.filter(c => c.status === 'Upcoming');
-
-        return (
-             <div className="space-y-6">
-                <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
-                    <DialogContent
-                        className="sm:max-w-lg"
-                        onPointerDownOutside={(e) => {
-                            const target = e.target as HTMLElement;
-                            if (target.closest('[data-radix-popper-content-wrapper]')) {
-                                e.preventDefault();
-                            }
-                        }}
-                    >
-                        <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} />
-                    </DialogContent>
-                </Dialog>
-
-                 <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold tracking-tight">Camps</h2>
-                    <Button onClick={() => setIsSuggestFormOpen(true)}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
-                    </Button>
-                </div>
-                
-                <VleCampTable data={assignedUpcoming} title="Your Assigned Camps"/>
-             </div>
-        )
-    }
-
-    return null;
+    return userProfile.isAdmin ? <AdminView /> : <PublicView />;
 }
+
+    

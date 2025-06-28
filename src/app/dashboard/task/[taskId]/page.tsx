@@ -292,17 +292,16 @@ export default function TaskDetailPage() {
     const [task, setTask] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
     const [isPaying, setIsPaying] = useState(false);
-
-    // State for VLE final certificate upload
-    const [selectedCertificate, setSelectedCertificate] = useState<File | null>(null);
-    const [isCertUploading, setIsCertUploading] = useState(false);
-    const vleFileInputRef = useRef<HTMLInputElement>(null);
     
     // State for additional document uploads
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-
+    
+    // State for VLE final certificate upload
+    const [selectedCertificate, setSelectedCertificate] = useState<File | null>(null);
+    const [isCertUploading, setIsCertUploading] = useState(false);
+    const vleFileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!taskId) return;
@@ -350,11 +349,13 @@ export default function TaskDetailPage() {
 
             const newDocuments = await Promise.all(uploadPromises);
             const taskRef = doc(db, 'tasks', taskId as string);
+            
+            const actorRole = userProfile.isAdmin ? 'Admin' : (userProfile.role === 'vle' ? 'VLE' : 'Customer');
 
             const historyEntry = {
                 timestamp: new Date().toISOString(),
                 actorName: userProfile.name,
-                actorRole: userProfile.isAdmin ? 'Admin' : 'Customer',
+                actorRole: actorRole,
                 action: 'Documents Uploaded',
                 details: `${newDocuments.length} new document(s) uploaded.`,
             };
@@ -381,6 +382,10 @@ export default function TaskDetailPage() {
             toast({ title: "Upload Failed", variant: "destructive" });
         } finally {
             setIsUploading(false);
+            // Reset the file input
+            if(fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
         }
     };
 
@@ -657,8 +662,8 @@ export default function TaskDetailPage() {
                                     </CardFooter>
                                 </Card>
                            )}
-
-                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs) && task.status !== 'Completed' && (
+                           
+                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction) && task.status !== 'Completed' && task.status !== 'Pending Price Approval' && task.status !== 'Awaiting Payment' && (
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
                            )}
                         </CardContent>
@@ -736,3 +741,5 @@ export default function TaskDetailPage() {
         </div>
     );
 }
+
+    

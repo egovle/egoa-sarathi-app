@@ -45,11 +45,11 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
 
 const ALL_NAV_ITEMS = [
-    { href: "/dashboard", icon: Home, label: "Dashboard", adminOnly: false },
-    { href: "/dashboard/extract", icon: BrainCircuit, label: "Smart Extractor", adminOnly: false },
-    { href: "/dashboard/reports", icon: BarChart, label: "Reports", adminOnly: false },
-    { href: "/dashboard/camps", icon: Tent, label: "Camps", adminOnly: false },
-    { href: "/dashboard/services", icon: ListPlus, label: "Service Management", adminOnly: true },
+    { href: "/dashboard", icon: Home, label: "Dashboard", roles: ['admin', 'vle', 'customer'] },
+    { href: "/dashboard/extract", icon: BrainCircuit, label: "Smart Extractor", roles: ['admin', 'vle'] },
+    { href: "/dashboard/reports", icon: BarChart, label: "Reports", roles: ['admin', 'vle'] },
+    { href: "/dashboard/camps", icon: Tent, label: "Camps", roles: ['admin', 'vle', 'customer'] },
+    { href: "/dashboard/services", icon: ListPlus, label: "Service Management", roles: ['admin'] },
 ];
 
 const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -91,10 +91,8 @@ export default function DashboardLayout({
   const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
   
   const navItems = ALL_NAV_ITEMS.filter(item => {
-    if (item.href === '/dashboard/camps') {
-      return userProfile?.isAdmin || userProfile?.role === 'vle';
-    }
-    return !item.adminOnly || userProfile?.isAdmin
+    const userRole = userProfile?.isAdmin ? 'admin' : userProfile?.role;
+    return userRole && item.roles.includes(userRole);
   });
 
   useEffect(() => {
@@ -396,3 +394,5 @@ export default function DashboardLayout({
     </div>
   )
 }
+
+    
