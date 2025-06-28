@@ -4,7 +4,7 @@
 import { useState, useEffect, type FormEvent, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, where, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, where, getDocs, arrayUnion } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -53,7 +53,7 @@ const MultiSelect = ({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen} modal={false}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -96,7 +96,7 @@ const MultiSelect = ({
           <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0">
+      <PopoverContent className="w-full p-0" align="start">
         <Command className={className}>
           <CommandInput placeholder="Search..." />
           <CommandList>
@@ -340,9 +340,7 @@ export default function CampManagementPage() {
         setLoadingData(true);
         const unsubscribers: (() => void)[] = [];
         
-        let campsQuery;
-        // Public query for all users
-        campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
+        const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
 
         const unsubCamps = onSnapshot(campsQuery, (snapshot) => {
              setAllCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -355,7 +353,6 @@ export default function CampManagementPage() {
         });
         unsubscribers.push(unsubCamps);
         
-        // Admins need services for the creation dialog
         const serviceQuery = query(collection(db, 'services'));
         const unsubServices = onSnapshot(serviceQuery, (snapshot) => {
             setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -480,9 +477,6 @@ export default function CampManagementPage() {
             }}>
                 <DialogContent
                     className="sm:max-w-lg"
-                    onInteractOutside={(e) => {
-                        e.preventDefault();
-                    }}
                 >
                     <CampFormDialog camp={selectedCamp} services={services} onFinished={handleFormFinished} />
                 </DialogContent>
@@ -550,9 +544,6 @@ export default function CampManagementPage() {
                         <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
                              <DialogContent
                                 className="sm:max-w-lg"
-                                onInteractOutside={(e) => {
-                                   e.preventDefault();
-                                }}
                             >
                                 <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} />
                             </DialogContent>
