@@ -4,7 +4,7 @@
 import { useState, useEffect, type FormEvent, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, runTransaction } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, runTransaction, writeBatch, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Tent, UserPlus, ChevronsUpDown, Check, X } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Tent, UserPlus, ChevronsUpDown, Check, X, UserCog } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -25,16 +25,25 @@ import { cn } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // --- Camp Dialog Components ---
 
-const CampFormDialog = ({ camp, onFinished }: { camp?: any; onFinished: () => void; }) => {
+const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; suggestion?: any; vles: any[]; onFinished: () => void; }) => {
     const { toast } = useToast();
-    const [name, setName] = useState(camp?.name || '');
-    const [location, setLocation] = useState(camp?.location || '');
-    const [date, setDate] = useState<Date | undefined>(camp?.date ? new Date(camp.date) : undefined);
+    const initialData = camp || suggestion || {};
+    
+    // If it's a suggestion, create a better default name than "Suggested by..."
+    const initialName = camp?.name || (suggestion ? `Camp at ${suggestion.location}`: '');
+
+    const [name, setName] = useState(initialName);
+    const [location, setLocation] = useState(initialData.location || '');
+    const [date, setDate] = useState<Date | undefined>(initialData.date ? new Date(initialData.date) : undefined);
     const [loading, setLoading] = useState(false);
     
+    const [assignedVles, setAssignedVles] = useState<any[]>(camp?.assignedVles || []);
+    const [isVlePopoverOpen, setIsVlePopoverOpen] = useState(false);
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -49,18 +58,42 @@ const CampFormDialog = ({ camp, onFinished }: { camp?: any; onFinished: () => vo
             name,
             location,
             date: date.toISOString(),
-            status: camp?.status || 'Upcoming',
+            status: 'Upcoming',
+            services: initialData.services || [],
+            otherServices: initialData.otherServices || '',
+            assignedVles: assignedVles.map(v => ({ id: v.id, name: v.name, status: v.status || 'pending' })),
+            vleParticipantIds: assignedVles.map(v => v.id), // For easier querying
         };
 
         try {
             if (camp) {
                 await updateDoc(doc(db, "camps", camp.id), campData);
-                 toast({ title: 'Camp Updated', description: `${name} has been successfully updated.` });
-            } else {
+                toast({ title: 'Camp Updated', description: `${name} has been successfully updated.` });
+            } else if (suggestion) { // Approving a suggestion
+                 const newCampRef = doc(collection(db, "camps"));
+                 const suggestionRef = doc(db, "campSuggestions", suggestion.id);
+                 
+                 const batch = writeBatch(db);
+                 batch.set(newCampRef, campData);
+                 batch.delete(suggestionRef);
+                 await batch.commit();
+
+                 toast({ title: 'Suggestion Approved', description: 'The camp is now listed as upcoming.' });
+                 if (suggestion.suggestedBy?.id) {
+                    await createNotification(suggestion.suggestedBy.id, 'Camp Suggestion Approved!', `Your suggestion for a camp at ${suggestion.location} has been approved.`);
+                }
+            } else { // Creating a new camp from scratch
                 await addDoc(collection(db, "camps"), campData);
-                await createNotificationForAdmins('New Camp Created', `A new camp "${name}" has been scheduled at ${location}.`, `/dashboard/camps`);
                 toast({ title: 'Camp Created', description: `${name} has been successfully created.` });
             }
+            
+            // Notify newly assigned VLEs
+            for (const vle of assignedVles) {
+                if (!camp?.assignedVles?.some((av:any) => av.id === vle.id)) {
+                    await createNotification(vle.id, 'New Camp Invitation', `You have been invited to join the camp "${name}".`, '/dashboard/camps');
+                }
+            }
+            
             onFinished();
         } catch (error: any) {
             toast({ title: 'Error', description: error.message || 'An unknown error occurred.', variant: 'destructive' });
@@ -71,9 +104,9 @@ const CampFormDialog = ({ camp, onFinished }: { camp?: any; onFinished: () => vo
     return (
         <form onSubmit={handleSubmit}>
             <DialogHeader>
-                <DialogTitle>{camp ? 'Edit Camp' : 'Create New Camp'}</DialogTitle>
+                <DialogTitle>{camp ? 'Edit Camp' : (suggestion ? 'Approve & Finalize Camp' : 'Create New Camp')}</DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="name" className="text-right">Camp Name</Label>
                     <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Summer Service Drive" required className="col-span-3"/>
@@ -95,11 +128,76 @@ const CampFormDialog = ({ camp, onFinished }: { camp?: any; onFinished: () => vo
                         </PopoverContent>
                     </Popover>
                 </div>
+                {/* VLE Assignment */}
+                 <div className="grid grid-cols-4 items-start gap-4 pt-2">
+                    <Label className="text-right pt-2">Assign VLEs</Label>
+                    <div className="col-span-3 space-y-2">
+                        <Popover open={isVlePopoverOpen} onOpenChange={setIsVlePopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    className="w-full justify-between"
+                                >
+                                    {assignedVles.length > 0 ? `${assignedVles.length} VLE(s) assigned` : "Select VLEs..."}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                <Command>
+                                    <CommandInput placeholder="Search VLEs..." />
+                                    <CommandList>
+                                        <CommandEmpty>No VLE found.</CommandEmpty>
+                                        <CommandGroup>
+                                            {vles.map((vle) => (
+                                                <CommandItem
+                                                    key={vle.id}
+                                                    value={vle.name}
+                                                    onSelect={() => {
+                                                        const isSelected = assignedVles.some(s => s.id === vle.id);
+                                                        if (isSelected) {
+                                                            setAssignedVles(assignedVles.filter(s => s.id !== vle.id));
+                                                        } else {
+                                                            setAssignedVles([...assignedVles, vle]);
+                                                        }
+                                                    }}
+                                                >
+                                                    <Check
+                                                        className={cn(
+                                                            "mr-2 h-4 w-4",
+                                                            assignedVles.some(s => s.id === vle.id) ? "opacity-100" : "opacity-0"
+                                                        )}
+                                                    />
+                                                    {vle.name} ({vle.location})
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
+                        <div className="flex flex-wrap gap-1">
+                            {assignedVles.map(vle => (
+                                <Badge key={vle.id} variant="secondary" className="flex items-center gap-1">
+                                    {vle.name}
+                                    <button
+                                        type="button"
+                                        className="ml-1 rounded-full hover:bg-muted-foreground/20"
+                                        onClick={() => setAssignedVles(assignedVles.filter(s => s.id !== vle.id))}
+                                    >
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </Badge>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
             </div>
             <DialogFooter>
                 <Button type="submit" disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {camp ? 'Save Changes' : 'Create Camp'}
+                    {camp ? 'Save Changes' : (suggestion ? 'Approve & Create Camp' : 'Create Camp')}
                 </Button>
             </DialogFooter>
         </form>
@@ -274,11 +372,13 @@ export default function CampManagementPage() {
     const [allCamps, setAllCamps] = useState<any[]>([]);
     const [campSuggestions, setCampSuggestions] = useState<any[]>([]);
     const [services, setServices] = useState<any[]>([]);
+    const [vles, setVles] = useState<any[]>([]);
     const [loadingData, setLoadingData] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isSuggestFormOpen, setIsSuggestFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedCamp, setSelectedCamp] = useState<any | null>(null);
+    const [selectedSuggestion, setSelectedSuggestion] = useState<any | null>(null);
 
     // Effect for authorization
     useEffect(() => {
@@ -297,8 +397,6 @@ export default function CampManagementPage() {
              setLoadingData(false);
         }, (error) => {
             console.error("Error fetching camps: ", error);
-            // This toast is helpful for debugging permissions, but can be annoying.
-            // toast({ title: "Error", description: "Could not fetch camps. Check Firestore rules.", variant: "destructive" });
             setLoadingData(false);
         });
         
@@ -306,19 +404,24 @@ export default function CampManagementPage() {
 
     }, [toast]);
     
-    // Effect for fetching camp suggestions (Admins only)
+    // Effect for fetching camp suggestions & VLEs (Admins only)
     useEffect(() => {
         if (!userProfile?.isAdmin) return;
 
         const suggestionsQuery = query(collection(db, 'campSuggestions'), orderBy('date', 'asc'));
         const unsubSuggestions = onSnapshot(suggestionsQuery, (snapshot) => {
             setCampSuggestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }, (error) => {
-            console.error("Error fetching camp suggestions:", error);
-            toast({ title: "Error", description: "Could not fetch suggestions.", variant: "destructive" });
-        });
+        }, (error) => console.error("Error fetching camp suggestions:", error));
 
-        return () => unsubSuggestions();
+        const vlesQuery = query(collection(db, 'vles'), where('isAdmin', '==', false), orderBy('name'));
+        const unsubVles = onSnapshot(vlesQuery, (snapshot) => {
+            setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => console.error("Error fetching VLEs:", error));
+
+        return () => {
+            unsubSuggestions();
+            unsubVles();
+        };
     }, [userProfile, toast]);
 
     // Effect to fetch services for the suggestion dialog
@@ -327,10 +430,7 @@ export default function CampManagementPage() {
         const unsubServices = onSnapshot(servicesQuery, (snapshot) => {
             const fetchedServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setServices(fetchedServices);
-        }, (error) => {
-            console.error("Error fetching services:", error);
-            toast({ title: "Error", description: "Could not fetch services for suggestions.", variant: "destructive" });
-        });
+        }, (error) => console.error("Error fetching services:", error));
 
         return () => unsubServices();
     }, [toast]);
@@ -355,31 +455,11 @@ export default function CampManagementPage() {
         setIsAlertOpen(false);
         setSelectedCamp(null);
     };
-
-    const handleApproveSuggestion = async (suggestion: any) => {
-        const { id, ...suggestionData } = suggestion;
-        const campData = {
-            ...suggestionData,
-            status: 'Upcoming',
-        };
-
-        try {
-            await runTransaction(db, async (transaction) => {
-                const newCampRef = doc(collection(db, "camps"));
-                const suggestionRef = doc(db, "campSuggestions", id);
-                transaction.set(newCampRef, campData);
-                transaction.delete(suggestionRef);
-            });
-            
-            toast({ title: 'Suggestion Approved', description: 'The camp is now listed as upcoming.' });
-            if (suggestion.suggestedBy?.id) {
-                await createNotification(suggestion.suggestedBy.id, 'Camp Suggestion Approved!', `Your suggestion for a camp at ${suggestion.location} has been approved.`);
-            }
-        } catch (error: any) {
-            console.error("Error approving suggestion: ", error);
-            toast({ title: "Approval Failed", description: error.message || "Could not approve the suggestion.", variant: "destructive"});
-        }
-    };
+    
+    const handleApproveSuggestion = (suggestion: any) => {
+        setSelectedSuggestion(suggestion);
+        setIsFormOpen(true);
+    }
     
     const handleRejectSuggestion = async (suggestion: any) => {
         await deleteDoc(doc(db, "campSuggestions", suggestion.id));
@@ -389,10 +469,10 @@ export default function CampManagementPage() {
         }
     }
 
-
     const handleFormFinished = () => {
         setIsFormOpen(false);
         setSelectedCamp(null);
+        setSelectedSuggestion(null);
     }
 
     if (authLoading || loadingData) {
@@ -414,7 +494,8 @@ export default function CampManagementPage() {
                             <TableHead>Location</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead>Services</TableHead>
-                             {userProfile.isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                            {userProfile.isAdmin && <TableHead>Assigned VLEs</TableHead>}
+                            {userProfile.isAdmin && <TableHead className="text-right">Actions</TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -430,22 +511,47 @@ export default function CampManagementPage() {
                                     </div>
                                 </TableCell>
                                 {userProfile.isAdmin && (
-                                    <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleEdit(camp)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleDelete(camp)} className="text-destructive"><Trash className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </TableCell>
+                                    <>
+                                        <TableCell>
+                                            <div className="flex items-center -space-x-2">
+                                                {camp.assignedVles?.slice(0, 3).map((vle: any) => (
+                                                     <TooltipProvider key={vle.id}>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
+                                                                    {vle.name.charAt(0)}
+                                                                </span>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                <p>{vle.name}</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                ))}
+                                                 {camp.assignedVles?.length > 3 && (
+                                                    <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
+                                                        +{camp.assignedVles.length - 3}
+                                                    </span>
+                                                 )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleEdit(camp)}><UserCog className="mr-2 h-4 w-4"/>Manage VLEs / Edit</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleDelete(camp)} className="text-destructive"><Trash className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </>
                                 )}
                             </TableRow>
                         )) : (
                             <TableRow>
-                                <TableCell colSpan={userProfile.isAdmin ? 5 : 4} className="h-24 text-center">No camps to display.</TableCell>
+                                <TableCell colSpan={userProfile.isAdmin ? 6 : 4} className="h-24 text-center">No camps to display.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
@@ -471,8 +577,8 @@ export default function CampManagementPage() {
                 </AlertDialogContent>
             </AlertDialog>
             <Dialog open={isFormOpen} onOpenChange={(open) => {
-                if (!open) setSelectedCamp(null);
-                setIsFormOpen(open);
+                if (!open) handleFormFinished();
+                else setIsFormOpen(open);
             }}>
                 <DialogContent
                     className="sm:max-w-lg"
@@ -483,13 +589,18 @@ export default function CampManagementPage() {
                       }
                     }}
                 >
-                    <CampFormDialog camp={selectedCamp} onFinished={handleFormFinished} />
+                    <CampFormDialog 
+                        camp={selectedCamp} 
+                        suggestion={selectedSuggestion} 
+                        vles={vles} 
+                        onFinished={handleFormFinished} 
+                    />
                 </DialogContent>
             </Dialog>
 
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold tracking-tight">Camp Management</h1>
-                <Button onClick={() => { setSelectedCamp(null); setIsFormOpen(true); }}>
+                <Button onClick={() => { setSelectedCamp(null); setSelectedSuggestion(null); setIsFormOpen(true); }}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Create New Camp
                 </Button>
             </div>
