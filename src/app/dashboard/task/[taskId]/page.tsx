@@ -54,6 +54,24 @@ async function createNotificationForAdmins(title: string, description: string, l
     }
 }
 
+// --- FILE VALIDATION ---
+const fileValidationConfig = {
+    allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
+    maxSize: 1 * 1024 * 1024, // 1 MB
+};
+
+const validateFiles = (files: File[]): { isValid: boolean, message?: string } => {
+    for (const file of files) {
+        if (!fileValidationConfig.allowedTypes.includes(file.type)) {
+            return { isValid: false, message: `Invalid file type: ${file.name}. Only PNG, JPG, JPEG, and PDF are allowed.` };
+        }
+        if (file.size > fileValidationConfig.maxSize) {
+            return { isValid: false, message: `File is too large: ${file.name}. Maximum size is 1MB.` };
+        }
+    }
+    return { isValid: true };
+};
+
 
 // --- TASK DETAIL PAGE DIALOGS ---
 
@@ -323,7 +341,13 @@ export default function TaskDetailPage() {
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            setSelectedFiles((prev) => [...prev, ...Array.from(e.target.files as FileList)]);
+            const files = Array.from(e.target.files);
+            const validation = validateFiles(files);
+            if (!validation.isValid) {
+                toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+                return;
+            }
+            setSelectedFiles((prev) => [...prev, ...files]);
         }
     };
 
@@ -341,7 +365,7 @@ export default function TaskDetailPage() {
         try {
             const uploadPromises = selectedFiles.map(async (file) => {
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-                const metadata = { customMetadata: { creatorId: user.uid } };
+                const metadata = { customMetadata: { uploaderId: user.uid } };
                 await uploadBytes(storageRef, file, metadata);
                 return getDownloadURL(storageRef);
             });
@@ -389,7 +413,13 @@ export default function TaskDetailPage() {
 
     const handleVleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setSelectedCertificate(e.target.files[0]);
+            const file = e.target.files[0];
+            const validation = validateFiles([file]);
+            if (!validation.isValid) {
+                toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+                return;
+            }
+            setSelectedCertificate(file);
         }
     };
 
@@ -402,7 +432,7 @@ export default function TaskDetailPage() {
         
         try {
             const storageRef = ref(storage, `tasks/${taskId}/certificate/${selectedCertificate.name}`);
-            const metadata = { customMetadata: { creatorId: user.uid } };
+            const metadata = { customMetadata: { uploaderId: user.uid } };
             await uploadBytes(storageRef, selectedCertificate, metadata);
             const downloadURL = await getDownloadURL(storageRef);
             const finalCertificate = { name: selectedCertificate.name, url: downloadURL };
@@ -534,6 +564,7 @@ export default function TaskDetailPage() {
     const canCustomerPay = isTaskCreator && task.status === 'Awaiting Payment';
     const canUploadMoreDocs = (isTaskCreator || isAdmin) && task.status === 'Awaiting Documents';
 
+    const displayStatus = task.status === 'Paid Out' && isTaskCreator ? 'Completed' : task.status;
 
     return (
         <div className="w-full space-y-6">
@@ -548,7 +579,7 @@ export default function TaskDetailPage() {
                         </CardHeader>
                         <CardContent className="grid sm:grid-cols-2 gap-4">
                             <div><Label>Service</Label><p>{task.service}</p></div>
-                            <div><Label>Status</Label><div><Badge variant="outline">{task.status}</Badge></div></div>
+                            <div><Label>Status</Label><div><Badge variant="outline">{displayStatus}</Badge></div></div>
                             <div><Label>Customer</Label><p>{task.customer}</p></div>
                              <div>
                                 <Label>Assigned VLE</Label>
@@ -656,7 +687,7 @@ export default function TaskDetailPage() {
                                </Card>
                            )}
                            
-                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress) && task.status !== 'Completed' && task.status !== 'Pending Price Approval' && task.status !== 'Awaiting Payment' && (
+                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress) && task.status !== 'Completed' && task.status !== 'Pending Price Approval' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
                            )}
                         </CardContent>

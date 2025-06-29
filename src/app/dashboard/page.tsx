@@ -66,6 +66,24 @@ export async function createNotificationForAdmins(title: string, description: st
 
 // --- HELPER COMPONENTS ---
 
+const fileValidationConfig = {
+    allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
+    maxSize: 1 * 1024 * 1024, // 1 MB
+};
+
+const validateFiles = (files: File[]): { isValid: boolean, message?: string } => {
+    for (const file of files) {
+        if (!fileValidationConfig.allowedTypes.includes(file.type)) {
+            return { isValid: false, message: `Invalid file type: ${file.name}. Only PNG, JPG, JPEG, and PDF are allowed.` };
+        }
+        if (file.size > fileValidationConfig.maxSize) {
+            return { isValid: false, message: `File is too large: ${file.name}. Maximum size is 1MB.` };
+        }
+    }
+    return { isValid: true };
+};
+
+
 const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01s-.521.074-.792.372c-.272.296-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
 );
@@ -107,7 +125,13 @@ const ComplaintResponseDialog = ({ trigger, complaint, taskId, customerId, onRes
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            setSelectedFiles(prev => [...prev, ...Array.from(e.target.files as FileList)]);
+            const files = Array.from(e.target.files);
+            const validation = validateFiles(files);
+            if (!validation.isValid) {
+                toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+                return;
+            }
+            setSelectedFiles(prev => [...prev, ...files]);
         }
     };
 
@@ -183,11 +207,22 @@ const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: Reac
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            setSelectedFiles(prev => [...prev, ...Array.from(e.target.files as FileList)]);
+            const files = Array.from(e.target.files);
+            const validation = validateFiles(files);
+            if (!validation.isValid) {
+                toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+                return;
+            }
+            setSelectedFiles(prev => [...prev, ...files]);
         }
     };
     
     const handleCameraCapture = (file: File) => {
+        const validation = validateFiles([file]);
+        if (!validation.isValid) {
+            toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+            return;
+        }
         setSelectedFiles(prevFiles => [...prevFiles, file]);
     };
 
@@ -423,14 +458,25 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
   }, [selectedCategory])
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setSelectedFiles((prev) => [...prev, ...Array.from(e.target.files as FileList)]);
+    if (e.target.files) {
+        const files = Array.from(e.target.files);
+        const validation = validateFiles(files);
+        if (!validation.isValid) {
+            toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+            return;
         }
-    };
+        setSelectedFiles((prev) => [...prev, ...files]);
+    }
+  };
     
-    const handleCameraCapture = (file: File) => {
-        setSelectedFiles(prevFiles => [...prevFiles, file]);
-    };
+  const handleCameraCapture = (file: File) => {
+    const validation = validateFiles([file]);
+    if (!validation.isValid) {
+        toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+        return;
+    }
+    setSelectedFiles(prevFiles => [...prevFiles, file]);
+  };
 
   const handleDialogSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -438,6 +484,12 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
     if (!creatorProfile || !creatorId) {
         toast({ title: "Error", description: "Your profile is still loading, please wait a moment.", variant: 'destructive' });
+        setIsSubmitting(false);
+        return;
+    }
+
+    if (selectedFiles.length === 0) {
+        toast({ title: "Documents Required", description: "You must upload at least one document to create a task.", variant: 'destructive' });
         setIsSubmitting(false);
         return;
     }
@@ -569,7 +621,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                 </div>
 
                 <div className="space-y-2">
-                    <Label>Attach Documents (Optional)</Label>
+                    <Label>Attach Required Documents</Label>
                     <div className="flex gap-2">
                         <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="outline">
                             <FileUp className="mr-2 h-4 w-4"/> Choose Files
@@ -973,40 +1025,43 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {filteredTasks.map(task => (
-                            <TableRow key={task.id}>
-                            <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
-                            <TableCell>{task.service}</TableCell>
-                            <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                            <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
-                            <TableCell className="text-right">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center w-full"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
-                                        
-                                        {task.status === 'Completed' && (
-                                            <>
-                                                <DropdownMenuSeparator />
-                                                {!task.feedback && (
-                                                    <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={
-                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><StarIcon className="mr-2 h-4 w-4"/>Give Feedback</DropdownMenuItem>
-                                                    } />
+                        {filteredTasks.map(task => {
+                            const displayStatus = task.status === 'Paid Out' ? 'Completed' : task.status;
+                            return (
+                                <TableRow key={task.id}>
+                                    <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
+                                    <TableCell>{task.service}</TableCell>
+                                    <TableCell><Badge variant="outline">{displayStatus}</Badge></TableCell>
+                                    <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell className="text-right">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center w-full"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
+                                                
+                                                {task.status === 'Completed' && (
+                                                    <>
+                                                        <DropdownMenuSeparator />
+                                                        {!task.feedback && (
+                                                            <FeedbackDialog taskId={task.id} onFeedbackSubmit={onFeedbackSubmit} trigger={
+                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="flex items-center w-full"><StarIcon className="mr-2 h-4 w-4"/>Give Feedback</DropdownMenuItem>
+                                                            } />
+                                                        )}
+                                                        {!task.complaint && (
+                                                            <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={
+                                                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive flex items-center w-full"><ShieldAlert className="mr-2 h-4 w-4"/>Raise Complaint</DropdownMenuItem>
+                                                            } />
+                                                        )}
+                                                    </>
                                                 )}
-                                                {!task.complaint && (
-                                                    <ComplaintDialog taskId={task.id} onComplaintSubmit={onComplaintSubmit} trigger={
-                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive flex items-center w-full"><ShieldAlert className="mr-2 h-4 w-4"/>Raise Complaint</DropdownMenuItem>
-                                                    } />
-                                                )}
-                                            </>
-                                        )}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </TableCell>
-                            </TableRow>
-                        ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
                         </TableBody>
                     </Table>
                     </CardContent>
@@ -2177,61 +2232,91 @@ export default function DashboardPage() {
             toast({ title: 'Error', description: 'Cannot process payout. Missing required information.', variant: 'destructive' });
             return;
         }
-
+    
         const adminRef = doc(db, "vles", user.uid);
-        const vleRef = doc(db, "vles", task.assignedVleId);
+        const assignedVleRef = doc(db, "vles", task.assignedVleId);
+        const creatingVleRef = task.type === 'VLE Lead' ? doc(db, "vles", task.creatorId) : null;
         const taskRef = doc(db, "tasks", task.id);
-
+    
         try {
             await runTransaction(db, async (transaction) => {
                 const adminDoc = await transaction.get(adminRef);
-                const vleDoc = await transaction.get(vleRef);
-
+                const assignedVleDoc = await transaction.get(assignedVleRef);
+    
                 if (!adminDoc.exists()) throw new Error("Admin profile not found.");
-                if (!vleDoc.exists()) throw new Error("VLE profile not found.");
-
+                if (!assignedVleDoc.exists()) throw new Error("Assigned VLE profile not found.");
+    
                 const adminBalance = adminDoc.data().walletBalance || 0;
-                const vleBalance = vleDoc.data().walletBalance || 0;
+                const assignedVleBalance = assignedVleDoc.data().walletBalance || 0;
                 const fee = parseFloat(task.rate);
-
-                if (adminBalance < fee) {
+    
+                const adminCommission = fee * 0.2;
+    
+                let payoutDetails = `Paid out a total of ₹${(fee - adminCommission).toFixed(2)}.`;
+                let historyDetails = '';
+                
+                // The money to be paid out comes from the admin's wallet.
+                if (adminBalance < (fee - adminCommission)) {
                     throw new Error("Admin wallet has insufficient funds to process this payout.");
                 }
-
-                const newAdminBalance = adminBalance - fee;
-                const newVleBalance = vleBalance + fee;
-
+    
+                let newAdminBalance = adminBalance - (fee - adminCommission);
+    
+                if (task.type === 'VLE Lead' && creatingVleRef) {
+                    if (task.assignedVleId === task.creatorId) {
+                        // VLE created and completed the task themselves
+                        const totalVleShare = fee * 0.8;
+                        const newAssignedVleBalance = assignedVleBalance + totalVleShare;
+                        transaction.update(assignedVleRef, { walletBalance: newAssignedVleBalance });
+                        historyDetails = `VLE (creator & assignee) share: ₹${totalVleShare.toFixed(2)}. Admin commission: ₹${adminCommission.toFixed(2)}.`;
+                    } else {
+                        // Different VLE created and completed the task
+                        const creatingVleDoc = await transaction.get(creatingVleRef);
+                        if (!creatingVleDoc.exists()) throw new Error("Creating VLE profile not found.");
+                        
+                        const creatingVleBalance = creatingVleDoc.data().walletBalance || 0;
+                        const assignedVleShare = fee * 0.4;
+                        const creatingVleShare = fee * 0.4;
+                        
+                        const newAssignedVleBalance = assignedVleBalance + assignedVleShare;
+                        const newCreatingVleBalance = creatingVleBalance + creatingVleShare;
+                        
+                        transaction.update(assignedVleRef, { walletBalance: newAssignedVleBalance });
+                        transaction.update(creatingVleRef, { walletBalance: newCreatingVleBalance });
+                        historyDetails = `Assigned VLE share: ₹${assignedVleShare.toFixed(2)}. Creating VLE share: ₹${creatingVleShare.toFixed(2)}. Admin commission: ₹${adminCommission.toFixed(2)}.`;
+                    }
+                } else { // Customer Request
+                    const assignedVleShare = fee * 0.8;
+                    const newAssignedVleBalance = assignedVleBalance + assignedVleShare;
+                    transaction.update(assignedVleRef, { walletBalance: newAssignedVleBalance });
+                    historyDetails = `VLE share: ₹${assignedVleShare.toFixed(2)}. Admin commission: ₹${adminCommission.toFixed(2)}.`;
+                }
+    
                 transaction.update(adminRef, { walletBalance: newAdminBalance });
-                transaction.update(vleRef, { walletBalance: newVleBalance });
-
+    
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
                     actorId: user.uid,
                     actorRole: 'Admin',
                     action: 'Payout Approved',
-                    details: `Paid out ₹${fee.toFixed(2)} to VLE ${vleDoc.data().name}.`
+                    details: historyDetails
                 };
-
+    
                 transaction.update(taskRef, {
                     status: 'Paid Out',
                     history: arrayUnion(historyEntry)
                 });
             });
-
-            toast({ title: 'Payout Approved!', description: `₹${task.rate.toFixed(2)} has been transferred to the VLE.` });
-            await createNotification(
-                task.assignedVleId,
-                'Payment Received',
-                `You have received a payment of ₹${task.rate.toFixed(2)} for task ${task.id.slice(-6).toUpperCase()}.`
-            );
-
+    
+            toast({ title: 'Payout Approved!', description: payoutDetails });
+            await createNotification(task.assignedVleId, 'Payment Received', `You have received a payment for task ${task.id.slice(-6).toUpperCase()}.`);
+            if (task.type === 'VLE Lead' && task.creatorId !== task.assignedVleId) {
+                 await createNotification(task.creatorId, 'Commission Received', `You have received a commission for a lead on task ${task.id.slice(-6).toUpperCase()}.`);
+            }
+    
         } catch (error: any) {
             console.error("Payout transaction failed:", error);
-            toast({
-                title: 'Payout Failed',
-                description: error.message || 'An unknown error occurred.',
-                variant: 'destructive',
-            });
+            toast({ title: 'Payout Failed', description: error.message || 'An unknown error occurred.', variant: 'destructive' });
         }
     };
 
