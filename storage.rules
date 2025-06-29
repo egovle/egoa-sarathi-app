@@ -3,51 +3,32 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // --- Helper Functions ---
-    // Checks if the requesting user is an admin.
+    
+    // Defines a function to check if a user is an admin.
     function isAdmin() {
       return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // Gets the task document from Firestore.
-    function getTask(taskId) {
-      return get(/databases/$(database)/documents/tasks/$(taskId));
-    }
-
-    // Checks if the user is the creator of the task.
-    function isTaskCreator(taskId) {
-      return request.auth.uid == getTask(taskId).data.creatorId;
-    }
-
-    // Checks if the user is the VLE assigned to the task.
-    function isAssignedVle(taskId) {
-      let taskData = getTask(taskId).data;
-      return taskData.assignedVleId != null && request.auth.uid == taskData.assignedVleId;
-    }
-
-    // --- Path Rules ---
+    // Rules for all files within a task folder.
     match /tasks/{taskId}/{allPaths=**} {
-      // READ access is granted if the user is an admin, the task creator, or the assigned VLE.
-      // This rule requires the task document to exist in Firestore.
-      allow read: if request.auth != null && exists(/databases/$(database)/documents/tasks/$(taskId)) &&
-                     (isAdmin() || isTaskCreator(taskId) || isAssignedVle(taskId));
 
-      // WRITE access (create, update, delete) has two main conditions:
-      allow write: if request.auth != null && (
-        // 1. For the INITIAL UPLOAD, when the task document may not exist yet.
-        // We allow the upload if the user provides metadata marking themselves as the creator.
-        // This is a secure way to handle the "chicken-and-egg" problem.
-        request.resource.metadata.creatorId == request.auth.uid
-        ||
-        // 2. For ALL SUBSEQUENT uploads/deletes (more docs, final certificate).
-        // The task document must exist, and the user must be an admin, the creator, or the assigned VLE.
-        (
-          exists(/databases/$(database)/documents/tasks/$(taskId)) &&
-          (isAdmin() || isTaskCreator(taskId) || isAssignedVle(taskId))
-        )
-      );
+      // CREATE (UPLOAD) RULE:
+      // Allow any authenticated user to create a file IF they include their UID in the metadata.
+      // This is the key to solving the "chicken-and-egg" problem for new tasks.
+      // The app MUST send { customMetadata: { creatorId: request.auth.uid } } with the upload.
+      allow create: if request.auth != null && request.resource.metadata.creatorId == request.auth.uid;
+      
+      // READ, UPDATE, DELETE RULES:
+      // Allow access only if the corresponding Firestore task document exists AND
+      // the user is the creator, the assigned VLE, or an admin.
+      allow read, update, delete: if request.auth != null
+        && exists(/databases/$(database)/documents/tasks/$(taskId))
+        && (
+          get(/databases/$(database)/documents/tasks/$(taskId)).data.creatorId == request.auth.uid ||
+          (get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId != null && get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId == request.auth.uid) ||
+          isAdmin()
+        );
     }
   }
 }

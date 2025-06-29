@@ -341,7 +341,7 @@ export default function TaskDetailPage() {
         try {
             const uploadPromises = selectedFiles.map(async (file) => {
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-                const metadata = { customMetadata: { 'creatorId': user.uid } };
+                const metadata = { customMetadata: { creatorId: user.uid } };
                 await uploadBytes(storageRef, file, metadata);
                 return getDownloadURL(storageRef);
             });
@@ -402,7 +402,7 @@ export default function TaskDetailPage() {
         
         try {
             const storageRef = ref(storage, `tasks/${taskId}/certificate/${selectedCertificate.name}`);
-            const metadata = { customMetadata: { 'creatorId': user.uid } };
+            const metadata = { customMetadata: { creatorId: user.uid } };
             await uploadBytes(storageRef, selectedCertificate, metadata);
             const downloadURL = await getDownloadURL(storageRef);
             const finalCertificate = { name: selectedCertificate.name, url: downloadURL };

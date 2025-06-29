@@ -1873,11 +1873,7 @@ export default function DashboardPage() {
         if (filesToUpload.length > 0) {
             const uploadPromises = filesToUpload.map(async (file) => {
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-                const metadata = {
-                    customMetadata: {
-                        'creatorId': user.uid
-                    }
-                };
+                const metadata = { customMetadata: { creatorId: user.uid } };
                 await uploadBytes(storageRef, file, metadata);
                 const downloadURL = await getDownloadURL(storageRef);
                 return { name: file.name, url: downloadURL };

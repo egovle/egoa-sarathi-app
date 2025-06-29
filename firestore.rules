@@ -4,71 +4,64 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- Helper Functions ---
+    // HELPER FUNCTIONS
+    function isAuth() {
+      return request.auth != null;
+    }
+
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return isAuth() && request.auth.uid == userId;
     }
 
     function isAdmin() {
       // Check if the user document exists in the 'vles' collection and has the isAdmin flag set to true.
-      return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+      return isAuth() && exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // --- Collection Rules ---
-
-    // User (Customer) Profiles
+    // RULES
     match /users/{userId} {
       allow read, update: if isOwner(userId) || isAdmin();
-      allow create: if request.auth.uid == userId; // User can create their own profile on signup
+      allow create: if isOwner(userId);
     }
 
-    // VLE Profiles
     match /vles/{vleId} {
       allow read, update: if isOwner(vleId) || isAdmin();
-      allow create: if request.auth.uid == vleId; // VLE can create their own profile on signup
+      allow create: if isOwner(vleId);
     }
 
-    // Tasks
     match /tasks/{taskId} {
-      // Allow creation by any authenticated user. The app's logic handles validation.
-      allow create: if request.auth != null;
+      // Any authenticated user can create a task.
+      allow create: if isAuth();
 
-      // Allow read/update by the task creator, the assigned VLE, or an admin.
-      allow read, update: if request.auth != null && (
+      // Read/update access for the task creator, the assigned VLE, or an admin.
+      allow read, update: if isAuth() && (
         isOwner(resource.data.creatorId) ||
         (resource.data.assignedVleId != null && isOwner(resource.data.assignedVleId)) ||
         isAdmin()
       );
     }
     
-    // Services
     match /services/{serviceId} {
-      allow read: if request.auth != null; // All authenticated users can read the services list
-      allow write: if isAdmin(); // Only admins can create, update, delete services
+      allow read: if true;
+      allow write: if isAdmin();
     }
     
-    // Camps
     match /camps/{campId} {
-        allow read: if request.auth != null;
+        allow read: if isAuth();
         allow write: if isAdmin();
     }
     
-    // Camp Suggestions
     match /campSuggestions/{suggestionId} {
-      allow create: if request.auth != null;
+      allow create: if isAuth();
       allow read, delete: if isAdmin();
     }
     
-    // Notifications
     match /notifications/{notificationId} {
-      // Create is handled by server-side logic (trusted)
-      allow create: if true; 
-      // User can only read/write their own notifications.
-      allow read, update, delete: if isOwner(resource.data.userId);
+      allow read, write: if isOwner(resource.data.userId);
+      allow create: if isAuth();
     }
     
-    // Payment Requests
     match /paymentRequests/{reqId} {
       allow create: if isOwner(request.resource.data.userId);
       allow read, update: if isAdmin();
