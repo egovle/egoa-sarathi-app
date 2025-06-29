@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo 
 import { db, storage } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction, limit, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { File, PlusCircle, User, FilePlus, Wallet, ToggleRight, BrainCircuit, UserCheck, Star, MessageSquareWarning, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent, Trash2 } from 'lucide-react';
+import { PlusCircle, User, FilePlus, Wallet, ToggleRight, UserCheck, Star, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -388,9 +388,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -429,12 +426,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         setIsSubmitting(false);
         return;
     }
-    
-    if(selectedFiles.length === 0) {
-        toast({ title: 'Document Required', description: 'Please upload at least one document.', variant: 'destructive' });
-        setIsSubmitting(false);
-        return;
-    }
 
     const form = e.target as HTMLFormElement;
 
@@ -445,20 +436,10 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
     }
     
     try {
-        // Generate a consistent ID for both storage and Firestore
         const taskId = doc(collection(db, "tasks")).id;
         
-        // 1. Upload files to storage first
-        const uploadPromises = selectedFiles.map(async (file) => {
-            const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-            await uploadBytes(storageRef, file);
-            const downloadURL = await getDownloadURL(storageRef);
-            return { name: file.name, url: downloadURL };
-        });
+        const uploadedDocuments: any[] = [];
 
-        const uploadedDocuments = await Promise.all(uploadPromises);
-
-        // 2. Prepare the task data with the uploaded document URLs
         const newTaskData = {
             customer: form.name.value,
             customerAddress: form.address.value,
@@ -485,7 +466,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             finalCertificate: null,
         };
 
-        // 3. Call the parent handler to perform the DB transaction
         await onTaskCreated(taskId, newTaskData, selectedService, uploadedDocuments);
         setDialogOpen(false); 
     } catch (error: any) {
@@ -500,23 +480,11 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
     }
   };
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setSelectedFiles(prev => [...prev, ...Array.from(e.target.files as FileList)]);
-    }
-  };
-
-  const handleCameraCapture = (file: File) => {
-      setSelectedFiles(prevFiles => [...prevFiles, file]);
-  };
-
   const handleOpenChange = (isOpen: boolean) => {
       setDialogOpen(isOpen);
       if (!isOpen) {
           setSelectedCategory('');
           setSelectedSubCategory('');
-          setSelectedFiles([]);
-          setIsCameraOpen(false);
           setIsSubmitting(false);
       }
   }
@@ -538,7 +506,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             <DialogHeader>
               <DialogTitle>Create a new Service Request</DialogTitle>
               <DialogDescription>
-                Fill in the details for your new service request. Document upload is mandatory.
+                Fill in the details for your new service request.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -612,28 +580,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                     )}
                  </Card>
               )}
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label className="text-right pt-2">
-                  Documents
-                </Label>
-                <div className="col-span-3 grid gap-2">
-                  <div className="flex gap-2">
-                    <Button type="button" onClick={() => fileInputRef.current?.click()} variant="secondary" className="bg-primary/20 text-primary hover:bg-primary/30">
-                        <FileUp className="mr-2 h-4 w-4"/> Choose Files
-                    </Button>
-                    <Button type="button" variant="outline" onClick={() => setIsCameraOpen(true)}>
-                        <Camera className="mr-2 h-4 w-4" /> Use Camera
-                    </Button>
-                  </div>
-                  <Input id="documents" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
-                  {selectedFiles.length > 0 && (
-                      <div className="text-xs text-muted-foreground space-y-1 mt-2">
-                          <p className='font-medium'>Selected files:</p>
-                          {selectedFiles.map((file, i) => <div key={i} className="flex items-center gap-2"><FileText className="h-3 w-3" /><span>{file.name}</span></div>)}
-                      </div>
-                  )}
-                </div>
-              </div>
             </div>
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting}>
@@ -644,7 +590,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
           </form>
         </DialogContent>
       </Dialog>
-      <CameraUploadDialog open={isCameraOpen} onOpenChange={setIsCameraOpen} onCapture={handleCameraCapture} />
     </>
   );
 };
