@@ -35,7 +35,7 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
     const initialData = camp || suggestion || {};
     
     // If it's a suggestion, create a better default name than "Suggested by..."
-    const initialName = camp?.name || (suggestion ? `Camp at ${suggestion.location}`: '');
+    const initialName = camp?.name || (suggestion ? `Goa Sarathi Camp at ${suggestion.location}`: '');
 
     const [name, setName] = useState(initialName);
     const [location, setLocation] = useState(initialData.location || '');
@@ -371,7 +371,7 @@ export default function CampManagementPage() {
         
         return () => { unsubCamps() };
 
-    }, [toast]);
+    }, []);
     
     // Effect for fetching camp suggestions & VLEs (Admins only)
     useEffect(() => {
@@ -382,16 +382,20 @@ export default function CampManagementPage() {
             setCampSuggestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (error) => console.error("Error fetching camp suggestions:", error));
 
-        const vlesQuery = query(collection(db, 'vles'), where('isAdmin', '==', false), orderBy('name'));
+        // FIX: The query that requires an index. Remove orderBy and sort on the client.
+        const vlesQuery = query(collection(db, 'vles'), where('isAdmin', '==', false));
         const unsubVles = onSnapshot(vlesQuery, (snapshot) => {
-            setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const fetchedVles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // Sort client-side
+            fetchedVles.sort((a, b) => a.name.localeCompare(b.name));
+            setVles(fetchedVles);
         }, (error) => console.error("Error fetching VLEs:", error));
 
         return () => {
             unsubSuggestions();
             unsubVles();
         };
-    }, [userProfile, toast]);
+    }, [userProfile]);
 
     // Effect to fetch services for the suggestion dialog
      useEffect(() => {
@@ -402,7 +406,7 @@ export default function CampManagementPage() {
         }, (error) => console.error("Error fetching services:", error));
 
         return () => unsubServices();
-    }, [toast]);
+    }, []);
     
     const upcomingCamps = useMemo(() => allCamps.filter(c => new Date(c.date) >= new Date()), [allCamps]);
     const pastCamps = useMemo(() => allCamps.filter(c => new Date(c.date) < new Date()), [allCamps]);
@@ -780,7 +784,7 @@ export default function CampManagementPage() {
                         <TableBody>
                             {upcomingCamps.length > 0 ? upcomingCamps.map((camp) => (
                                 <TableRow key={camp.id}>
-                                    <TableCell className="font-medium">{camp.name}</TableCell>
+                                    <TableCell className="font-medium">{camp.name.startsWith('Suggested by') ? `Goa Sarathi Camp at ${camp.location}` : camp.name}</TableCell>
                                     <TableCell>{camp.location}</TableCell>
                                     <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
                                     <TableCell>
@@ -808,5 +812,3 @@ export default function CampManagementPage() {
             ? <VleView />
             : <CustomerView />;
 }
-
-    
