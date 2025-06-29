@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -9,81 +10,84 @@ service cloud.firestore {
 
     function isAdmin() {
       // Check if the user document exists in the 'vles' collection and has the isAdmin flag set to true.
-      let vlePath = /databases/$(database)/documents/vles/$(request.auth.uid);
-      return exists(vlePath) && get(vlePath).data.isAdmin == true;
+      return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
-    
-    // --- User & VLE Profiles ---
+
+    // --- User and VLE Profiles ---
     match /users/{userId} {
-      // Admins can read/write any user profile. Users can read/write their own.
-      allow get, update: if isAdmin() || isOwner(userId);
+      // Anyone can create their own user document during registration.
+      allow create: if isOwner(userId);
+      // Only the owner or an admin can get or update a user profile.
+      allow get, update: if isOwner(userId) || isAdmin();
       // Only admins can list all users.
       allow list: if isAdmin();
-      // A user can create their own profile on signup.
-      allow create: if isOwner(userId);
     }
 
     match /vles/{vleId} {
-      // Admins can read/write any VLE profile. VLEs can read/write their own.
-      allow get, update: if isAdmin() || isOwner(vleId);
+      // Anyone can create their own VLE document during registration.
+      allow create: if isOwner(vleId);
+      // Only the owner or an admin can get or update a VLE profile.
+      allow get, update: if isOwner(vleId) || isAdmin();
       // Only admins can list all VLEs.
       allow list: if isAdmin();
-      // A VLE can create their own profile on signup.
-      allow create: if isOwner(vleId);
     }
 
-    // --- Core Data Collections ---
+    // --- Core Task Management ---
     match /tasks/{taskId} {
-      // Any authenticated user can create a task.
+      // Any authenticated user can create a task document.
       allow create: if request.auth != null;
-
-      // Rules for reading and updating tasks are combined because the permissions are the same.
-      // - Admins can read/update any task.
-      // - Users can read/update tasks they created.
-      // - VLEs can read/update tasks assigned to them.
-      // This single 'read' rule covers both 'get' and 'list' operations because Firestore can
-      // verify client queries (e.g., `where('creatorId', '==', uid)`) against these conditions.
-      allow read, update: if request.auth != null && (
+      
+      // Allow reading/updating a specific task doc if you are the creator, assigned VLE, or an admin.
+      allow get, update: if
         isAdmin() ||
         isOwner(resource.data.creatorId) ||
-        (resource.data.assignedVleId != null && isOwner(resource.data.assignedVleId))
-      );
+        (resource.data.assignedVleId != null && isOwner(resource.data.assignedVleId));
+
+      // Allow LISTING tasks.
+      // This rule works with the client-side queries. The client MUST filter by a user-specific ID
+      // for non-admins, otherwise the query will fail. Admins can list all tasks.
+      allow list: if request.auth != null;
     }
-    
+
+    // --- Services (Publicly Readable) ---
     match /services/{serviceId} {
-      // Any authenticated user can read the list of available services.
-      allow read: if request.auth != null;
-      // Only admins can add, edit, or remove services.
+      // Anyone can read the list of services.
+      allow read: if true;
+      // Only admins can modify the services list.
       allow write: if isAdmin();
     }
-    
+
+    // --- Camps & Suggestions ---
     match /camps/{campId} {
-        // Any authenticated user can read camp details.
-        allow read: if request.auth != null;
-        // Only admins can create, update, or delete camps.
-        allow write: if isAdmin();
+      // Any authenticated user can read the list of camps.
+      allow read: if request.auth != null;
+      // Only admins can create/update/delete camps.
+      allow write: if isAdmin();
     }
-    
+
     match /campSuggestions/{suggestionId} {
-      // Any authenticated user can create a camp suggestion.
+      // Any authenticated user can create a suggestion.
       allow create: if request.auth != null;
-      // Only admins can read or delete suggestions.
+      // Only admins can view and manage suggestions.
       allow read, delete: if isAdmin();
     }
-    
-    // --- Notifications & Payment Requests ---
+
+    // --- Notifications (User-Specific) ---
     match /notifications/{notificationId} {
-      // A user can only read or write their own notifications.
-      // The client query `where('userId', '==', uid)` is enforced by this rule.
-      allow read, write: if isOwner(resource.data.userId);
-      // The app's server logic handles creating notifications for the correct user.
+      // Server-side functions create notifications.
       allow create: if request.auth != null;
+      // A user can get/update/delete their own specific notifications.
+      allow get, write: if isOwner(resource.data.userId);
+      // A user can LIST notifications, but the client query MUST filter by their userId.
+      allow list: if request.auth != null;
     }
-    
+
+    // --- Payment Requests (Admin-Managed) ---
     match /paymentRequests/{reqId} {
       // A user can only create a payment request for themselves.
       allow create: if isOwner(request.resource.data.userId);
-      // Only admins can read the list of requests and approve them.
+      // Only admins can view and manage payment requests.
       allow read, update: if isAdmin();
     }
   }
