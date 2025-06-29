@@ -22,7 +22,7 @@ import { DayPicker } from 'react-day-picker';
 import "react-day-picker/dist/style.css";
 import { createNotification, createNotificationForAdmins } from '@/app/dashboard/page';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
@@ -117,6 +117,8 @@ const SuggestCampDialog = ({ onFinished, services }: { onFinished: () => void; s
     const [selectedServices, setSelectedServices] = useState<any[]>([]);
     const [otherServices, setOtherServices] = useState('');
     const [isServicesPopoverOpen, setIsServicesPopoverOpen] = useState(false);
+
+    const minDate = addDays(new Date(), 7);
     
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -172,7 +174,7 @@ const SuggestCampDialog = ({ onFinished, services }: { onFinished: () => void; s
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
-                            <DayPicker mode="single" selected={date} onSelect={setDate} initialFocus />
+                            <DayPicker mode="single" selected={date} onSelect={setDate} initialFocus fromDate={minDate} />
                         </PopoverContent>
                     </Popover>
                 </div>
