@@ -1869,11 +1869,16 @@ export default function DashboardPage() {
         const taskId = doc(collection(db, "tasks")).id;
         let uploadedDocuments: { name: string, url: string }[] = [];
     
-        // 1. Upload files to storage
+        // 1. Upload files to storage with metadata
         if (filesToUpload.length > 0) {
             const uploadPromises = filesToUpload.map(async (file) => {
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-                await uploadBytes(storageRef, file);
+                const metadata = {
+                    customMetadata: {
+                        'creatorId': user.uid
+                    }
+                };
+                await uploadBytes(storageRef, file, metadata);
                 const downloadURL = await getDownloadURL(storageRef);
                 return { name: file.name, url: downloadURL };
             });
