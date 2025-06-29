@@ -2239,6 +2239,8 @@ export default function DashboardPage() {
         const taskRef = doc(db, "tasks", task.id);
     
         try {
+            let payoutDetails = '';
+            
             await runTransaction(db, async (transaction) => {
                 const adminDoc = await transaction.get(adminRef);
                 const assignedVleDoc = await transaction.get(assignedVleRef);
@@ -2252,10 +2254,9 @@ export default function DashboardPage() {
     
                 const adminCommission = fee * 0.2;
     
-                let payoutDetails = `Paid out a total of ₹${(fee - adminCommission).toFixed(2)}.`;
+                payoutDetails = `Paid out a total of ₹${(fee - adminCommission).toFixed(2)}.`;
                 let historyDetails = '';
                 
-                // The money to be paid out comes from the admin's wallet.
                 if (adminBalance < (fee - adminCommission)) {
                     throw new Error("Admin wallet has insufficient funds to process this payout.");
                 }
@@ -2264,13 +2265,11 @@ export default function DashboardPage() {
     
                 if (task.type === 'VLE Lead' && creatingVleRef) {
                     if (task.assignedVleId === task.creatorId) {
-                        // VLE created and completed the task themselves
                         const totalVleShare = fee * 0.8;
                         const newAssignedVleBalance = assignedVleBalance + totalVleShare;
                         transaction.update(assignedVleRef, { walletBalance: newAssignedVleBalance });
                         historyDetails = `VLE (creator & assignee) share: ₹${totalVleShare.toFixed(2)}. Admin commission: ₹${adminCommission.toFixed(2)}.`;
                     } else {
-                        // Different VLE created and completed the task
                         const creatingVleDoc = await transaction.get(creatingVleRef);
                         if (!creatingVleDoc.exists()) throw new Error("Creating VLE profile not found.");
                         
