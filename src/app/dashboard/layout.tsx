@@ -16,7 +16,8 @@ import {
   Trash2,
   ListPlus,
   BarChart,
-  Tent
+  Tent,
+  ArrowLeft
 } from "lucide-react"
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch, getDocs } from "firebase/firestore";
@@ -296,99 +297,105 @@ export default function DashboardLayout({
               </nav>
             </SheetContent>
           </Sheet>
-          <div className="relative ml-auto flex-1 md:grow-0">
-             <h1 className="font-semibold text-xl">{getPageTitle(pathname)}</h1>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => router.back()}>
+                <ArrowLeft className="h-4 w-4" />
+                <span className="sr-only">Back</span>
+            </Button>
+            <h1 className="font-semibold text-lg">{getPageTitle(pathname)}</h1>
           </div>
-          <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="icon" className="relative rounded-full">
-                  <Bell className="h-5 w-5" />
-                  {unreadNotifications > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-4 w-4 shrink-0 justify-center rounded-full p-0 text-[10px]">
-                      {unreadNotifications}
-                    </Badge>
-                  )}
-                  <span className="sr-only">Toggle notifications</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-[380px] p-0">
-                  <div className="p-4 border-b">
-                      <div className="flex items-center justify-between">
-                         <div>
-                            <h4 className="font-medium">Notifications</h4>
-                            <p className="text-sm text-muted-foreground">You have {unreadNotifications} unread messages.</p>
-                         </div>
-                         <div className="flex items-center gap-2">
-                            {unreadNotifications > 0 && (
-                                <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="text-xs">
-                                    <Check className="mr-1 h-3 w-3" />
-                                    Mark all as read
-                                </Button>
-                            )}
-                            {notifications.length > 0 && (
-                                <Button variant="ghost" size="sm" onClick={() => setIsClearAlertOpen(true)} className="text-xs text-destructive hover:text-destructive">
-                                    <Trash2 className="mr-1 h-3 w-3" />
-                                    Clear all
-                                </Button>
-                             )}
-                         </div>
-                      </div>
-                  </div>
-                  <div className="space-y-1 p-2 max-h-80 overflow-y-auto">
-                      {notifications.length > 0 ? (
-                        notifications.map((notif) => (
-                          <div key={notif.id} className={`p-3 rounded-md transition-colors hover:bg-muted ${!notif.read ? 'bg-primary/10' : 'bg-transparent'}`}>
-                              <Link href={notif.link || '/dashboard'} className="block">
-                                <p className="font-semibold text-sm">{notif.title}</p>
-                                <p className="text-sm text-muted-foreground">{notif.description}</p>
-                                <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(notif.date), { addSuffix: true })}</p>
-                              </Link>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-8 text-center text-sm text-muted-foreground">
-                            You have no new notifications.
+          <div className="ml-auto flex items-center gap-2">
+            <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="icon" className="relative rounded-full">
+                    <Bell className="h-5 w-5" />
+                    {unreadNotifications > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-4 w-4 shrink-0 justify-center rounded-full p-0 text-[10px]">
+                        {unreadNotifications}
+                      </Badge>
+                    )}
+                    <span className="sr-only">Toggle notifications</span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-[380px] p-0">
+                    <div className="p-4 border-b">
+                        <div className="flex items-center justify-between">
+                           <div>
+                              <h4 className="font-medium">Notifications</h4>
+                              <p className="text-sm text-muted-foreground">You have {unreadNotifications} unread messages.</p>
+                           </div>
+                           <div className="flex items-center gap-2">
+                              {unreadNotifications > 0 && (
+                                  <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="text-xs">
+                                      <Check className="mr-1 h-3 w-3" />
+                                      Mark all as read
+                                  </Button>
+                              )}
+                              {notifications.length > 0 && (
+                                  <Button variant="ghost" size="sm" onClick={() => setIsClearAlertOpen(true)} className="text-xs text-destructive hover:text-destructive">
+                                      <Trash2 className="mr-1 h-3 w-3" />
+                                      Clear all
+                                  </Button>
+                               )}
+                           </div>
                         </div>
-                      )}
-                  </div>
-              </PopoverContent>
-            </Popover>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="secondary" size="icon" className="rounded-full">
-                <User className="h-5 w-5" />
-                <span className="sr-only">Toggle user menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard?tab=profile">Profile</Link>
-              </DropdownMenuItem>
-              {!userProfile?.isAdmin && (
-                <Dialog>
-                    <DialogTrigger asChild>
-                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>Support</DropdownMenuItem>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-xs">
-                        <DialogHeader>
-                            <DialogTitle>Contact Support</DialogTitle>
-                            <DialogDescription>
-                            Reach out to us for any assistance.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <SupportContent />
-                    </DialogContent>
-                </Dialog>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Logout</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    </div>
+                    <div className="space-y-1 p-2 max-h-80 overflow-y-auto">
+                        {notifications.length > 0 ? (
+                          notifications.map((notif) => (
+                            <div key={notif.id} className={`p-3 rounded-md transition-colors hover:bg-muted ${!notif.read ? 'bg-primary/10' : 'bg-transparent'}`}>
+                                <Link href={notif.link || '/dashboard'} className="block">
+                                  <p className="font-semibold text-sm">{notif.title}</p>
+                                  <p className="text-sm text-muted-foreground">{notif.description}</p>
+                                  <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(notif.date), { addSuffix: true })}</p>
+                                </Link>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-8 text-center text-sm text-muted-foreground">
+                              You have no new notifications.
+                          </div>
+                        )}
+                    </div>
+                </PopoverContent>
+              </Popover>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="secondary" size="icon" className="rounded-full">
+                  <User className="h-5 w-5" />
+                  <span className="sr-only">Toggle user menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard?tab=profile">Profile</Link>
+                </DropdownMenuItem>
+                {!userProfile?.isAdmin && (
+                  <Dialog>
+                      <DialogTrigger asChild>
+                          <DropdownMenuItem onSelect={(e) => e.preventDefault()}>Support</DropdownMenuItem>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-xs">
+                          <DialogHeader>
+                              <DialogTitle>Contact Support</DialogTitle>
+                              <DialogDescription>
+                              Reach out to us for any assistance.
+                              </DialogDescription>
+                          </DialogHeader>
+                          <SupportContent />
+                      </DialogContent>
+                  </Dialog>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
         <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
             {children}

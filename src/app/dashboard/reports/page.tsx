@@ -70,9 +70,17 @@ const AdminReports = ({ tasks, vles }: { tasks: any[], vles: any[] }) => {
         count: {
           label: "Tasks",
         },
+        'Paid Out': {
+            label: "Paid Out",
+            color: "hsl(120, 80%, 40%)",
+        },
         Completed: {
           label: "Completed",
           color: "hsl(var(--chart-2))",
+        },
+        'In Progress': {
+            label: 'In Progress',
+            color: 'hsl(210, 80%, 60%)',
         },
         Assigned: {
           label: "Assigned",
@@ -136,7 +144,7 @@ eGoa Sarathi Admin Team
                     </CardHeader>
                     <CardContent>
                         <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-                            <BarChart accessibilityLayer data={taskStatusData} layout="vertical">
+                            <BarChart accessibilityLayer data={taskStatusData} layout="vertical" margin={{ left: 20 }}>
                                 <CartesianGrid horizontal={false} />
                                 <XAxis type="number" hide />
                                  <YAxis
@@ -145,6 +153,7 @@ eGoa Sarathi Admin Team
                                     tickLine={false}
                                     tickMargin={10}
                                     axisLine={false}
+                                    width={120}
                                 />
                                 <ChartTooltip 
                                     cursor={false}
@@ -155,7 +164,7 @@ eGoa Sarathi Admin Team
                                 />
                                 <Bar dataKey="count" radius={5}>
                                     {taskStatusData.map((entry) => (
-                                        <Cell key={entry.status} fill={chartConfig[entry.status]?.color || 'hsl(var(--muted))'} />
+                                        <Cell key={entry.status} fill={chartConfig[entry.status as keyof typeof chartConfig]?.color || 'hsl(var(--muted))'} />
                                     ))}
                                 </Bar>
                             </BarChart>
@@ -271,7 +280,7 @@ const VleReports = ({ tasks, userProfile }: { tasks: any[], userProfile: any }) 
             pending,
             totalCommission,
         };
-    }, [assignedTasks]);
+    }, [assignedTasks, userProfile]);
 
     return (
         <div className="space-y-6">

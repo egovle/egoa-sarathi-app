@@ -122,7 +122,7 @@ const SetPriceDialog = ({ taskId, customerId, onPriceSet, adminId }: { taskId: s
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button><PenSquare className="mr-2 h-4 w-4" />Set Final Price</Button>
+                <Button><PenSquare />Set Final Price</Button>
             </DialogTrigger>
             <DialogContent>
                 <form onSubmit={handleSubmit}>
@@ -196,7 +196,7 @@ const RequestInfoDialog = ({ taskId, vleId, customerId }: { taskId:string, vleId
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline"><MessageSquarePlus className="mr-2 h-4 w-4" />Request More Information</Button>
+                <Button variant="outline"><MessageSquarePlus />Request More Information</Button>
             </DialogTrigger>
             <DialogContent>
                 <form onSubmit={handleSubmit}>
@@ -218,7 +218,7 @@ const RequestInfoDialog = ({ taskId, vleId, customerId }: { taskId:string, vleId
                         />
                     </div>
                     <DialogFooter>
-                        <Button type="submit"><Send className="mr-2 h-4 w-4" /> Send Request</Button>
+                        <Button type="submit"><Send /> Send Request</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
@@ -271,7 +271,7 @@ const SubmitAcknowledgementDialog = ({ taskId, vleId, customerId }: { taskId: st
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button><CheckCircle className="mr-2 h-4 w-4" />Submit Acknowledgement</Button>
+                <Button><CheckCircle />Submit Acknowledgement</Button>
             </DialogTrigger>
             <DialogContent>
                 <form onSubmit={handleSubmit}>
@@ -606,7 +606,7 @@ export default function TaskDetailPage() {
                             <CardContent>
                                 <p className="mb-4">The final price for this service has been set to <strong>₹{task.rate.toFixed(2)}</strong>. Please approve and pay to proceed.</p>
                                  <Button onClick={handlePayment} disabled={isPaying}>
-                                    {isPaying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wallet className="mr-2 h-4 w-4" />}
+                                    {isPaying ? <Loader2 className="animate-spin" /> : <Wallet />}
                                     Approve & Pay ₹{task.rate.toFixed(2)}
                                 </Button>
                             </CardContent>
@@ -684,7 +684,7 @@ export default function TaskDetailPage() {
                                    </CardHeader>
                                    <CardContent className="p-4 pt-0 space-y-2">
                                        <Button type="button" onClick={() => vleFileInputRef.current?.click()} size="sm" variant="secondary" className='w-full'>
-                                           <FileUp className="mr-2 h-4 w-4"/> Choose File
+                                           <FileUp /> Choose File
                                        </Button>
                                        <Input id="vle-documents" type="file" onChange={handleVleFileChange} ref={vleFileInputRef} className="hidden" />
                                        {selectedCertificate && (
@@ -696,7 +696,7 @@ export default function TaskDetailPage() {
                                    </CardContent>
                                    <CardFooter className="p-4 pt-0">
                                        <Button onClick={handleCertificateUpload} disabled={isCertUploading || !selectedCertificate} className='w-full'>
-                                           {isCertUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                                           {isCertUploading ? <Loader2 className="animate-spin" /> : <UploadCloud />}
                                            Upload & Complete Task
                                        </Button>
                                    </CardFooter>
@@ -723,7 +723,7 @@ export default function TaskDetailPage() {
                                         variant="secondary"
                                         className="bg-primary/20 text-primary hover:bg-primary/30"
                                     >
-                                        <FileUp className="mr-2 h-4 w-4" /> Choose Files
+                                        <FileUp /> Choose Files
                                     </Button>
                                 </div>
                                 <Input
@@ -748,11 +748,7 @@ export default function TaskDetailPage() {
                             </CardContent>
                             <CardFooter>
                                 <Button onClick={handleUpload} disabled={isUploading || selectedFiles.length === 0}>
-                                    {isUploading ? (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <UploadCloud className="mr-2 h-4 w-4" />
-                                    )}
+                                    {isUploading ? <Loader2 className="animate-spin" /> : <UploadCloud />}
                                     Upload Documents
                                 </Button>
                             </CardFooter>
