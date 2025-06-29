@@ -16,6 +16,12 @@ if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'your_api_key_here') {
     throw new Error("CRITICAL: Firebase configuration is missing. Please follow these steps: 1. Create a file named .env.local in the root of your project. 2. Copy the contents of .env.local.example into it. 3. Replace the placeholder values with your actual Firebase project credentials. You can find these in your Firebase project settings.");
 }
 
+// ---- DIAGNOSTIC LOG ----
+// This will print the Project ID to your browser's developer console.
+// Check this against the Project ID in your Firebase console's URL to ensure they match.
+console.log("Firebase App is connecting to Project ID:", firebaseConfig.projectId);
+// ------------------------
+
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
