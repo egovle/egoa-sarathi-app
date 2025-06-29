@@ -1,30 +1,53 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
 
-    // Function to check if the user is an admin
+    // --- Helper Functions ---
+    // Checks if the requesting user is an admin.
     function isAdmin() {
       return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // Rules for all files within a specific task folder
+    // Gets the task document from Firestore.
+    function getTask(taskId) {
+      return get(/databases/$(database)/documents/tasks/$(taskId));
+    }
+
+    // Checks if the user is the creator of the task.
+    function isTaskCreator(taskId) {
+      return request.auth.uid == getTask(taskId).data.creatorId;
+    }
+
+    // Checks if the user is the VLE assigned to the task.
+    function isAssignedVle(taskId) {
+      let taskData = getTask(taskId).data;
+      return taskData.assignedVleId != null && request.auth.uid == taskData.assignedVleId;
+    }
+
+    // --- Path Rules ---
     match /tasks/{taskId}/{allPaths=**} {
+      // READ access is granted if the user is an admin, the task creator, or the assigned VLE.
+      // This rule requires the task document to exist in Firestore.
+      allow read: if request.auth != null && exists(/databases/$(database)/documents/tasks/$(taskId)) &&
+                     (isAdmin() || isTaskCreator(taskId) || isAssignedVle(taskId));
 
-      // Allow file creation (upload) if the user is authenticated and they are the creator specified in the file's metadata.
-      // This is the secure way to handle uploads for documents that don't have a Firestore record yet.
-      allow create: if request.auth != null && request.resource.metadata.creatorId == request.auth.uid;
-
-      // Allow reading, updating, or deleting files if the user is an admin, the task creator, or the assigned VLE.
-      // It's critical to check that the task document exists before trying to read data from it.
-      allow read, update, delete: if request.auth != null &&
-                                     exists(/databases/$(database)/documents/tasks/$(taskId)) &&
-                                     (isAdmin() ||
-                                      get(/databases/$(database)/documents/tasks/$(taskId)).data.creatorId == request.auth.uid ||
-                                      (get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId != null &&
-                                       get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId == request.auth.uid)
-                                     );
+      // WRITE access (create, update, delete) has two main conditions:
+      allow write: if request.auth != null && (
+        // 1. For the INITIAL UPLOAD, when the task document may not exist yet.
+        // We allow the upload if the user provides metadata marking themselves as the creator.
+        // This is a secure way to handle the "chicken-and-egg" problem.
+        request.resource.metadata.creatorId == request.auth.uid
+        ||
+        // 2. For ALL SUBSEQUENT uploads/deletes (more docs, final certificate).
+        // The task document must exist, and the user must be an admin, the creator, or the assigned VLE.
+        (
+          exists(/databases/$(database)/documents/tasks/$(taskId)) &&
+          (isAdmin() || isTaskCreator(taskId) || isAssignedVle(taskId))
+        )
+      );
     }
   }
 }
