@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Tent, UserPlus, ChevronsUpDown, Check, X, UserCog } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Tent, UserPlus, ChevronsUpDown, Check, X, UserCog, CheckCircle2, XCircle } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -53,6 +53,11 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
             setLoading(false);
             return;
         }
+        
+        // Find newly assigned VLEs to notify them
+        const newlyAssignedVles = assignedVles.filter(
+            vle => !camp?.assignedVles?.some((av:any) => av.id === vle.id)
+        );
 
         const campData = {
             name,
@@ -88,10 +93,8 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
             }
             
             // Notify newly assigned VLEs
-            for (const vle of assignedVles) {
-                if (!camp?.assignedVles?.some((av:any) => av.id === vle.id)) {
-                    await createNotification(vle.id, 'New Camp Invitation', `You have been invited to join the camp "${name}".`, '/dashboard/camps');
-                }
+            for (const vle of newlyAssignedVles) {
+                await createNotification(vle.id, 'New Camp Invitation', `You have been invited to join the camp "${name}".`, '/dashboard/camps');
             }
             
             onFinished();
@@ -177,18 +180,22 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
                             </PopoverContent>
                         </Popover>
                         <div className="flex flex-wrap gap-1">
-                            {assignedVles.map(vle => (
-                                <Badge key={vle.id} variant="secondary" className="flex items-center gap-1">
-                                    {vle.name}
-                                    <button
-                                        type="button"
-                                        className="ml-1 rounded-full hover:bg-muted-foreground/20"
-                                        onClick={() => setAssignedVles(assignedVles.filter(s => s.id !== vle.id))}
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                </Badge>
-                            ))}
+                            {assignedVles.map(vle => {
+                                const status = vle.status || 'pending';
+                                const variant = status === 'accepted' ? 'default' : status === 'rejected' ? 'destructive' : 'secondary';
+                                return (
+                                    <Badge key={vle.id} variant={variant} className="flex items-center gap-1">
+                                        {vle.name} ({status})
+                                        <button
+                                            type="button"
+                                            className="ml-1 rounded-full hover:bg-muted-foreground/20"
+                                            onClick={() => setAssignedVles(assignedVles.filter(s => s.id !== vle.id))}
+                                        >
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </Badge>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -438,6 +445,9 @@ export default function CampManagementPage() {
     const upcomingCamps = useMemo(() => allCamps.filter(c => new Date(c.date) >= new Date()), [allCamps]);
     const pastCamps = useMemo(() => allCamps.filter(c => new Date(c.date) < new Date()), [allCamps]);
 
+    const myInvitations = useMemo(() => userProfile?.role === 'vle' ? allCamps.filter(c => c.assignedVles?.some((v:any) => v.id === userProfile.id && v.status === 'pending')) : [], [allCamps, userProfile]);
+    const myConfirmedCamps = useMemo(() => userProfile?.role === 'vle' ? allCamps.filter(c => c.assignedVles?.some((v:any) => v.id === userProfile.id && v.status === 'accepted')) : [], [allCamps, userProfile]);
+
     const handleEdit = (camp: any) => {
         setSelectedCamp(camp);
         setIsFormOpen(true);
@@ -468,6 +478,49 @@ export default function CampManagementPage() {
             await createNotification(suggestion.suggestedBy.id, 'Camp Suggestion Update', `Your suggestion for a camp at ${suggestion.location} was not approved.`);
         }
     }
+    
+    const handleVleResponse = async (camp: any, newStatus: 'accepted' | 'rejected') => {
+        if (!userProfile || userProfile.role !== 'vle') return;
+
+        const campRef = doc(db, "camps", camp.id);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const campDoc = await transaction.get(campRef);
+                if (!campDoc.exists()) {
+                    throw "Camp does not exist!";
+                }
+                const campData = campDoc.data();
+                const assignedVles = campData.assignedVles || [];
+                const vleIndex = assignedVles.findIndex((v:any) => v.id === userProfile.id);
+
+                if (vleIndex === -1) {
+                    throw "You are not assigned to this camp.";
+                }
+
+                assignedVles[vleIndex].status = newStatus;
+                transaction.update(campRef, { assignedVles });
+            });
+            
+            toast({
+                title: `Invitation ${newStatus}`,
+                description: `You have ${newStatus} the invitation for the camp: ${camp.name}.`
+            });
+            
+            await createNotificationForAdmins(
+                `Camp Invitation ${newStatus}`,
+                `${userProfile.name} has ${newStatus} the invitation for the camp "${camp.name}".`
+            );
+
+        } catch (error: any) {
+            console.error("Error responding to invitation:", error);
+            toast({
+                title: 'Error',
+                description: error.message || 'Could not update your status.',
+                variant: 'destructive',
+            });
+        }
+    };
+
 
     const handleFormFinished = () => {
         setIsFormOpen(false);
@@ -483,7 +536,7 @@ export default function CampManagementPage() {
         return null; // Redirect logic in useEffect handles this
     }
     
-    const CampTable = ({ data, title }: { data: any[], title: string }) => (
+    const AdminCampTable = ({ data, title }: { data: any[], title: string }) => (
         <Card>
             {title && <CardHeader><CardTitle>{title}</CardTitle></CardHeader>}
             <CardContent className={cn(!title && 'pt-6')}>
@@ -494,8 +547,8 @@ export default function CampManagementPage() {
                             <TableHead>Location</TableHead>
                             <TableHead>Date</TableHead>
                             <TableHead>Services</TableHead>
-                            {userProfile.isAdmin && <TableHead>Assigned VLEs</TableHead>}
-                            {userProfile.isAdmin && <TableHead className="text-right">Actions</TableHead>}
+                            <TableHead>Assigned VLEs</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -510,48 +563,44 @@ export default function CampManagementPage() {
                                         {camp.otherServices && <Badge key="other" variant="secondary">{camp.otherServices}</Badge>}
                                     </div>
                                 </TableCell>
-                                {userProfile.isAdmin && (
-                                    <>
-                                        <TableCell>
-                                            <div className="flex items-center -space-x-2">
-                                                {camp.assignedVles?.slice(0, 3).map((vle: any) => (
-                                                     <TooltipProvider key={vle.id}>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
-                                                                    {vle.name.charAt(0)}
-                                                                </span>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                <p>{vle.name}</p>
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
-                                                ))}
-                                                 {camp.assignedVles?.length > 3 && (
-                                                    <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
-                                                        +{camp.assignedVles.length - 3}
-                                                    </span>
-                                                 )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={() => handleEdit(camp)}><UserCog className="mr-2 h-4 w-4"/>Manage VLEs / Edit</DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleDelete(camp)} className="text-destructive"><Trash className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    </>
-                                )}
+                                <TableCell>
+                                    <div className="flex items-center -space-x-2">
+                                        {camp.assignedVles?.slice(0, 3).map((vle: any) => (
+                                             <TooltipProvider key={vle.id}>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
+                                                            {vle.name.charAt(0)}
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>{vle.name} - <span className="capitalize">{vle.status || 'pending'}</span></p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        ))}
+                                         {camp.assignedVles?.length > 3 && (
+                                            <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
+                                                +{camp.assignedVles.length - 3}
+                                            </span>
+                                         )}
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => handleEdit(camp)}><UserCog className="mr-2 h-4 w-4"/>Manage VLEs / Edit</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleDelete(camp)} className="text-destructive"><Trash className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </TableCell>
                             </TableRow>
                         )) : (
                             <TableRow>
-                                <TableCell colSpan={userProfile.isAdmin ? 6 : 4} className="h-24 text-center">No camps to display.</TableCell>
+                                <TableCell colSpan={6} className="h-24 text-center">No camps to display.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
@@ -612,7 +661,7 @@ export default function CampManagementPage() {
                     <TabsTrigger value="past">Past</TabsTrigger>
                 </TabsList>
                 <TabsContent value="upcoming" className="mt-4">
-                    <CampTable data={upcomingCamps} title="Upcoming Camps" />
+                    <AdminCampTable data={upcomingCamps} title="Upcoming Camps" />
                 </TabsContent>
                 <TabsContent value="suggestions" className="mt-4">
                     <Card>
@@ -631,7 +680,7 @@ export default function CampManagementPage() {
                                 <TableBody>
                                     {campSuggestions.length > 0 ? campSuggestions.map(camp => (
                                         <TableRow key={camp.id}>
-                                            <TableCell>{camp.suggestedBy?.name}</TableCell>
+                                            <TableCell>{camp.suggestedBy?.name || 'Unknown'}</TableCell>
                                             <TableCell>{camp.location}</TableCell>
                                             <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
                                             <TableCell>
@@ -652,40 +701,154 @@ export default function CampManagementPage() {
                     </Card>
                 </TabsContent>
                 <TabsContent value="past" className="mt-4">
-                     <CampTable data={pastCamps} title="Past Camps" />
+                     <AdminCampTable data={pastCamps} title="Past Camps" />
                 </TabsContent>
             </Tabs>
         </div>
     );
     
-    const PublicView = () => (
+    const VleView = () => (
          <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold tracking-tight">Upcoming Camps</h1>
-                {userProfile.role === 'vle' && (
-                    <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
-                            </Button>
-                        </DialogTrigger>
-                         <DialogContent
-                            className="sm:max-w-lg"
-                            onInteractOutside={(e) => {
-                              const target = e.target as HTMLElement;
-                              if (target.closest('[data-radix-popper-content-wrapper]')) {
-                                e.preventDefault();
-                              }
-                            }}
-                        >
-                            <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} services={services} />
-                        </DialogContent>
-                    </Dialog>
-                )}
+                <h1 className="text-3xl font-bold tracking-tight">Your Camps</h1>
+                <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
+                        </Button>
+                    </DialogTrigger>
+                        <DialogContent
+                        className="sm:max-w-lg"
+                        onInteractOutside={(e) => {
+                            const target = e.target as HTMLElement;
+                            if (target.closest('[data-radix-popper-content-wrapper]')) {
+                            e.preventDefault();
+                            }
+                        }}
+                    >
+                        <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} services={services} />
+                    </DialogContent>
+                </Dialog>
             </div>
-            <CampTable data={upcomingCamps} title="" />
+             <Tabs defaultValue="invitations">
+                <TabsList>
+                    <TabsTrigger value="invitations">Invitations <Badge className="ml-2">{myInvitations.length}</Badge></TabsTrigger>
+                    <TabsTrigger value="confirmed">Confirmed Camps</TabsTrigger>
+                </TabsList>
+                <TabsContent value="invitations" className="mt-4">
+                     <Card>
+                        <CardHeader>
+                            <CardTitle>New Camp Invitations</CardTitle>
+                            <CardDescription>You have been invited to join the following camps. Please respond.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                           <Table>
+                               <TableHeader>
+                                   <TableRow>
+                                       <TableHead>Camp Name</TableHead>
+                                       <TableHead>Location</TableHead>
+                                       <TableHead>Date</TableHead>
+                                       <TableHead className="text-right">Actions</TableHead>
+                                   </TableRow>
+                               </TableHeader>
+                               <TableBody>
+                                   {myInvitations.length > 0 ? myInvitations.map(camp => (
+                                       <TableRow key={camp.id}>
+                                           <TableCell>{camp.name}</TableCell>
+                                           <TableCell>{camp.location}</TableCell>
+                                           <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                           <TableCell className="text-right space-x-2">
+                                               <Button size="sm" variant="outline" onClick={() => handleVleResponse(camp, 'accepted')}><CheckCircle2 className="mr-2 h-4 w-4"/>Accept</Button>
+                                               <Button size="sm" variant="destructive" onClick={() => handleVleResponse(camp, 'rejected')}><XCircle className="mr-2 h-4 w-4"/>Reject</Button>
+                                           </TableCell>
+                                       </TableRow>
+                                   )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No pending invitations.</TableCell></TableRow>}
+                               </TableBody>
+                           </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                <TabsContent value="confirmed" className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Your Confirmed Camps</CardTitle>
+                            <CardDescription>These are the upcoming camps you have confirmed your attendance for.</CardDescription>
+                        </CardHeader>
+                         <CardContent>
+                           <Table>
+                               <TableHeader>
+                                   <TableRow>
+                                       <TableHead>Camp Name</TableHead>
+                                       <TableHead>Location</TableHead>
+                                       <TableHead>Date</TableHead>
+                                       <TableHead>Services Offered</TableHead>
+                                   </TableRow>
+                               </TableHeader>
+                               <TableBody>
+                                   {myConfirmedCamps.length > 0 ? myConfirmedCamps.map(camp => (
+                                       <TableRow key={camp.id}>
+                                           <TableCell>{camp.name}</TableCell>
+                                           <TableCell>{camp.location}</TableCell>
+                                           <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                           <TableCell>
+                                                <div className="flex flex-wrap gap-1 max-w-xs">
+                                                    {camp.services?.map((service: string) => <Badge key={service} variant="outline">{service}</Badge>)}
+                                                    {camp.otherServices && <Badge key="other" variant="secondary">{camp.otherServices}</Badge>}
+                                                </div>
+                                           </TableCell>
+                                       </TableRow>
+                                   )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">You have not confirmed attendance for any camps.</TableCell></TableRow>}
+                               </TableBody>
+                           </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+             </Tabs>
          </div>
     );
 
-    return userProfile.isAdmin ? <AdminView /> : <PublicView />;
+    const CustomerView = () => (
+         <div className="space-y-6">
+            <h1 className="text-3xl font-bold tracking-tight">Upcoming Camps</h1>
+            <Card>
+                <CardContent className="pt-6">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Camp Name</TableHead>
+                                <TableHead>Location</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Services Offered</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {upcomingCamps.length > 0 ? upcomingCamps.map((camp) => (
+                                <TableRow key={camp.id}>
+                                    <TableCell className="font-medium">{camp.name}</TableCell>
+                                    <TableCell>{camp.location}</TableCell>
+                                    <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-wrap gap-1 max-w-xs">
+                                            {camp.services?.map((service: string) => <Badge key={service} variant="outline">{service}</Badge>)}
+                                            {camp.otherServices && <Badge key="other" variant="secondary">{camp.otherServices}</Badge>}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="h-24 text-center">No upcoming camps scheduled.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+         </div>
+    );
+
+    return userProfile.isAdmin
+        ? <AdminView />
+        : userProfile.role === 'vle'
+            ? <VleView />
+            : <CustomerView />;
 }
