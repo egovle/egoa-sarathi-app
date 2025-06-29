@@ -1,42 +1,34 @@
+
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // Helper function to check if the user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Helper function to check if the user is an Admin
+    
+    // Helper function to check if the requesting user is an Admin.
     function isAdmin() {
-      // Check if the user document exists in 'vles' and if 'isAdmin' is true
-      let vlePath = /databases/$(database)/documents/vles/$(request.auth.uid);
-      return isAuthenticated() && exists(vlePath) && get(vlePath).data.isAdmin == true;
+      return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // Helper function to check if the user is the creator or the assigned VLE for a task
-    function isTaskParticipant(taskId) {
-      let taskPath = /databases/$(database)/documents/tasks/$(taskId);
-      // The task must exist to check permissions
-      if (!exists(taskPath)) {
-        return false;
-      }
-      let taskData = get(taskPath).data;
-      let isCreator = taskData.creatorId == request.auth.uid;
-      let isAssigned = taskData.assignedVleId != null && taskData.assignedVleId == request.auth.uid;
-      return isCreator || isAssigned;
+    // Helper function to check if the user created the task.
+    function isCreator(taskId) {
+      return get(/databases/$(database)/documents/tasks/$(taskId)).data.creatorId == request.auth.uid;
+    }
+    
+    // Helper function to check if the user is assigned to the task.
+    function isAssigned(taskId) {
+      return get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId == request.auth.uid;
     }
 
-    // Rules for all files within a task folder
     match /tasks/{taskId}/{allPaths=**} {
-      
-      // Allow any authenticated user to UPLOAD (create) files.
-      // This is necessary because the task document doesn't exist in the database at the moment of upload.
-      // The application logic is trusted to create the corresponding database record immediately after the upload.
-      allow create: if isAuthenticated();
+      // Allow any authenticated user to create (upload) files.
+      // This is required because the task record might not exist in Firestore when the upload starts.
+      // The application logic must handle creating the corresponding database record.
+      allow create: if request.auth != null;
 
-      // Allow users to READ, UPDATE, or DELETE files only if they are an admin or a participant in that specific task.
-      allow read, update, delete: if isAdmin() || isTaskParticipant(taskId);
+      // Allow read, update, and delete access only to the task creator, the assigned VLE, or an admin.
+      // This rule requires that the task document already exists in Firestore.
+      allow read, update, delete: if request.auth != null && (isAdmin() || isCreator(taskId) || isAssigned(taskId));
     }
   }
 }
