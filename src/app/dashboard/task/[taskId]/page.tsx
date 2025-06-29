@@ -547,6 +547,7 @@ export default function TaskDetailPage() {
     const isTaskCreator = user?.uid === task.creatorId;
     const isAssignedVle = user?.uid === task.assignedVleId;
     const isAdmin = userProfile?.isAdmin;
+    const canSeeFullHistory = isAdmin || isAssignedVle;
 
     if (!isTaskCreator && !isAssignedVle && !isAdmin) {
          return (
@@ -584,7 +585,10 @@ export default function TaskDetailPage() {
                              <div>
                                 <Label>Assigned VLE</Label>
                                 <p>
-                                    {task.assignedVleName ? `${task.assignedVleName} (ID: ${task.assignedVleId.slice(-6).toUpperCase()})` : 'N/A'}
+                                    {canSeeFullHistory && task.assignedVleName 
+                                        ? `${task.assignedVleName} (ID: ${task.assignedVleId.slice(-6).toUpperCase()})` 
+                                        : (task.assignedVleName ? 'Assigned' : 'N/A')
+                                    }
                                 </p>
                             </div>
                              {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.rate?.toFixed(2)}</p></div>}
@@ -633,8 +637,20 @@ export default function TaskDetailPage() {
                                     <div key={index} className="relative mb-6">
                                         <div className="absolute -left-[30px] top-1.5 h-3 w-3 rounded-full bg-primary border-2 border-background"></div>
                                         <p className="font-semibold">{entry.action}</p>
-                                        <p className="text-sm text-muted-foreground">by {entry.actorRole} ({entry.actorId ? `ID: ${entry.actorId.slice(-6).toUpperCase()}` : 'System'})</p>
-                                        <p className="text-sm mt-1">{entry.details}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                             {
+                                                canSeeFullHistory || entry.actorRole === 'Customer' || entry.actorRole === 'Admin'
+                                                ? `by ${entry.actorRole} (${entry.actorId ? `ID: ${entry.actorId.slice(-6).toUpperCase()}` : 'System'})`
+                                                : `by VLE`
+                                            }
+                                        </p>
+                                        <p className="text-sm mt-1">
+                                            {
+                                                canSeeFullHistory || entry.action !== 'Task Assigned'
+                                                ? entry.details
+                                                : `Task has been assigned for processing. Fee of ₹${task.rate.toFixed(2)} processed.`
+                                            }
+                                        </p>
                                         <p className="text-xs text-muted-foreground mt-1">{format(new Date(entry.timestamp), "dd/MM/yyyy, p")}</p>
                                     </div>
                                 ))}

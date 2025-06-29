@@ -9,12 +9,13 @@ import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Mail, BarChart2, Briefcase, CheckCircle, Clock, AlertTriangle, Wallet } from 'lucide-react';
+import { Loader2, Mail, BarChart2, Briefcase, CheckCircle, Clock, AlertTriangle, Wallet, TrendingUp, Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer, PieChart, Pie, Cell, Legend, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
 
 // --- Admin Reports ---
 const AdminReports = ({ tasks, vles }: { tasks: any[], vles: any[] }) => {
@@ -31,7 +32,7 @@ const AdminReports = ({ tasks, vles }: { tasks: any[], vles: any[] }) => {
     const vlePerformance = useMemo(() => {
         return vles.filter(v => !v.isAdmin).map(vle => {
             const assignedTasks = tasks.filter(t => t.assignedVleId === vle.id);
-            const completedTasks = assignedTasks.filter(t => t.status === 'Completed');
+            const completedTasks = assignedTasks.filter(t => t.status === 'Completed' || t.status === 'Paid Out');
             const totalCommission = completedTasks.reduce((sum, task) => sum + (task.rate || 0), 0);
             return {
                 ...vle,
@@ -39,8 +40,31 @@ const AdminReports = ({ tasks, vles }: { tasks: any[], vles: any[] }) => {
                 tasksCompleted: completedTasks.length,
                 totalCommission,
             };
-        });
+        }).sort((a,b) => b.tasksCompleted - a.tasksCompleted);
     }, [tasks, vles]);
+
+    const revenueByMonth = useMemo(() => {
+        const data: { [key: string]: number } = {};
+        tasks.filter(t => t.status === 'Paid Out' || t.status === 'Completed').forEach(task => {
+            const month = format(new Date(task.date), 'yyyy-MM');
+            const fee = task.rate || 0;
+            data[month] = (data[month] || 0) + fee;
+        });
+        return Object.entries(data)
+            .map(([month, revenue]) => ({ month: format(new Date(month), 'MMM yy'), revenue }))
+            .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+    }, [tasks]);
+
+    const popularServices = useMemo(() => {
+        const data: { [key: string]: number } = {};
+        tasks.forEach(task => {
+            data[task.service] = (data[task.service] || 0) + 1;
+        });
+        return Object.entries(data)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5); // Top 5
+    }, [tasks]);
 
      const chartConfig: ChartConfig = {
         count: {
@@ -75,6 +99,10 @@ const AdminReports = ({ tasks, vles }: { tasks: any[], vles: any[] }) => {
           color: "hsl(0, 100%, 30%)",
         },
       } satisfies ChartConfig
+
+      const revenueChartConfig: ChartConfig = {
+        revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
+    };
 
     const handleEmailReport = (vle: any) => {
         const subject = `Your Weekly Performance Report - eGoa Sarathi`;
@@ -136,8 +164,8 @@ eGoa Sarathi Admin Team
                 </Card>
                  <Card>
                     <CardHeader>
-                        <CardTitle>VLE Performance</CardTitle>
-                         <CardDescription>Performance metrics for all VLEs.</CardDescription>
+                        <CardTitle>Top VLE Performance</CardTitle>
+                         <CardDescription>Performance metrics for all VLEs, sorted by completions.</CardDescription>
                     </CardHeader>
                      <CardContent>
                         <Table>
@@ -169,6 +197,51 @@ eGoa Sarathi Admin Team
                      </CardContent>
                  </Card>
             </div>
+             <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                    <CardHeader className="flex flex-row items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                        <CardTitle>Revenue Over Time</CardTitle>
+                    </CardHeader>
+                    <CardDescription className="px-6 -mt-4">Based on fees from completed tasks.</CardDescription>
+                    <CardContent>
+                        <ChartContainer config={revenueChartConfig} className="min-h-[250px] w-full pt-4">
+                            <BarChart data={revenueByMonth}>
+                                <CartesianGrid vertical={false} />
+                                <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
+                                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${value}`} />
+                                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                                <Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} />
+                            </BarChart>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center gap-2">
+                         <Sparkles className="h-5 w-5 text-muted-foreground" />
+                         <CardTitle>Most Popular Services</CardTitle>
+                    </CardHeader>
+                     <CardDescription className="px-6 -mt-4">Top 5 services by task count.</CardDescription>
+                    <CardContent className="pt-6">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Service Name</TableHead>
+                                    <TableHead className="text-right">Bookings</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {popularServices.length > 0 ? popularServices.map(service => (
+                                    <TableRow key={service.name}>
+                                        <TableCell className="font-medium">{service.name}</TableCell>
+                                        <TableCell className="text-right">{service.count}</TableCell>
+                                    </TableRow>
+                                )) : <TableRow><TableCell colSpan={2} className="h-24 text-center">No task data available.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 };
@@ -178,11 +251,19 @@ const VleReports = ({ tasks, userProfile }: { tasks: any[], userProfile: any }) 
     const assignedTasks = useMemo(() => tasks.filter(t => t.assignedVleId === userProfile.id), [tasks, userProfile.id]);
     
     const stats = useMemo(() => {
-        const completed = assignedTasks.filter(t => t.status === 'Completed').length;
+        const completed = assignedTasks.filter(t => t.status === 'Completed' || t.status === 'Paid Out').length;
         const pending = assignedTasks.length - completed;
         const totalCommission = assignedTasks
-            .filter(t => t.status === 'Completed')
-            .reduce((sum, task) => sum + (task.rate || 0), 0);
+            .filter(t => t.status === 'Completed' || t.status === 'Paid Out')
+            .reduce((sum, task) => {
+                const fee = task.rate || 0;
+                if (task.type === 'VLE Lead') {
+                    // VLE gets 40% if they are the assignee but not creator, 80% if they are both
+                    return sum + (fee * (task.creatorId === task.assignedVleId ? 0.8 : 0.4));
+                }
+                // VLE gets 80% for customer requests
+                return sum + (fee * 0.8);
+            }, 0);
         
         return {
             total: assignedTasks.length,
@@ -224,7 +305,7 @@ const VleReports = ({ tasks, userProfile }: { tasks: any[], userProfile: any }) 
                 </Card>
                  <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Total Fees Processed</CardTitle>
+                        <CardTitle className="text-sm font-medium">Your Total Earnings</CardTitle>
                         <Wallet className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -245,7 +326,7 @@ const VleReports = ({ tasks, userProfile }: { tasks: any[], userProfile: any }) 
                                 <TableHead>Task ID</TableHead>
                                 <TableHead>Service</TableHead>
                                 <TableHead>Status</TableHead>
-                                <TableHead>Fee</TableHead>
+                                <TableHead>Total Fee</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
