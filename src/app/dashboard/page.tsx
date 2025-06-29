@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo 
 import { db, storage } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction, limit, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { PlusCircle, User, FilePlus, Wallet, ToggleRight, UserCheck, Star, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent, Trash2 } from 'lucide-react';
+import { PlusCircle, User, FilePlus, Wallet, ToggleRight, UserCheck, Star, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent, Trash2, CircleDollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1263,7 +1263,7 @@ const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.R
 };
 
 
-const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData }: { allTasks: any[], vles: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void, onResetData: () => Promise<void> }) => {
+const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData, onApprovePayout }: { allTasks: any[], vles: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void, onResetData: () => Promise<void>, onApprovePayout: (task: any) => Promise<void> }) => {
     const vlesForManagement = vles.filter(v => !v.isAdmin);
     const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
     const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
@@ -1671,6 +1671,12 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
                                                                 availableVles={availableVles}
                                                                 onAssign={onVleAssign}
                                                             />
+                                                        )}
+                                                        {task.status === 'Completed' && (
+                                                            <DropdownMenuItem onClick={() => onApprovePayout(task)}>
+                                                                <CircleDollarSign className="mr-2 h-4 w-4" />
+                                                                Approve Payout
+                                                            </DropdownMenuItem>
                                                         )}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -2166,6 +2172,69 @@ export default function DashboardPage() {
         }
     };
 
+    const handleApprovePayout = async (task: any) => {
+        if (!user || !realtimeProfile?.isAdmin || !task.assignedVleId || !task.rate) {
+            toast({ title: 'Error', description: 'Cannot process payout. Missing required information.', variant: 'destructive' });
+            return;
+        }
+
+        const adminRef = doc(db, "vles", user.uid);
+        const vleRef = doc(db, "vles", task.assignedVleId);
+        const taskRef = doc(db, "tasks", task.id);
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                const adminDoc = await transaction.get(adminRef);
+                const vleDoc = await transaction.get(vleRef);
+
+                if (!adminDoc.exists()) throw new Error("Admin profile not found.");
+                if (!vleDoc.exists()) throw new Error("VLE profile not found.");
+
+                const adminBalance = adminDoc.data().walletBalance || 0;
+                const vleBalance = vleDoc.data().walletBalance || 0;
+                const fee = parseFloat(task.rate);
+
+                if (adminBalance < fee) {
+                    throw new Error("Admin wallet has insufficient funds to process this payout.");
+                }
+
+                const newAdminBalance = adminBalance - fee;
+                const newVleBalance = vleBalance + fee;
+
+                transaction.update(adminRef, { walletBalance: newAdminBalance });
+                transaction.update(vleRef, { walletBalance: newVleBalance });
+
+                const historyEntry = {
+                    timestamp: new Date().toISOString(),
+                    actorId: user.uid,
+                    actorRole: 'Admin',
+                    action: 'Payout Approved',
+                    details: `Paid out ₹${fee.toFixed(2)} to VLE ${vleDoc.data().name}.`
+                };
+
+                transaction.update(taskRef, {
+                    status: 'Paid Out',
+                    history: arrayUnion(historyEntry)
+                });
+            });
+
+            toast({ title: 'Payout Approved!', description: `₹${task.rate.toFixed(2)} has been transferred to the VLE.` });
+            await createNotification(
+                task.assignedVleId,
+                'Payment Received',
+                `You have received a payment of ₹${task.rate.toFixed(2)} for task ${task.id.slice(-6).toUpperCase()}.`
+            );
+
+        } catch (error: any) {
+            console.error("Payout transaction failed:", error);
+            toast({
+                title: 'Payout Failed',
+                description: error.message || 'An unknown error occurred.',
+                variant: 'destructive',
+            });
+        }
+    };
+
     if (loading || !user || !realtimeProfile) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
@@ -2183,7 +2252,7 @@ export default function DashboardPage() {
 
         switch (primaryRole) {
             case 'admin':
-                return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} />;
+                return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} />;
             case 'vle':
                 return <VLEDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'customer':
