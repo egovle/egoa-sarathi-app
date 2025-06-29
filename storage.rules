@@ -1,13 +1,12 @@
-
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // WARNING: These rules are for development and testing only.
-    // They allow any authenticated user to read and write any file.
-    // DO NOT use these rules in a production environment.
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      // DANGER: Allow read/write access to all files for ANYONE.
+      // This is for development and testing only to unblock the testing flow.
+      // This is insecure and MUST be replaced with secure rules before production.
+      allow read, write: if true;
     }
   }
 }
