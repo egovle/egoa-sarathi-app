@@ -384,12 +384,17 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
     );
 };
 
-const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (taskId: string, task: any, service: any, uploadedDocs: any[]) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
+const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // File upload state
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const parentServices = useMemo(() => services.filter(s => !s.parentId), [services]);
   const subServices = useMemo(() => {
@@ -417,6 +422,16 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
       setSelectedSubCategory('');
   }, [selectedCategory])
 
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setSelectedFiles((prev) => [...prev, ...Array.from(e.target.files as FileList)]);
+        }
+    };
+    
+    const handleCameraCapture = (file: File) => {
+        setSelectedFiles(prevFiles => [...prevFiles, file]);
+    };
+
   const handleDialogSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -436,10 +451,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
     }
     
     try {
-        const taskId = doc(collection(db, "tasks")).id;
-        
-        const uploadedDocuments: any[] = [];
-
         const newTaskData = {
             customer: form.name.value,
             customerAddress: form.address.value,
@@ -459,14 +470,13 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             complaint: null,
             feedback: null,
             type: type,
-            documents: uploadedDocuments,
             assignedVleId: null,
             assignedVleName: null,
             creatorId: creatorId,
             finalCertificate: null,
         };
 
-        await onTaskCreated(taskId, newTaskData, selectedService, uploadedDocuments);
+        await onTaskCreated(newTaskData, selectedService, selectedFiles);
         setDialogOpen(false); 
     } catch (error: any) {
         console.error("Error creating task:", error);
@@ -485,6 +495,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
       if (!isOpen) {
           setSelectedCategory('');
           setSelectedSubCategory('');
+          setSelectedFiles([]);
           setIsSubmitting(false);
       }
   }
@@ -494,7 +505,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
       <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>{buttonTrigger}</DialogTrigger>
         <DialogContent 
-            className="sm:max-w-lg"
+            className="sm:max-w-2xl"
             onInteractOutside={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest('[data-radix-popper-content-wrapper]')) {
@@ -509,55 +520,75 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                 Fill in the details for your new service request.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">Name</Label>
-                <Input id="name" name="name" defaultValue={creatorProfile?.name} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="address" className="text-right">Address</Label>
-                <Input id="address" name="address" defaultValue={creatorProfile?.location} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="mobile" className="text-right">Mobile</Label>
-                <Input id="mobile" name="mobile" defaultValue={creatorProfile?.mobile} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="email" className="text-right">Email</Label>
-                <Input id="email" name="email" type="email" defaultValue={creatorProfile?.email} className="col-span-3" />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label className="text-right">Service Category</Label>
-                  <div className="col-span-3">
-                      <Select onValueChange={setSelectedCategory} value={selectedCategory} required>
-                          <SelectTrigger><SelectValue placeholder="Select a service category" /></SelectTrigger>
-                          <SelectContent>
-                              {parentServices?.map(s => (
-                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
-                  </div>
-              </div>
-              {selectedCategory && subServices.length > 0 && (
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label className="text-right">Specific Service</Label>
-                    <div className="col-span-3">
-                        <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory} required>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a specific service" />
-                            </SelectTrigger>
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-6">
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="name">Full Name</Label>
+                        <Input id="name" name="name" defaultValue={creatorProfile?.name} required />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="mobile">Mobile</Label>
+                        <Input id="mobile" name="mobile" defaultValue={creatorProfile?.mobile} required />
+                    </div>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="address">Address</Label>
+                    <Input id="address" name="address" defaultValue={creatorProfile?.location} required />
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" name="email" type="email" defaultValue={creatorProfile?.email} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <Label>Service Category</Label>
+                        <Select onValueChange={setSelectedCategory} value={selectedCategory} required>
+                            <SelectTrigger><SelectValue placeholder="Select a service category" /></SelectTrigger>
                             <SelectContent>
-                                {subServices?.map(s => (
-                                    <SelectItem key={s.id} value={s.id}>{s.name} - {s.isVariable ? s.rate : `₹${s.rate}`}</SelectItem>
+                                {parentServices?.map(s => (
+                                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     </div>
+                    {selectedCategory && subServices.length > 0 && (
+                        <div className="space-y-2">
+                            <Label>Specific Service</Label>
+                            <Select onValueChange={setSelectedSubCategory} value={selectedSubCategory} required>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a specific service" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {subServices?.map(s => (
+                                        <SelectItem key={s.id} value={s.id}>{s.name} - {s.isVariable ? s.rate : `₹${s.rate}`}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                 </div>
-              )}
+
+                <div className="space-y-2">
+                    <Label>Attach Documents</Label>
+                    <div className="flex gap-2">
+                        <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="outline">
+                            <FileUp className="mr-2 h-4 w-4"/> Choose Files
+                        </Button>
+                        <Button type="button" variant="outline" onClick={() => setIsCameraOpen(true)} size="sm">
+                            <Camera className="mr-2 h-4 w-4" /> Use Camera
+                        </Button>
+                    </div>
+                    <Input id="documents" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                    {selectedFiles.length > 0 && (
+                        <div className="text-xs text-muted-foreground space-y-1 pt-2">
+                            <p className='font-medium'>Selected files:</p>
+                            {selectedFiles.map((file, i) => <div key={i} className="flex items-center gap-2"><FileText className="h-3 w-3" /><span>{file.name}</span></div>)}
+                        </div>
+                    )}
+                </div>
+
                {selectedService && creatorProfile && (
-                 <Card className="col-span-4 bg-muted/50 p-4 mt-2">
+                 <Card className="bg-muted/50 p-4 mt-2">
                     <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Current Wallet Balance</span>
                         <span>₹{creatorProfile.walletBalance?.toFixed(2) || '0.00'}</span>
@@ -581,7 +612,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                  </Card>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className='pt-4 border-t'>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create Task
@@ -590,6 +621,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
           </form>
         </DialogContent>
       </Dialog>
+      <CameraUploadDialog open={isCameraOpen} onOpenChange={setIsCameraOpen} onCapture={handleCameraCapture} />
     </>
   );
 };
@@ -889,7 +921,7 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
 )};
 
 
-const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (taskId: string, task: any, service: any, uploadedDocs: any[]) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -1026,7 +1058,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
     );
 }
 
-const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (taskId: string, task: any, service: any, uploadedDocs: any[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
     const [searchQuery, setSearchQuery] = useState('');
     
     const filteredTasks = useMemo(() => {
@@ -1829,13 +1861,27 @@ export default function DashboardPage() {
     }, [user, realtimeProfile]);
 
 
-    const handleCreateTask = async (taskId: string, newTaskData: any, service: any, uploadedDocs: any[]) => {
+    const handleCreateTask = async (newTaskData: any, service: any, filesToUpload: File[]) => {
         if (!user || !realtimeProfile) {
             throw new Error("Profile not loaded");
         }
+    
+        const taskId = doc(collection(db, "tasks")).id;
+        let uploadedDocuments: { name: string, url: string }[] = [];
+    
+        // 1. Upload files to storage
+        if (filesToUpload.length > 0) {
+            const uploadPromises = filesToUpload.map(async (file) => {
+                const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
+                await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(storageRef);
+                return { name: file.name, url: downloadURL };
+            });
+            uploadedDocuments = await Promise.all(uploadPromises);
+        }
         
-        const taskWithDocs = { ...newTaskData, documents: uploadedDocs };
-
+        const taskWithDocs = { ...newTaskData, documents: uploadedDocuments };
+    
         if (service.isVariable) {
             const taskWithStatus = { ...taskWithDocs, status: 'Pending Price Approval', rate: service.rate };
             await setDoc(doc(db, "tasks", taskId), taskWithStatus);
