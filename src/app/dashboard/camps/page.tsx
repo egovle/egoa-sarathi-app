@@ -26,6 +26,7 @@ import { format, addDays } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox';
 
 // --- Camp Dialog Components ---
 
@@ -221,7 +222,6 @@ const SuggestCampDialog = ({ onFinished, services }: { onFinished: () => void; s
     // New state for services
     const [selectedServices, setSelectedServices] = useState<any[]>([]);
     const [otherServices, setOtherServices] = useState('');
-    const [isServicesPopoverOpen, setIsServicesPopoverOpen] = useState(false);
 
     const minDate = addDays(new Date(), 7);
     
@@ -283,68 +283,30 @@ const SuggestCampDialog = ({ onFinished, services }: { onFinished: () => void; s
                         </PopoverContent>
                     </Popover>
                 </div>
-                 {/* Services multi-select */}
                 <div className="grid grid-cols-4 items-start gap-4 pt-2">
                     <Label className="text-right pt-2">Services</Label>
-                    <div className="col-span-3 space-y-2">
-                        <Popover open={isServicesPopoverOpen} onOpenChange={setIsServicesPopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <Button
-                                    variant="outline"
-                                    role="combobox"
-                                    className="w-full justify-between"
-                                >
-                                    {selectedServices.length > 0 ? `${selectedServices.length} service(s) selected` : "Select services..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Search services..." />
-                                    <CommandList>
-                                        <CommandEmpty>No service found.</CommandEmpty>
-                                        <CommandGroup>
-                                            {services.map((service) => (
-                                                <CommandItem
-                                                    key={service.id}
-                                                    value={service.name}
-                                                    onSelect={() => {
-                                                        const isSelected = selectedServices.some(s => s.id === service.id);
-                                                        if (isSelected) {
-                                                            setSelectedServices(selectedServices.filter(s => s.id !== service.id));
-                                                        } else {
-                                                            setSelectedServices([...selectedServices, service]);
-                                                        }
-                                                    }}
-                                                >
-                                                    <Check
-                                                        className={cn(
-                                                            "mr-2 h-4 w-4",
-                                                            selectedServices.some(s => s.id === service.id) ? "opacity-100" : "opacity-0"
-                                                        )}
-                                                    />
-                                                    {service.name}
-                                                </CommandItem>
-                                            ))}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
-                            </PopoverContent>
-                        </Popover>
-                        <div className="flex flex-wrap gap-1">
-                            {selectedServices.map(service => (
-                                <Badge key={service.id} variant="secondary" className="flex items-center gap-1">
-                                    {service.name}
-                                    <button
-                                        type="button"
-                                        className="ml-1 rounded-full hover:bg-muted-foreground/20"
-                                        onClick={() => setSelectedServices(selectedServices.filter(s => s.id !== service.id))}
-                                    >
-                                        <X className="h-3 w-3" />
-                                    </button>
-                                </Badge>
-                            ))}
-                        </div>
+                    <div className="col-span-3">
+                        <Card>
+                            <CardContent className="p-4 space-y-2 max-h-48 overflow-y-auto">
+                                {services.filter(s => s.rate > 0 || s.isVariable).map((service) => (
+                                    <div key={service.id} className="flex items-center space-x-2">
+                                        <Checkbox
+                                            id={`service-${service.id}`}
+                                            checked={selectedServices.some(s => s.id === service.id)}
+                                            onCheckedChange={(checked) => {
+                                                setSelectedServices(prev => 
+                                                    checked 
+                                                        ? [...prev, service]
+                                                        : prev.filter(s => s.id !== service.id)
+                                                );
+                                            }}
+                                        />
+                                        <Label htmlFor={`service-${service.id}`} className="font-normal cursor-pointer">{service.name}</Label>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                        <p className="text-xs text-muted-foreground pt-1">Select all services that will be offered.</p>
                     </div>
                 </div>
 
@@ -719,12 +681,6 @@ export default function CampManagementPage() {
                     </DialogTrigger>
                         <DialogContent
                         className="sm:max-w-lg"
-                        onInteractOutside={(e) => {
-                            const target = e.target as HTMLElement;
-                            if (target.closest('[data-radix-popper-content-wrapper]')) {
-                            e.preventDefault();
-                            }
-                        }}
                     >
                         <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} services={services} />
                     </DialogContent>
@@ -852,3 +808,5 @@ export default function CampManagementPage() {
             ? <VleView />
             : <CustomerView />;
 }
+
+    
