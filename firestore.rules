@@ -1,11 +1,11 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // This rule allows anyone to read and write to any document.
+    // WARNING: This is insecure and for development ONLY.
     match /{document=**} {
-      // DANGER: Allow read/write access to all documents to ANYONE.
-      // This is for development and testing only to unblock the testing flow.
-      // This is insecure and MUST be replaced with secure rules before production.
       allow read, write: if true;
     }
   }
