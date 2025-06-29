@@ -1,41 +1,38 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    // Helper function to check if a user is an admin by looking at their VLE profile
-    function isAdmin(userId) {
-      let vleDoc = get(/databases/$(database)/documents/vles/$(userId));
-      return exists(/databases/$(database)/documents/vles/$(userId)) && vleDoc.data.isAdmin == true;
+
+    // Helper function to check if the requesting user is an admin.
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/vles/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
     }
 
-    // Match files within a specific task folder
-    match /tasks/{taskId}/{fileName} {
+    // Helper function to check if the user has rights to a specific task.
+    function isAllowedOnTask(taskId) {
+      let task = get(/databases/$(database)/documents/tasks/$(taskId)).data;
+      let isCreator = request.auth.uid == task.creatorId;
+      let isAssignedVle = task.assignedVleId != null && request.auth.uid == task.assignedVleId;
       
+      // A user is allowed if they are the creator, the assigned VLE, or an admin.
+      return isCreator || isAssignedVle || isAdmin();
+    }
+    
+    // Match any file path inside the 'tasks' folder.
+    match /tasks/{taskId}/{allPaths=**} {
+
       // --- CREATE (UPLOAD) RULE ---
-      // This is the key to solving the upload permission error.
-      // It allows an upload if the authenticated user's UID matches the 'creatorId'
-      // that the client app sends as custom metadata during the upload request.
-      // This verifies ownership at upload time without needing a database record yet.
-      allow create: if request.auth != null 
-                    && request.resource.metadata.creatorId == request.auth.uid;
-      
+      // This is the most important rule for fixing the upload error.
+      // An authenticated user can create a file IF they attach metadata proving they are the creator.
+      // The app logic is responsible for adding this metadata during the upload.
+      allow create: if request.auth != null && request.resource.metadata.creatorId == request.auth.uid;
+
       // --- READ, UPDATE, DELETE RULES ---
-      // These rules apply to existing files.
-      // They check the Firestore database to see if the user has the correct role for the task.
-      allow read, update, delete: if request.auth != null
-                  && exists(/databases/$(database)/documents/tasks/$(taskId))
-                  && (
-                    // Allow if the user is an admin
-                    isAdmin(request.auth.uid)
-                    // Allow if the user is the original creator of the task
-                    || get(/databases/$(database)/documents/tasks/$(taskId)).data.creatorId == request.auth.uid
-                    // Allow if the user is the VLE assigned to the task
-                    || (
-                         get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId != null 
-                         && get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId == request.auth.uid
-                       )
-                  );
+      // These actions are only allowed AFTER the task document exists in Firestore.
+      // A user can only perform these actions if they are the creator, assigned VLE, or an admin.
+      allow read, update, delete: if request.auth != null && exists(/databases/$(database)/documents/tasks/$(taskId)) && isAllowedOnTask(taskId);
     }
   }
 }

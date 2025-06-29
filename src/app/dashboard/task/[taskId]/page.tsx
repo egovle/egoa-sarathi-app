@@ -341,7 +341,8 @@ export default function TaskDetailPage() {
         try {
             const uploadPromises = selectedFiles.map(async (file) => {
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-                await uploadBytes(storageRef, file);
+                const metadata = { customMetadata: { 'creatorId': user.uid } };
+                await uploadBytes(storageRef, file, metadata);
                 return getDownloadURL(storageRef);
             });
     
@@ -401,7 +402,8 @@ export default function TaskDetailPage() {
         
         try {
             const storageRef = ref(storage, `tasks/${taskId}/certificate/${selectedCertificate.name}`);
-            await uploadBytes(storageRef, selectedCertificate);
+            const metadata = { customMetadata: { 'creatorId': user.uid } };
+            await uploadBytes(storageRef, selectedCertificate, metadata);
             const downloadURL = await getDownloadURL(storageRef);
             const finalCertificate = { name: selectedCertificate.name, url: downloadURL };
 
@@ -430,7 +432,7 @@ export default function TaskDetailPage() {
             toast({ title: "Certificate Uploaded", description: "The customer has been notified and the task is now complete." });
             setSelectedCertificate(null);
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error uploading certificate:", error);
             toast({ title: "Upload Failed", description: "There was an error uploading the certificate.", variant: "destructive" });
         } finally {
@@ -602,7 +604,7 @@ export default function TaskDetailPage() {
                                         <p className="font-semibold">{entry.action}</p>
                                         <p className="text-sm text-muted-foreground">by {entry.actorRole} ({entry.actorId ? `ID: ${entry.actorId.slice(-6).toUpperCase()}` : 'System'})</p>
                                         <p className="text-sm mt-1">{entry.details}</p>
-                                        <p className="text-xs text-muted-foreground mt-1">{format(new Date(entry.timestamp), "PPp")}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">{format(new Date(entry.timestamp), "dd/MM/yyyy, p")}</p>
                                     </div>
                                 ))}
                             </div>
@@ -628,32 +630,30 @@ export default function TaskDetailPage() {
                            ) : null }
                            
                            {isVleInProgress && (
-                                <Card className="bg-muted/50">
-                                    <CardHeader className="p-4">
-                                        <CardTitle className="text-base">Upload Final Certificate</CardTitle>
-                                        <CardDescription className="text-xs">Upload the final document for the customer.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="p-4 pt-0">
-                                        <div className="flex gap-2">
-                                            <Button type="button" onClick={() => vleFileInputRef.current?.click()} size="sm" variant="secondary">
-                                                <FileUp className="mr-2 h-4 w-4"/> Choose File
-                                            </Button>
-                                        </div>
-                                        <Input id="vle-documents" type="file" onChange={handleVleFileChange} ref={vleFileInputRef} className="hidden" />
-                                        {selectedCertificate && (
-                                            <div className="text-xs text-muted-foreground space-y-1 mt-2">
-                                                <p className='font-medium'>Selected file:</p>
-                                                <div className="flex items-center gap-2"><FileText className="h-3 w-3" /><span>{selectedCertificate.name}</span></div>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                    <CardFooter className="p-4 pt-0">
-                                        <Button onClick={handleCertificateUpload} disabled={isCertUploading || !selectedCertificate}>
-                                            {isCertUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                                            Upload & Complete Task
-                                        </Button>
-                                    </CardFooter>
-                                </Card>
+                               <Card className="bg-muted/50">
+                                   <CardHeader className="p-4">
+                                       <CardTitle className="text-base">Upload Final Certificate</CardTitle>
+                                       <CardDescription className="text-xs">Upload the final document for the customer.</CardDescription>
+                                   </CardHeader>
+                                   <CardContent className="p-4 pt-0 space-y-2">
+                                       <Button type="button" onClick={() => vleFileInputRef.current?.click()} size="sm" variant="secondary" className='w-full'>
+                                           <FileUp className="mr-2 h-4 w-4"/> Choose File
+                                       </Button>
+                                       <Input id="vle-documents" type="file" onChange={handleVleFileChange} ref={vleFileInputRef} className="hidden" />
+                                       {selectedCertificate && (
+                                           <div className="text-xs text-muted-foreground space-y-1 pt-1">
+                                               <p className='font-medium'>Selected file:</p>
+                                               <div className="flex items-center gap-2"><FileText className="h-3 w-3" /><span>{selectedCertificate.name}</span></div>
+                                           </div>
+                                       )}
+                                   </CardContent>
+                                   <CardFooter className="p-4 pt-0">
+                                       <Button onClick={handleCertificateUpload} disabled={isCertUploading || !selectedCertificate} className='w-full'>
+                                           {isCertUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+                                           Upload & Complete Task
+                                       </Button>
+                                   </CardFooter>
+                               </Card>
                            )}
                            
                            {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress) && task.status !== 'Completed' && task.status !== 'Pending Price Approval' && task.status !== 'Awaiting Payment' && (

@@ -569,7 +569,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                 </div>
 
                 <div className="space-y-2">
-                    <Label>Attach Documents</Label>
+                    <Label>Attach Documents (Optional)</Label>
                     <div className="flex gap-2">
                         <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="outline">
                             <FileUp className="mr-2 h-4 w-4"/> Choose Files
@@ -978,7 +978,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
                             <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
                             <TableCell>{task.service}</TableCell>
                             <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                            <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
+                            <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
                             <TableCell className="text-right">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -1140,7 +1140,7 @@ const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onV
                                 <TableCell>{task.service}</TableCell>
                                 <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                                 <TableCell>{task.customer}</TableCell>
-                                <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
+                                <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
                                 <TableCell className="text-right">
                                     <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
                                 </TableCell>
@@ -1656,7 +1656,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
                                             <TableCell>{task.service}</TableCell>
                                             <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                                             <TableCell>{task.assignedVleName || 'N/A'}</TableCell>
-                                            <TableCell>{new Date(task.date).toLocaleDateString()}</TableCell>
+                                            <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
                                             <TableCell className="text-right">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>

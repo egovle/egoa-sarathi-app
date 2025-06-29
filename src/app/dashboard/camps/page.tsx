@@ -86,7 +86,7 @@ const CampFormDialog = ({ camp, onFinished }: { camp?: any; onFinished: () => vo
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !date && "text-muted-foreground")}>
-                                {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                {date ? format(date, "dd/MM/yyyy") : <span>Pick a date</span>}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -160,7 +160,7 @@ const SuggestCampDialog = ({ onFinished }: { onFinished: () => void; }) => {
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !date && "text-muted-foreground")}>
-                                {date ? format(date, "PPP") : <span>Pick a date</span>}
+                                {date ? format(date, "dd/MM/yyyy") : <span>Pick a date</span>}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -321,7 +321,7 @@ export default function CampManagementPage() {
                             <TableRow key={camp.id}>
                                 <TableCell className="font-medium">{camp.name}</TableCell>
                                 <TableCell>{camp.location}</TableCell>
-                                <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
+                                <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
                                 {userProfile.isAdmin && (
                                     <TableCell className="text-right">
                                         <DropdownMenu>
@@ -414,7 +414,7 @@ export default function CampManagementPage() {
                                         <TableRow key={camp.id}>
                                             <TableCell>{camp.suggestedBy?.name}</TableCell>
                                             <TableCell>{camp.location}</TableCell>
-                                            <TableCell>{new Date(camp.date).toLocaleDateString()}</TableCell>
+                                            <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
                                             <TableCell className="text-right space-x-2">
                                                 <Button size="sm" variant="outline" onClick={() => handleApproveSuggestion(camp)}><UserPlus className="mr-2 h-4 w-4" />Approve</Button>
                                                 <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleRejectSuggestion(camp)}><Trash className="mr-2 h-4 w-4" />Reject</Button>
