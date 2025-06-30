@@ -66,6 +66,13 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
     const [isVariable, setIsVariable] = useState(service?.isVariable || false);
     const [loading, setLoading] = useState(false);
     
+    useEffect(() => {
+        if (isVariable) {
+            setCustomerRate('');
+            setVleRate('');
+        }
+    }, [isVariable]);
+    
     const isSubCategory = parentId !== 'none';
 
     const handleSubmit = async (e: FormEvent) => {
@@ -132,18 +139,6 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
                     <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder={isSubCategory ? "e.g., New Application" : "e.g., PAN Card Services"} required className="col-span-3"/>
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="customerRate" className="text-right">Customer Rate (₹)</Label>
-                    <Input id="customerRate" type="number" value={customerRate} onChange={(e) => setCustomerRate(e.target.value)} placeholder="e.g., 300" required className="col-span-3"/>
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="vleRate" className="text-right">VLE Rate (₹)</Label>
-                    <Input id="vleRate" type="number" value={vleRate} onChange={(e) => setVleRate(e.target.value)} placeholder="e.g., 200" required className="col-span-3"/>
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="governmentFee" className="text-right">Govt. Fee (₹)</Label>
-                    <Input id="governmentFee" type="number" value={governmentFee} onChange={(e) => setGovernmentFee(e.target.value)} placeholder="e.g., 107 (optional)" className="col-span-3"/>
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Variable Rate</Label>
                     <div className="col-span-3 flex items-center">
                        <Switch id="isVariable" checked={isVariable} onCheckedChange={setIsVariable} />
@@ -152,6 +147,36 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
                         </Label>
                     </div>
                  </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="customerRate" className={cn("text-right", isVariable && "text-muted-foreground/50")}>Customer Rate (₹)</Label>
+                    <Input 
+                        id="customerRate" 
+                        type="number" 
+                        value={customerRate} 
+                        onChange={(e) => setCustomerRate(e.target.value)} 
+                        placeholder={isVariable ? "N/A" : "e.g., 300"}
+                        required={!isVariable} 
+                        disabled={isVariable}
+                        className="col-span-3"
+                    />
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="vleRate" className={cn("text-right", isVariable && "text-muted-foreground/50")}>VLE Rate (₹)</Label>
+                    <Input 
+                        id="vleRate" 
+                        type="number" 
+                        value={vleRate} 
+                        onChange={(e) => setVleRate(e.target.value)} 
+                        placeholder={isVariable ? "N/A" : "e.g., 200"}
+                        required={!isVariable} 
+                        disabled={isVariable}
+                        className="col-span-3"
+                    />
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="governmentFee" className="text-right">Govt. Fee (₹)</Label>
+                    <Input id="governmentFee" type="number" value={governmentFee} onChange={(e) => setGovernmentFee(e.target.value)} placeholder="e.g., 107 (optional)" className="col-span-3"/>
+                </div>
                  <div className="grid grid-cols-4 items-start gap-4">
                     <Label htmlFor="documents" className="text-right pt-2">Required Documents</Label>
                     <div className="col-span-3">
