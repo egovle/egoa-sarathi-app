@@ -379,9 +379,9 @@ export default function ServiceManagementPage() {
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Service Name</TableHead>
-                                <TableHead>Customer Rate</TableHead>
-                                <TableHead>VLE Rate</TableHead>
-                                <TableHead>Govt. Fee</TableHead>
+                                <TableHead className="whitespace-nowrap">Customer Rate</TableHead>
+                                <TableHead className="whitespace-nowrap">VLE Rate</TableHead>
+                                <TableHead className="whitespace-nowrap">Govt. Fee</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
