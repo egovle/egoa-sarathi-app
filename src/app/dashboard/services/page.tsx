@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 
 // --- Client-side Service Functions ---
 
-async function addService(data: { name: string; rate: number; documents: string[], parentId: string | null, isVariable: boolean }) {
+async function addService(data: any) {
     try {
         await addDoc(collection(db, "services"), data);
         return { success: true };
@@ -34,7 +34,7 @@ async function addService(data: { name: string; rate: number; documents: string[
     }
 }
 
-async function updateService(id: string, data: { name: string; rate: number; documents: string[], parentId: string | null, isVariable: boolean }) {
+async function updateService(id: string, data: any) {
     try {
         const serviceRef = doc(db, "services", id);
         await updateDoc(serviceRef, data);
@@ -58,7 +58,9 @@ async function deleteService(id: string) {
 const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: any, parentServices: any[], onFinished: () => void }) => {
     const { toast } = useToast();
     const [name, setName] = useState(service?.name || '');
-    const [rate, setRate] = useState(service?.rate || '');
+    const [customerRate, setCustomerRate] = useState(service?.customerRate || '');
+    const [vleRate, setVleRate] = useState(service?.vleRate || '');
+    const [governmentFee, setGovernmentFee] = useState(service?.governmentFee || '');
     const [documents, setDocuments] = useState(service?.documents?.join(', ') || '');
     const [parentId, setParentId] = useState(service?.parentId || 'none');
     const [isVariable, setIsVariable] = useState(service?.isVariable || false);
@@ -72,7 +74,9 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
 
         const serviceData = {
             name,
-            rate: parseFloat(rate) || 0,
+            customerRate: parseFloat(customerRate) || 0,
+            vleRate: parseFloat(vleRate) || 0,
+            governmentFee: parseFloat(governmentFee) || 0,
             documents: documents.split(',').map(d => d.trim()).filter(d => d),
             parentId: parentId === 'none' ? null : parentId,
             isVariable: isVariable
@@ -106,7 +110,7 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
                     {service ? 'Update the details for this service.' : 'Fill in the details for the new service.'}
                 </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="parent" className="text-right">Category</Label>
                     <div className="col-span-3">
@@ -128,8 +132,16 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
                     <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder={isSubCategory ? "e.g., New Application" : "e.g., PAN Card Services"} required className="col-span-3"/>
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="rate" className="text-right">Rate (₹)</Label>
-                    <Input id="rate" type="text" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="e.g., 150 or 1000-2000" required className="col-span-3"/>
+                    <Label htmlFor="customerRate" className="text-right">Customer Rate (₹)</Label>
+                    <Input id="customerRate" type="number" value={customerRate} onChange={(e) => setCustomerRate(e.target.value)} placeholder="e.g., 300" required className="col-span-3"/>
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="vleRate" className="text-right">VLE Rate (₹)</Label>
+                    <Input id="vleRate" type="number" value={vleRate} onChange={(e) => setVleRate(e.target.value)} placeholder="e.g., 200" required className="col-span-3"/>
+                </div>
+                 <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="governmentFee" className="text-right">Govt. Fee (₹)</Label>
+                    <Input id="governmentFee" type="number" value={governmentFee} onChange={(e) => setGovernmentFee(e.target.value)} placeholder="e.g., 107 (optional)" className="col-span-3"/>
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label className="text-right">Variable Rate</Label>
@@ -255,19 +267,19 @@ export default function ServiceManagementPage() {
             const servicesCollectionRef = collection(db, 'services');
             const existingServicesSnapshot = await getDocs(query(servicesCollectionRef));
     
-            if (existingServicesSnapshot.empty) {
-                const batch = writeBatch(db);
-                seedServices.forEach(service => {
-                    const { id, ...serviceData } = service; // Exclude hardcoded ID from seed data
-                    const docRef = id ? doc(db, "services", id) : doc(collection(db, "services"));
-                    batch.set(docRef, serviceData);
-                });
-                await batch.commit();
+            const batch = writeBatch(db);
+            // Delete existing services to ensure a clean seed
+            existingServicesSnapshot.docs.forEach(doc => batch.delete(doc.ref));
 
-                toast({ title: "Database Seeded", description: "Common services have been added." });
-            } else {
-                toast({ title: "Database Not Empty", description: "Services already exist. Seeding skipped." });
-            }
+            // Add new services from seed file
+            seedServices.forEach(service => {
+                const { id, ...serviceData } = service; // Exclude hardcoded ID from seed data
+                const docRef = id ? doc(db, "services", id) : doc(collection(db, "services"));
+                batch.set(docRef, serviceData);
+            });
+            await batch.commit();
+
+            toast({ title: "Database Seeded", description: "Common services have been added." });
         } catch (error) {
             console.error("Error seeding database:", error);
             toast({ title: "Error", description: "Could not seed the database. Check console for details.", variant: "destructive" });
@@ -334,7 +346,7 @@ export default function ServiceManagementPage() {
                 }
                 setIsFormOpen(open);
             }}>
-                 <DialogContent className="sm:max-w-md">
+                 <DialogContent className="sm:max-w-lg">
                     <ServiceFormDialog service={selectedService} parentServices={parentServices} onFinished={handleFormFinished} />
                 </DialogContent>
             </Dialog>
@@ -366,10 +378,10 @@ export default function ServiceManagementPage() {
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[50px]">Sr.</TableHead>
                                 <TableHead>Service Name</TableHead>
-                                <TableHead>Rate</TableHead>
-                                <TableHead>Required Documents</TableHead>
+                                <TableHead>Customer Rate</TableHead>
+                                <TableHead>VLE Rate</TableHead>
+                                <TableHead>Govt. Fee</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -381,24 +393,20 @@ export default function ServiceManagementPage() {
                                     </TableCell>
                                 </TableRow>
                             ) : filteredServices.length > 0 ? (
-                                filteredServices.map((service, index) => (
+                                filteredServices.map((service) => (
                                     <TableRow key={service.id} className={!service.parentId ? 'bg-muted/50' : ''}>
-                                        <TableCell>{!service.parentId ? `${parentServices.findIndex(p => p.id === service.id) + 1}.` : ''}</TableCell>
                                         <TableCell className={cn("font-medium", service.parentId && 'pl-8')}>
                                             {service.name}
+                                            {service.isVariable && <Badge variant="outline" className="ml-2">Variable</Badge>}
                                         </TableCell>
                                         <TableCell>
-                                            {service.isVariable ? 
-                                                <Badge variant="outline">Variable</Badge> : 
-                                                (service.rate > 0 ? `₹${service.rate}` : <span className="text-muted-foreground">-</span>)
-                                            }
+                                             {service.customerRate > 0 ? `₹${service.customerRate}` : <span className="text-muted-foreground">-</span>}
                                         </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-wrap gap-1 max-w-sm">
-                                                {service.documents.map((doc: string, i: number) => (
-                                                    <Badge key={i} variant="secondary">{doc}</Badge>
-                                                ))}
-                                            </div>
+                                         <TableCell>
+                                             {service.vleRate > 0 ? `₹${service.vleRate}` : <span className="text-muted-foreground">-</span>}
+                                        </TableCell>
+                                         <TableCell>
+                                             {service.governmentFee > 0 ? `₹${service.governmentFee}` : <span className="text-muted-foreground">-</span>}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>

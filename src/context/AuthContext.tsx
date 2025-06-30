@@ -27,19 +27,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true);
       if (user) {
-        // User is signed in, fetch profile
+        // User is signed in, fetch profile from potential collections
         let profileDoc = await getDoc(doc(db, 'users', user.uid));
 
         if (!profileDoc.exists()) {
           profileDoc = await getDoc(doc(db, 'vles', user.uid));
         }
 
+        if (!profileDoc.exists()) {
+          // Check for government official role
+          profileDoc = await getDoc(doc(db, 'government', user.uid));
+        }
+
         if (profileDoc.exists()) {
           setUser(user);
           setUserProfile({ id: profileDoc.id, ...profileDoc.data() });
         } else {
-            // This can happen if user exists in Auth but not in Firestore (e.g., error during registration).
-            // For this app, we'll treat them as logged out.
+            // This can happen if user exists in Auth but not in Firestore.
             console.error("Authenticated user not found in Firestore. Logging out.");
             setUserProfile(null);
             setUser(null);

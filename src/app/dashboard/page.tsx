@@ -28,6 +28,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Separator } from '@/components/ui/separator';
 import { format } from 'date-fns';
 import { services as seedServices } from '@/lib/seed';
+import { Checkbox } from '@/components/ui/checkbox';
 
 
 // --- NOTIFICATION HELPERS ---
@@ -444,8 +445,9 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
   const serviceFee = useMemo(() => {
     if (!selectedService || selectedService.isVariable) return 0;
-    return parseFloat(selectedService.rate);
-  }, [selectedService]);
+    const isVleLead = creatorProfile?.role === 'vle';
+    return parseFloat(isVleLead ? selectedService.vleRate : selectedService.customerRate);
+  }, [selectedService, creatorProfile]);
 
   const remainingBalance = useMemo(() => {
     const currentBalance = creatorProfile?.walletBalance || 0;
@@ -496,13 +498,16 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
     const form = e.target as HTMLFormElement;
 
-    if (!selectedService || (!selectedService.isVariable && (!selectedService.rate || selectedService.rate <= 0))) {
+    if (!selectedService || (!selectedService.isVariable && (!selectedService.customerRate || selectedService.customerRate <= 0))) {
         toast({ title: 'Specific Service Required', description: 'This appears to be a category. Please select a specific sub-service to proceed.', variant: 'destructive' });
         setIsSubmitting(false);
         return;
     }
     
     try {
+        const isVleLead = creatorProfile.role === 'vle';
+        const totalPaid = isVleLead ? selectedService.vleRate : selectedService.customerRate;
+        
         const newTaskData = {
             customer: form.name.value,
             customerAddress: form.address.value,
@@ -511,6 +516,12 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             service: selectedService.name,
             serviceId: selectedService.id,
             date: new Date().toISOString(),
+            // Financials
+            totalPaid: totalPaid,
+            governmentFee: selectedService.governmentFee || 0,
+            customerRate: selectedService.customerRate,
+            vleRate: selectedService.vleRate,
+            // History & Status
             history: [{
                 timestamp: new Date().toISOString(),
                 actorId: creatorId,
@@ -550,6 +561,12 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
           setSelectedFiles([]);
           setIsSubmitting(false);
       }
+  }
+
+  const getServiceDisplayName = (s: any) => {
+    const isVle = creatorProfile?.role === 'vle';
+    const rate = isVle ? s.vleRate : s.customerRate;
+    return s.isVariable ? `${s.name} - Variable Rate` : `${s.name} - ₹${rate}`;
   }
 
   return (
@@ -612,7 +629,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                                 </SelectTrigger>
                                 <SelectContent>
                                     {subServices?.map(s => (
-                                        <SelectItem key={s.id} value={s.id}>{s.name} - {s.isVariable ? s.rate : `₹${s.rate}`}</SelectItem>
+                                        <SelectItem key={s.id} value={s.id}>{getServiceDisplayName(s)}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -745,60 +762,54 @@ const AddBalanceRequestDialog = ({ trigger, onBalanceRequest }: { trigger: React
 };
 
 
-const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userType: 'Customer' | 'VLE', userId: string, profileData: any, onBalanceRequest: (amount: number) => void}) => {
+const ProfileView = ({ userType, userId, profileData, onBalanceRequest, services }: {userType: 'Customer' | 'VLE', userId: string, profileData: any, onBalanceRequest: (amount: number) => void, services: any[]}) => {
     const { toast } = useToast();
-
-    type BankAccount = {
-        id: string;
-        bankName: string;
-        accountNumber: string;
-        ifscCode: string;
-        upiId: string;
-    };
-    
     const [userProfile, setUserProfile] = useState<any>(profileData);
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(profileData?.bankAccounts || []);
-    const [isEditing, setIsEditing] = useState(false);
-    const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
+    
+    // Bank Accounts state
+    const [bankAccounts, setBankAccounts] = useState<any[]>(profileData?.bankAccounts || []);
+    const [isEditingBankAccount, setIsEditingBankAccount] = useState(false);
+    const [editingAccount, setEditingAccount] = useState<any | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
+    const [bankFormState, setBankFormState] = useState<any>({ id: '', bankName: '', accountNumber: '', ifscCode: '', upiId: '' });
 
-    const [formState, setFormState] = useState<BankAccount>({
-        id: '', bankName: '', accountNumber: '', ifscCode: '', upiId: ''
-    });
+    // Offered Services state
+    const [offeredServices, setOfferedServices] = useState<string[]>(profileData?.offeredServices || []);
+    const [isSavingServices, setIsSavingServices] = useState(false);
 
     useEffect(() => {
         if (!userId) return;
         setUserProfile(profileData);
         setBankAccounts(profileData?.bankAccounts || []);
+        setOfferedServices(profileData?.offeredServices || []);
     }, [userId, profileData]);
 
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleBankInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
-        setFormState(prevState => ({ ...prevState, [id]: value }));
+        setBankFormState(prevState => ({ ...prevState, [id]: value }));
     };
 
-    const handleAddClick = () => {
+    const handleAddBankClick = () => {
         setEditingAccount(null);
-        setFormState({ id: '', bankName: '', accountNumber: '', ifscCode: '', upiId: '' });
-        setIsEditing(true);
+        setBankFormState({ id: '', bankName: '', accountNumber: '', ifscCode: '', upiId: '' });
+        setIsEditingBankAccount(true);
     };
 
-    const handleEditClick = (account: BankAccount) => {
+    const handleEditBankClick = (account: any) => {
         setEditingAccount(account);
-        setFormState(account);
-        setIsEditing(true);
+        setBankFormState(account);
+        setIsEditingBankAccount(true);
     };
 
-    const handleSave = async (e: React.FormEvent) => {
+    const handleSaveBank = async (e: React.FormEvent) => {
         e.preventDefault();
         let updatedAccounts;
         if (editingAccount) {
-            updatedAccounts = bankAccounts.map(acc => acc.id === editingAccount.id ? formState : acc);
+            updatedAccounts = bankAccounts.map(acc => acc.id === editingAccount.id ? bankFormState : acc);
             toast({ title: "Bank Details Updated", description: "Your bank account has been updated."});
         } else {
-            const newAccount = { ...formState, id: Date.now().toString() };
+            const newAccount = { ...bankFormState, id: Date.now().toString() };
             updatedAccounts = [...bankAccounts, newAccount];
             toast({ title: "Bank Account Added", description: "Your new bank account has been added."});
         }
@@ -807,16 +818,16 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
         const docRef = doc(db, collectionName, userId);
         await updateDoc(docRef, { bankAccounts: updatedAccounts });
 
-        setIsEditing(false);
+        setIsEditingBankAccount(false);
         setEditingAccount(null);
     };
 
-    const handleDeleteClick = (accountId: string) => {
+    const handleDeleteBankClick = (accountId: string) => {
         setAccountToDelete(accountId);
         setIsDeleteDialogOpen(true);
     }
     
-    const confirmDelete = async () => {
+    const confirmDeleteBank = async () => {
         if (accountToDelete) {
             const updatedAccounts = bankAccounts.filter(acc => acc.id !== accountToDelete);
             const collectionName = userType === 'Customer' ? 'users' : 'vles';
@@ -829,11 +840,39 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
         setAccountToDelete(null);
     }
 
-    const handleCancelEdit = () => {
-        setIsEditing(false);
+    const handleCancelEditBank = () => {
+        setIsEditingBankAccount(false);
         setEditingAccount(null);
     }
     
+    const handleServiceSelectionChange = (serviceId: string, checked: boolean) => {
+        setOfferedServices(prev => 
+            checked ? [...prev, serviceId] : prev.filter(id => id !== serviceId)
+        );
+    }
+
+    const handleSaveOfferedServices = async () => {
+        setIsSavingServices(true);
+        const docRef = doc(db, "vles", userId);
+        try {
+            await updateDoc(docRef, { offeredServices: offeredServices });
+            toast({ title: "Services Updated", description: "Your offered services have been saved." });
+        } catch (error) {
+            console.error("Error updating services:", error);
+            toast({ title: "Error", description: "Could not save your services.", variant: "destructive" });
+        } finally {
+            setIsSavingServices(false);
+        }
+    }
+
+    const serviceCategories = useMemo(() => {
+        const parents = services.filter(s => !s.parentId);
+        return parents.map(parent => ({
+            ...parent,
+            children: services.filter(s => s.parentId === parent.id)
+        })).sort((a,b) => a.name.localeCompare(b.name));
+    }, [services]);
+
     if (!userProfile) {
         return <div>Loading profile...</div>;
     }
@@ -850,7 +889,7 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+                    <AlertDialogAction onClick={confirmDeleteBank}>Delete</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -872,29 +911,65 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
             </CardContent>
         </Card>
 
-        <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                        <span>Profile Details</span>
-                        <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                     <div className="space-y-2">
-                        <Label htmlFor="profile-name">Full Name</Label>
-                        <Input id="profile-name" defaultValue={userProfile.name} readOnly className="bg-muted/50" />
-                     </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="profile-email">Email Address</Label>
-                        <Input id="profile-email" type="email" defaultValue={userProfile.email} readOnly className="bg-muted/50" />
-                     </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="profile-mobile">Mobile Number</Label>
-                        <Input id="profile-mobile" defaultValue={userProfile.mobile} readOnly className="bg-muted/50" />
-                     </div>
-                </CardContent>
-            </Card>
+        <div className="grid gap-6 lg:grid-cols-2">
+            <div className="space-y-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                            <span>Profile Details</span>
+                            <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                         <div className="space-y-2">
+                            <Label htmlFor="profile-name">Full Name</Label>
+                            <Input id="profile-name" defaultValue={userProfile.name} readOnly className="bg-muted/50" />
+                         </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="profile-email">Email Address</Label>
+                            <Input id="profile-email" type="email" defaultValue={userProfile.email} readOnly className="bg-muted/50" />
+                         </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="profile-mobile">Mobile Number</Label>
+                            <Input id="profile-mobile" defaultValue={userProfile.mobile} readOnly className="bg-muted/50" />
+                         </div>
+                    </CardContent>
+                </Card>
+                {userType === 'VLE' && (
+                    <Card>
+                        <CardHeader>
+                             <CardTitle>My Services</CardTitle>
+                             <CardDescription>Select the services you are qualified to offer.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                            {serviceCategories.map(category => (
+                                <div key={category.id} className="space-y-3">
+                                    <h4 className="font-semibold text-base">{category.name}</h4>
+                                    <div className="pl-4 space-y-2">
+                                        {category.children.map(service => (
+                                            <div key={service.id} className="flex items-center space-x-2">
+                                                <Checkbox 
+                                                    id={`service-offer-${service.id}`}
+                                                    checked={offeredServices.includes(service.id)}
+                                                    onCheckedChange={(checked) => handleServiceSelectionChange(service.id, !!checked)}
+                                                />
+                                                <Label htmlFor={`service-offer-${service.id}`} className="font-normal cursor-pointer">{service.name}</Label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                        <CardFooter>
+                            <Button onClick={handleSaveOfferedServices} disabled={isSavingServices}>
+                                {isSavingServices && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Save My Services
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                )}
+            </div>
+            
             <Card>
                 <CardHeader>
                     <div className="flex justify-between items-start">
@@ -904,32 +979,32 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
                         </div>
                     </div>
                 </CardHeader>
-                {isEditing ? (
-                     <form onSubmit={handleSave}>
+                {isEditingBankAccount ? (
+                     <form onSubmit={handleSaveBank}>
                         <CardContent className="space-y-4">
                             <h4 className="text-base font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h4>
                             <div className="space-y-2 pt-2">
                                 <Label htmlFor="bankName">Bank Name</Label>
-                                <Input id="bankName" placeholder="e.g., State Bank of India" value={formState.bankName} onChange={handleInputChange} required />
+                                <Input id="bankName" placeholder="e.g., State Bank of India" value={bankFormState.bankName} onChange={handleBankInputChange} required />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="accountNumber">Account Number</Label>
-                                <Input id="accountNumber" placeholder="Enter your account number" value={formState.accountNumber} onChange={handleInputChange} required />
+                                <Input id="accountNumber" placeholder="Enter your account number" value={bankFormState.accountNumber} onChange={handleBankInputChange} required />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="ifscCode">IFSC Code</Label>
-                                <Input id="ifscCode" placeholder="Enter IFSC Code" value={formState.ifscCode} onChange={handleInputChange} required />
+                                <Input id="ifscCode" placeholder="Enter IFSC Code" value={bankFormState.ifscCode} onChange={handleBankInputChange} required />
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="upiId">UPI ID (Optional)</Label>
                                 <div className="relative">
                                     <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input id="upiId" placeholder="your-name@okbank" className="pl-10" value={formState.upiId} onChange={handleInputChange} />
+                                    <Input id="upiId" placeholder="your-name@okbank" className="pl-10" value={bankFormState.upiId} onChange={handleBankInputChange} />
                                 </div>
                             </div>
                         </CardContent>
                         <CardFooter className="justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={handleCancelEdit}>Cancel</Button>
+                            <Button type="button" variant="outline" onClick={handleCancelEditBank}>Cancel</Button>
                             <Button type="submit">Save Changes</Button>
                         </CardFooter>
                      </form>
@@ -941,8 +1016,8 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
                                 {bankAccounts.map((account) => (
                                     <div key={account.id} className="p-4 border rounded-lg relative bg-muted/50">
                                          <div className="absolute top-2 right-2 flex gap-1">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditClick(account)}><Edit className="h-4 w-4" /></Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteClick(account.id)}><Trash className="h-4 w-4" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditBankClick(account)}><Edit className="h-4 w-4" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteBankClick(account.id)}><Trash className="h-4 w-4" /></Button>
                                         </div>
                                         <div className="space-y-2 text-sm">
                                             <p className="font-semibold">{account.bankName}</p>
@@ -961,7 +1036,7 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest }: {userT
                              )}
                         </CardContent>
                         <CardFooter>
-                            <Button onClick={handleAddClick} variant={bankAccounts.length > 0 ? 'default' : 'default'}>
+                            <Button onClick={handleAddBankClick} variant={bankAccounts.length > 0 ? 'default' : 'default'}>
                                <PlusCircle className="mr-2 h-4 w-4"/> {bankAccounts.length > 0 ? 'Add Another Account' : 'Add Bank Account'}
                             </Button>
                         </CardFooter>
@@ -1041,7 +1116,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center w-full"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
                                                 
-                                                {task.status === 'Completed' && (
+                                                {displayStatus === 'Completed' && (
                                                     <>
                                                         <DropdownMenuSeparator />
                                                         {!task.feedback && (
@@ -1113,23 +1188,33 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
     );
 }
 
-const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { assignedTasks: any[], myLeads: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
     const [searchQuery, setSearchQuery] = useState('');
     
     const filteredTasks = useMemo(() => {
-        if (!searchQuery) return tasks;
-        return tasks.filter(task => 
+        if (!searchQuery) return assignedTasks;
+        return assignedTasks.filter(task => 
             task.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
             task.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
             task.customer.toLowerCase().includes(searchQuery.toLowerCase())
         );
-    }, [tasks, searchQuery]);
+    }, [assignedTasks, searchQuery]);
+
+    const filteredLeads = useMemo(() => {
+        if (!searchQuery) return myLeads;
+        return myLeads.filter(task => 
+            task.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            task.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            task.customer.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [myLeads, searchQuery]);
 
     return (
     <Tabs defaultValue="tasks" className="w-full">
         <div className="flex items-center">
             <TabsList>
                 <TabsTrigger value="tasks">Assigned Tasks</TabsTrigger>
+                <TabsTrigger value="leads">My Generated Leads</TabsTrigger>
             </TabsList>
             <div className="ml-auto flex items-center gap-2">
                 <TaskCreatorDialog services={services} type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={userId} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
@@ -1206,6 +1291,55 @@ const VLEDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onV
                     </CardContent>
                 </Card>
             </div>
+        </TabsContent>
+        <TabsContent value="leads" className="mt-4">
+             <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                               <CardTitle>My Generated Leads</CardTitle>
+                               <CardDescription>Track the status of tasks you created for customers.</CardDescription>
+                            </div>
+                             <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Search by ID, service, or customer..." 
+                                    className="pl-8 w-72"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                        <TableHeader>
+                            <TableRow>
+                            <TableHead>Task ID</TableHead>
+                            <TableHead>Service</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredLeads.map(task => (
+                            <TableRow key={task.id}>
+                                <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
+                                <TableCell>{task.service}</TableCell>
+                                <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
+                                <TableCell>{task.customer}</TableCell>
+                                <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
+                                </TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
         </TabsContent>
     </Tabs>
 )};
@@ -1800,19 +1934,28 @@ export default function DashboardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     
-    const [tasks, setTasks] = useState<any[]>([]);
+    // Admin state
+    const [allTasks, setAllTasks] = useState<any[]>([]);
     const [vles, setVles] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
-    const [services, setServices] = useState<any[]>([]);
     const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
+    
+    // VLE state
+    const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
+    const [myLeads, setMyLeads] = useState<any[]>([]);
+    
+    // Customer state
+    const [customerTasks, setCustomerTasks] = useState<any[]>([]);
+    
+    // Shared state
+    const [services, setServices] = useState<any[]>([]);
     const [realtimeProfile, setRealtimeProfile] = useState<any | null>(null);
     
     const activeTab = useMemo(() => {
         const tabFromUrl = searchParams.get('tab');
         if (tabFromUrl) return tabFromUrl;
         if (userProfile?.isAdmin) return 'overview';
-        if (userProfile?.role) return 'tasks';
-        return 'tasks'; // default fallback
+        return 'tasks'; // default for customer/vle
     }, [searchParams, userProfile]);
 
     useEffect(() => {
@@ -1825,24 +1968,12 @@ export default function DashboardPage() {
         if (!user) return;
         
         const probableRole = userProfile?.role || 'customer';
-        const collectionName = (userProfile?.isAdmin || probableRole === 'vle') ? 'vles' : 'users';
+        const collectionName = probableRole === 'vle' ? 'vles' : (probableRole === 'government' ? 'government' : 'users');
         const docRef = doc(db, collectionName, user.uid);
         
         const unsubscribe = onSnapshot(docRef, (doc) => {
             if (doc.exists()) {
                 setRealtimeProfile({ id: doc.id, ...doc.data() });
-            } else if (collectionName === 'users') {
-                 const vleDocRef = doc(db, 'vles', user.uid);
-                 const unsubVle = onSnapshot(vleDocRef, (vleDoc) => {
-                     if (vleDoc.exists()) {
-                         setRealtimeProfile({ id: vleDoc.id, ...vleDoc.data() });
-                     } else {
-                         console.error(`User ${user.uid} not found in users or vles collection.`);
-                     }
-                 });
-                 return () => unsubVle();
-            } else {
-                console.error(`User ${user.uid} not found in ${collectionName} collection.`);
             }
         }, (error) => {
             console.error("Error listening to profile updates:", error);
@@ -1857,67 +1988,47 @@ export default function DashboardPage() {
             return;
         }
 
-        let unsubscribeTasks: () => void = () => {};
-        let unsubscribeVles: () => void = () => {};
-        let unsubscribeUsers: () => void = () => {};
-        let unsubscribeServices: () => void = () => {};
-        let unsubscribePaymentRequests: () => void = () => {};
+        let unsubscribers: (() => void)[] = [];
 
         const primaryRole = realtimeProfile.isAdmin ? 'admin' : realtimeProfile.role;
 
-        // All users need to see the list of services for the dropdown
+        // All users need to see the list of services
         const servicesQuery = query(collection(db, "services"), orderBy("name"));
-        unsubscribeServices = onSnapshot(servicesQuery, (snapshot) => {
-            const fetchedServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setServices(fetchedServices);
-        });
+        unsubscribers.push(onSnapshot(servicesQuery, (snapshot) => {
+            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }));
 
         if (primaryRole === 'admin') {
-            const tasksQuery = query(collection(db, "tasks"), orderBy("date", "desc"));
-            unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
-                const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setTasks(fetchedTasks);
-            });
-
-            const vlesQuery = query(collection(db, "vles"));
-            unsubscribeVles = onSnapshot(vlesQuery, (snapshot) => {
-                const fetchedVles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setVles(fetchedVles);
-            });
-
-            const usersQuery = query(collection(db, "users"));
-            unsubscribeUsers = onSnapshot(usersQuery, (snapshot) => {
-                const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                setAllUsers(fetchedUsers);
-            });
-
-            const paymentRequestsQuery = query(collection(db, "paymentRequests"), where("status", "==", "pending"));
-            unsubscribePaymentRequests = onSnapshot(paymentRequestsQuery, (snapshot) => {
-                 setPaymentRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            });
-
+            unsubscribers.push(onSnapshot(query(collection(db, "tasks"), orderBy("date", "desc")), (s) => setAllTasks(s.docs.map(d => ({ id: d.id, ...d.data() })))));
+            unsubscribers.push(onSnapshot(query(collection(db, "vles")), (s) => setVles(s.docs.map(d => ({ id: d.id, ...d.data() })))));
+            unsubscribers.push(onSnapshot(query(collection(db, "users")), (s) => setAllUsers(s.docs.map(d => ({ id: d.id, ...d.data() })))));
+            unsubscribers.push(onSnapshot(query(collection(db, "paymentRequests"), where("status", "==", "pending")), (s) => setPaymentRequests(s.docs.map(d => ({ id: d.id, ...d.data() })))));
         } else if (primaryRole === 'vle') {
-            const tasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
-            unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
-                const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setTasks(fetchedTasks);
-            });
+            const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
+            unsubscribers.push(onSnapshot(assignedTasksQuery, (snapshot) => {
+                const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                fetched.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setAssignedTasks(fetched);
+            }));
+
+            const myLeadsQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
+             unsubscribers.push(onSnapshot(myLeadsQuery, (snapshot) => {
+                const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                fetched.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setMyLeads(fetched);
+            }));
+
         } else { // Customer
             const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
-            unsubscribeTasks = onSnapshot(tasksQuery, (snapshot) => {
-                 const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setTasks(fetchedTasks);
-            });
+            unsubscribers.push(onSnapshot(tasksQuery, (snapshot) => {
+                 const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                fetched.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setCustomerTasks(fetched);
+            }));
         }
         
         return () => {
-            unsubscribeTasks();
-            unsubscribeVles();
-            unsubscribeUsers();
-            unsubscribeServices();
-            unsubscribePaymentRequests();
+            unsubscribers.forEach(unsub => unsub());
         };
     }, [user, realtimeProfile]);
 
@@ -1945,7 +2056,7 @@ export default function DashboardPage() {
         const taskWithDocs = { ...newTaskData, documents: uploadedDocuments };
     
         if (service.isVariable) {
-            const taskWithStatus = { ...taskWithDocs, status: 'Pending Price Approval', rate: service.rate };
+            const taskWithStatus = { ...taskWithDocs, status: 'Pending Price Approval' };
             await setDoc(doc(db, "tasks", taskId), taskWithStatus);
             toast({
                 title: 'Request Submitted!',
@@ -1957,7 +2068,7 @@ export default function DashboardPage() {
                 `/dashboard/task/${taskId}`
             );
         } else {
-            const rate = parseFloat(service.rate);
+            const rate = taskWithDocs.totalPaid;
             
             await runTransaction(db, async (transaction) => {
                 const creatorCollection = realtimeProfile.role === 'vle' ? 'vles' : 'users';
@@ -1972,7 +2083,7 @@ export default function DashboardPage() {
                 const newCreatorBalance = creatorBalance - rate;
                 transaction.update(creatorRef, { walletBalance: newCreatorBalance });
 
-                const taskWithStatus = { ...taskWithDocs, status: 'Unassigned', rate: rate };
+                const taskWithStatus = { ...taskWithDocs, status: 'Unassigned' };
                 transaction.set(doc(db, "tasks", taskId), taskWithStatus);
             });
 
@@ -2054,7 +2165,7 @@ export default function DashboardPage() {
                 if (!taskDoc.exists()) throw new Error("Task does not exist!");
                 
                 const taskData = taskDoc.data();
-                if (taskData.status !== 'Unassigned' || !taskData.rate || taskData.rate <= 0) {
+                if (taskData.status !== 'Unassigned' || !taskData.totalPaid || taskData.totalPaid <= 0) {
                      throw new Error("Task cannot be assigned or has no fee to process.");
                 }
 
@@ -2062,7 +2173,7 @@ export default function DashboardPage() {
                 const adminDoc = await transaction.get(adminRef);
                 if (!adminDoc.exists()) throw new Error("Admin profile not found!");
                 const adminBalance = adminDoc.data().walletBalance || 0;
-                const newAdminBalance = adminBalance + parseFloat(taskData.rate);
+                const newAdminBalance = adminBalance + parseFloat(taskData.totalPaid);
                 transaction.update(adminRef, { walletBalance: newAdminBalance });
                 
                 // Finally, update the task to be assigned.
@@ -2071,7 +2182,7 @@ export default function DashboardPage() {
                     actorId: user.uid,
                     actorRole: 'Admin',
                     action: 'Task Assigned',
-                    details: `Task assigned to VLE ID: ${vleId}. Fee of ₹${taskData.rate.toFixed(2)} processed.`
+                    details: `Task assigned to VLE ID: ${vleId}. Fee of ₹${taskData.totalPaid.toFixed(2)} processed.`
                 };
 
                 transaction.update(taskRef, { 
@@ -2228,18 +2339,17 @@ export default function DashboardPage() {
     };
 
     const handleApprovePayout = async (task: any) => {
-        if (!user || !realtimeProfile?.isAdmin || !task.assignedVleId || !task.rate) {
+        if (!user || !realtimeProfile?.isAdmin || !task.assignedVleId || !task.totalPaid) {
             toast({ title: 'Error', description: 'Cannot process payout. Missing required information.', variant: 'destructive' });
             return;
         }
     
         const adminRef = doc(db, "vles", user.uid);
         const assignedVleRef = doc(db, "vles", task.assignedVleId);
-        const creatingVleRef = task.type === 'VLE Lead' ? doc(db, "vles", task.creatorId) : null;
         const taskRef = doc(db, "tasks", task.id);
     
         try {
-            let payoutDetails = '';
+            let payoutDetailsToast = '';
             
             await runTransaction(db, async (transaction) => {
                 const adminDoc = await transaction.get(adminRef);
@@ -2250,49 +2360,27 @@ export default function DashboardPage() {
     
                 const adminBalance = adminDoc.data().walletBalance || 0;
                 const assignedVleBalance = assignedVleDoc.data().walletBalance || 0;
-                const fee = parseFloat(task.rate);
-    
-                const adminCommission = fee * 0.2;
-    
-                payoutDetails = `Paid out a total of ₹${(fee - adminCommission).toFixed(2)}.`;
-                let historyDetails = '';
-                
-                if (adminBalance < (fee - adminCommission)) {
+
+                const totalPaid = parseFloat(task.totalPaid);
+                const governmentFee = parseFloat(task.governmentFee || 0);
+
+                const serviceProfit = totalPaid - governmentFee;
+                const vleCommission = serviceProfit * 0.8;
+                const payoutAmount = governmentFee + vleCommission;
+
+                if (adminBalance < payoutAmount) {
                     throw new Error("Admin wallet has insufficient funds to process this payout.");
                 }
-    
-                let newAdminBalance = adminBalance - (fee - adminCommission);
-    
-                if (task.type === 'VLE Lead' && creatingVleRef) {
-                    if (task.assignedVleId === task.creatorId) {
-                        const totalVleShare = fee * 0.8;
-                        const newAssignedVleBalance = assignedVleBalance + totalVleShare;
-                        transaction.update(assignedVleRef, { walletBalance: newAssignedVleBalance });
-                        historyDetails = `VLE (creator & assignee) share: ₹${totalVleShare.toFixed(2)}. Admin commission: ₹${adminCommission.toFixed(2)}.`;
-                    } else {
-                        const creatingVleDoc = await transaction.get(creatingVleRef);
-                        if (!creatingVleDoc.exists()) throw new Error("Creating VLE profile not found.");
-                        
-                        const creatingVleBalance = creatingVleDoc.data().walletBalance || 0;
-                        const assignedVleShare = fee * 0.4;
-                        const creatingVleShare = fee * 0.4;
-                        
-                        const newAssignedVleBalance = assignedVleBalance + assignedVleShare;
-                        const newCreatingVleBalance = creatingVleBalance + creatingVleShare;
-                        
-                        transaction.update(assignedVleRef, { walletBalance: newAssignedVleBalance });
-                        transaction.update(creatingVleRef, { walletBalance: newCreatingVleBalance });
-                        historyDetails = `Assigned VLE share: ₹${assignedVleShare.toFixed(2)}. Creating VLE share: ₹${creatingVleShare.toFixed(2)}. Admin commission: ₹${adminCommission.toFixed(2)}.`;
-                    }
-                } else { // Customer Request
-                    const assignedVleShare = fee * 0.8;
-                    const newAssignedVleBalance = assignedVleBalance + assignedVleShare;
-                    transaction.update(assignedVleRef, { walletBalance: newAssignedVleBalance });
-                    historyDetails = `VLE share: ₹${assignedVleShare.toFixed(2)}. Admin commission: ₹${adminCommission.toFixed(2)}.`;
-                }
-    
+
+                const newAdminBalance = adminBalance - payoutAmount;
+                const newAssignedVleBalance = assignedVleBalance + payoutAmount;
+
                 transaction.update(adminRef, { walletBalance: newAdminBalance });
-    
+                transaction.update(assignedVleRef, { walletBalance: newAssignedVleBalance });
+                
+                const historyDetails = `Payout of ₹${payoutAmount.toFixed(2)} approved. VLE Commission: ₹${vleCommission.toFixed(2)}, Govt. Fee reimbursement: ₹${governmentFee.toFixed(2)}.`;
+                payoutDetailsToast = `Paid out ₹${payoutAmount.toFixed(2)} to ${task.assignedVleName}.`;
+
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
                     actorId: user.uid,
@@ -2307,11 +2395,8 @@ export default function DashboardPage() {
                 });
             });
     
-            toast({ title: 'Payout Approved!', description: payoutDetails });
+            toast({ title: 'Payout Approved!', description: payoutDetailsToast });
             await createNotification(task.assignedVleId, 'Payment Received', `You have received a payment for task ${task.id.slice(-6).toUpperCase()}.`);
-            if (task.type === 'VLE Lead' && task.creatorId !== task.assignedVleId) {
-                 await createNotification(task.creatorId, 'Commission Received', `You have received a commission for a lead on task ${task.id.slice(-6).toUpperCase()}.`);
-            }
     
         } catch (error: any) {
             console.error("Payout transaction failed:", error);
@@ -2331,16 +2416,16 @@ export default function DashboardPage() {
     
     const renderContent = () => {
         if (activeTab === 'profile') {
-            return <ProfileView userType={primaryRole === 'vle' ? 'VLE' : 'Customer'} userId={user!.uid} profileData={realtimeProfile} onBalanceRequest={handleBalanceRequest} />
+            return <ProfileView userType={primaryRole === 'vle' ? 'VLE' : 'Customer'} userId={user!.uid} profileData={realtimeProfile} onBalanceRequest={handleBalanceRequest} services={services} />
         }
 
         switch (primaryRole) {
             case 'admin':
-                return <AdminDashboard allTasks={tasks} vles={vles} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} />;
+                return <AdminDashboard allTasks={allTasks} vles={vles} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} />;
             case 'vle':
-                return <VLEDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
+                return <VLEDashboard assignedTasks={assignedTasks} myLeads={myLeads} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'customer':
-                return <CustomerDashboard tasks={tasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
+                return <CustomerDashboard tasks={customerTasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
             default:
                  return (
                     <div className="flex items-center justify-center h-[calc(100vh-10rem)]">

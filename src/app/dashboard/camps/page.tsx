@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Tent, UserPlus, ChevronsUpDown, Check, X, UserCog, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Tent, UserPlus, ChevronsUpDown, Check, X, UserCog, CheckCircle2, XCircle, Phone } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -67,7 +67,7 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
             status: 'Upcoming',
             services: initialData.services || [],
             otherServices: initialData.otherServices || '',
-            assignedVles: assignedVles.map(v => ({ id: v.id, name: v.name, status: v.status || 'pending' })),
+            assignedVles: assignedVles.map(v => ({ id: v.id, name: v.name, mobile: v.mobile, status: v.status || 'pending' })),
             vleParticipantIds: assignedVles.map(v => v.id), // For easier querying
         };
 
@@ -288,7 +288,7 @@ const SuggestCampDialog = ({ onFinished, services }: { onFinished: () => void; s
                     <div className="col-span-3">
                         <Card>
                             <CardContent className="p-4 space-y-2 max-h-48 overflow-y-auto">
-                                {services.filter(s => s.rate > 0 || s.isVariable).map((service) => (
+                                {services.filter(s => s.customerRate > 0 || s.isVariable).map((service) => (
                                     <div key={service.id} className="flex items-center space-x-2">
                                         <Checkbox
                                             id={`service-${service.id}`}
@@ -373,28 +373,37 @@ export default function CampManagementPage() {
 
     }, []);
     
-    // Effect for fetching camp suggestions & VLEs (Admins only)
+    // Effect for fetching camp suggestions & VLEs (Admins/Govt only)
     useEffect(() => {
-        if (!userProfile?.isAdmin) return;
+        if (!userProfile || (userProfile.role !== 'government' && !userProfile.isAdmin)) return;
 
-        const suggestionsQuery = query(collection(db, 'campSuggestions'), orderBy('date', 'asc'));
-        const unsubSuggestions = onSnapshot(suggestionsQuery, (snapshot) => {
-            setCampSuggestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }, (error) => console.error("Error fetching camp suggestions:", error));
+        if (userProfile.isAdmin) {
+            const suggestionsQuery = query(collection(db, 'campSuggestions'), orderBy('date', 'asc'));
+            const unsubSuggestions = onSnapshot(suggestionsQuery, (snapshot) => {
+                setCampSuggestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }, (error) => console.error("Error fetching camp suggestions:", error));
+    
+            // FIX: The query that requires an index. Remove orderBy and sort on the client.
+            const vlesQuery = query(collection(db, 'vles'), where('isAdmin', '==', false));
+            const unsubVles = onSnapshot(vlesQuery, (snapshot) => {
+                const fetchedVles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Sort client-side
+                fetchedVles.sort((a, b) => a.name.localeCompare(b.name));
+                setVles(fetchedVles);
+            }, (error) => console.error("Error fetching VLEs:", error));
+    
+            return () => {
+                unsubSuggestions();
+                unsubVles();
+            };
+        } else if (userProfile.role === 'government') {
+            const vlesQuery = query(collection(db, 'vles'), where('isAdmin', '==', false));
+             const unsubVles = onSnapshot(vlesQuery, (snapshot) => {
+                setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }, (error) => console.error("Error fetching VLEs:", error));
+            return () => unsubVles();
+        }
 
-        // FIX: The query that requires an index. Remove orderBy and sort on the client.
-        const vlesQuery = query(collection(db, 'vles'), where('isAdmin', '==', false));
-        const unsubVles = onSnapshot(vlesQuery, (snapshot) => {
-            const fetchedVles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            // Sort client-side
-            fetchedVles.sort((a, b) => a.name.localeCompare(b.name));
-            setVles(fetchedVles);
-        }, (error) => console.error("Error fetching VLEs:", error));
-
-        return () => {
-            unsubSuggestions();
-            unsubVles();
-        };
     }, [userProfile]);
 
     // Effect to fetch services for the suggestion dialog
@@ -806,9 +815,71 @@ export default function CampManagementPage() {
          </div>
     );
 
-    return userProfile.isAdmin
-        ? <AdminView />
-        : userProfile.role === 'vle'
-            ? <VleView />
-            : <CustomerView />;
+    const GovernmentView = () => (
+         <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h1 className="text-3xl font-bold tracking-tight">Upcoming Camps</h1>
+                <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
+                        </Button>
+                    </DialogTrigger>
+                        <DialogContent
+                        className="sm:max-w-lg"
+                    >
+                        <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} services={services} />
+                    </DialogContent>
+                </Dialog>
+            </div>
+            <Card>
+                <CardContent className="pt-6">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Camp Name</TableHead>
+                                <TableHead>Location</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Assigned VLEs</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {upcomingCamps.length > 0 ? upcomingCamps.map((camp) => (
+                                <TableRow key={camp.id}>
+                                    <TableCell className="font-medium">{camp.name.startsWith('Suggested by') ? `Goa Sarathi Camp at ${camp.location}` : camp.name}</TableCell>
+                                    <TableCell>{camp.location}</TableCell>
+                                    <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell>
+                                        <div className="flex flex-col gap-2">
+                                            {camp.assignedVles?.filter((vle:any) => vle.status === 'accepted').map((vle: any) => (
+                                                <div key={vle.id} className="text-sm">
+                                                    <p className="font-medium">{vle.name}</p>
+                                                    <p className="flex items-center gap-1.5 text-muted-foreground"><Phone className="h-3 w-3" />{vle.mobile}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            )) : (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="h-24 text-center">No upcoming camps scheduled.</TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+         </div>
+    );
+    
+    if (userProfile.isAdmin) {
+        return <AdminView />;
+    }
+    if (userProfile.role === 'vle') {
+        return <VleView />;
+    }
+    if (userProfile.role === 'government') {
+        return <GovernmentView />;
+    }
+    return <CustomerView />;
 }

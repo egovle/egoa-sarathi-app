@@ -45,9 +45,9 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
 
 const ALL_NAV_ITEMS = [
-    { href: "/dashboard", icon: Home, label: "Dashboard", roles: ['admin', 'vle', 'customer'] },
+    { href: "/dashboard", icon: Home, label: "Dashboard", roles: ['admin', 'vle', 'customer', 'government'] },
     { href: "/dashboard/reports", icon: BarChart, label: "Reports", roles: ['admin', 'vle'] },
-    { href: "/dashboard/camps", icon: Tent, label: "Camps", roles: ['admin', 'vle', 'customer'] },
+    { href: "/dashboard/camps", icon: Tent, label: "Camps", roles: ['admin', 'vle', 'customer', 'government'] },
     { href: "/dashboard/services", icon: ListPlus, label: "Service Management", roles: ['admin'] },
 ];
 
@@ -242,7 +242,7 @@ export default function DashboardLayout({
           ))}
         </nav>
         <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
-            {!userProfile?.isAdmin && (
+            {!userProfile?.isAdmin && userProfile?.role !== 'government' && (
                 <Popover>
                     <PopoverTrigger asChild>
                         <button className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8">
@@ -285,7 +285,7 @@ export default function DashboardLayout({
                 {navItems.map(item => (
                     <MobileNavLink key={item.href} {...item} isActive={pathname === item.href} />
                 ))}
-                 {!userProfile?.isAdmin && (
+                 {!userProfile?.isAdmin && userProfile?.role !== 'government' && (
                     <div className="mt-auto border-t p-4">
                         <div className="mb-4">
                             <h4 className="font-semibold">Support</h4>
@@ -372,7 +372,7 @@ export default function DashboardLayout({
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard?tab=profile">Profile</Link>
                 </DropdownMenuItem>
-                {!userProfile?.isAdmin && (
+                {!userProfile?.isAdmin && userProfile?.role !== 'government' && (
                   <Dialog>
                       <DialogTrigger asChild>
                           <DropdownMenuItem onSelect={(e) => e.preventDefault()}>Support</DropdownMenuItem>
