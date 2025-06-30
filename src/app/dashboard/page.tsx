@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo 
 import { db, storage } from '@/lib/firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction, limit, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { PlusCircle, User, FilePlus, Wallet, ToggleRight, UserCheck, Star, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent, Trash2, CircleDollarSign } from 'lucide-react';
+import { PlusCircle, User, FilePlus, Wallet, ToggleRight, UserCheck, Star, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent, Trash2, CircleDollarSign, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -518,7 +518,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             date: new Date().toISOString(),
             // Financials
             totalPaid: totalPaid,
-            governmentFee: selectedService.governmentFee || 0,
+            governmentFeeApplicable: selectedService.governmentFee || 0,
             customerRate: selectedService.customerRate,
             vleRate: selectedService.vleRate,
             // History & Status
@@ -1188,18 +1188,12 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
     );
 }
 
-const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange }: { assignedTasks: any[], myLeads: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange, onTaskAccept, onTaskReject }: { assignedTasks: any[], myLeads: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, onTaskAccept: (taskId: string) => void, onTaskReject: (taskId: string) => void }) => {
     const [searchQuery, setSearchQuery] = useState('');
-    
-    const filteredTasks = useMemo(() => {
-        if (!searchQuery) return assignedTasks;
-        return assignedTasks.filter(task => 
-            task.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            task.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            task.customer.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    }, [assignedTasks, searchQuery]);
 
+    const invitations = useMemo(() => assignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), [assignedTasks]);
+    const activeTasks = useMemo(() => assignedTasks.filter(t => t.status !== 'Pending VLE Acceptance'), [assignedTasks]);
+    
     const filteredLeads = useMemo(() => {
         if (!searchQuery) return myLeads;
         return myLeads.filter(task => 
@@ -1209,18 +1203,67 @@ const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, o
         );
     }, [myLeads, searchQuery]);
 
+    const getCommissionDetails = (task: any) => {
+        const governmentFee = task.governmentFeeApplicable || 0;
+        const serviceProfit = (task.totalPaid || 0) - governmentFee;
+        const vleCommission = serviceProfit * 0.8;
+        return { governmentFee, vleCommission };
+    };
+
     return (
-    <Tabs defaultValue="tasks" className="w-full">
+    <Tabs defaultValue="invitations" className="w-full">
         <div className="flex items-center">
             <TabsList>
-                <TabsTrigger value="tasks">Assigned Tasks</TabsTrigger>
+                <TabsTrigger value="invitations">Invitations <Badge className="ml-2">{invitations.length}</Badge></TabsTrigger>
+                <TabsTrigger value="active">Active Tasks</TabsTrigger>
                 <TabsTrigger value="leads">My Generated Leads</TabsTrigger>
             </TabsList>
             <div className="ml-auto flex items-center gap-2">
                 <TaskCreatorDialog services={services} type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={userId} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
             </div>
         </div>
-        <TabsContent value="tasks" className="mt-4">
+        <TabsContent value="invitations" className="mt-4">
+             <Card>
+                <CardHeader>
+                    <CardTitle>New Task Invitations</CardTitle>
+                    <CardDescription>Please review and respond to these new task assignments.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                   <Table>
+                       <TableHeader>
+                           <TableRow>
+                               <TableHead>Service</TableHead>
+                               <TableHead>Customer</TableHead>
+                               <TableHead>Your Earnings</TableHead>
+                               <TableHead className="text-right">Actions</TableHead>
+                           </TableRow>
+                       </TableHeader>
+                       <TableBody>
+                           {invitations.length > 0 ? invitations.map(task => {
+                               const { governmentFee, vleCommission } = getCommissionDetails(task);
+                               return (
+                                   <TableRow key={task.id}>
+                                       <TableCell className="font-medium">{task.service}</TableCell>
+                                       <TableCell>{task.customer}</TableCell>
+                                       <TableCell>
+                                           <div className='text-sm'>
+                                               <p>Commission: <span className='font-semibold'>₹{vleCommission.toFixed(2)}</span></p>
+                                               <p className='text-xs text-muted-foreground'>+ ₹{governmentFee.toFixed(2)} for Govt. Fee</p>
+                                           </div>
+                                       </TableCell>
+                                       <TableCell className="text-right space-x-2">
+                                           <Button size="sm" variant="outline" onClick={() => onTaskAccept(task.id)}><CheckCircle2 className="mr-2 h-4 w-4"/>Accept</Button>
+                                           <Button size="sm" variant="destructive" onClick={() => onTaskReject(task.id)}><XCircle className="mr-2 h-4 w-4"/>Reject</Button>
+                                       </TableCell>
+                                   </TableRow>
+                               )
+                           }) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No pending task invitations.</TableCell></TableRow>}
+                       </TableBody>
+                   </Table>
+                </CardContent>
+            </Card>
+        </TabsContent>
+        <TabsContent value="active" className="mt-4">
             <div className="space-y-6">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1245,21 +1288,8 @@ const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, o
                 
                 <Card>
                     <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                               <CardTitle>Assigned Tasks</CardTitle>
-                               <CardDescription>Tasks assigned to you for fulfillment.</CardDescription>
-                            </div>
-                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input 
-                                    placeholder="Search by ID, service, or customer..." 
-                                    className="pl-8 w-72"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
-                            </div>
-                        </div>
+                        <CardTitle>Your Active Tasks</CardTitle>
+                        <CardDescription>Tasks you have accepted and are currently working on.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <Table>
@@ -1274,7 +1304,7 @@ const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, o
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredTasks.map(task => (
+                            {activeTasks.length > 0 ? activeTasks.map(task => (
                             <TableRow key={task.id}>
                                 <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
                                 <TableCell>{task.service}</TableCell>
@@ -1285,7 +1315,7 @@ const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, o
                                     <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
                                 </TableCell>
                             </TableRow>
-                            ))}
+                            )) : <TableRow><TableCell colSpan={6} className="h-24 text-center">No active tasks.</TableCell></TableRow>}
                         </TableBody>
                         </Table>
                     </CardContent>
@@ -1324,7 +1354,7 @@ const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, o
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredLeads.map(task => (
+                            {filteredLeads.length > 0 ? filteredLeads.map(task => (
                             <TableRow key={task.id}>
                                 <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
                                 <TableCell>{task.service}</TableCell>
@@ -1335,7 +1365,7 @@ const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, o
                                     <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
                                 </TableCell>
                             </TableRow>
-                            ))}
+                            )) : <TableRow><TableCell colSpan={6} className="h-24 text-center">You have not generated any leads.</TableCell></TableRow>}
                         </TableBody>
                         </Table>
                     </CardContent>
@@ -2105,7 +2135,7 @@ export default function DashboardPage() {
             });
             await createNotificationForAdmins(
                 'New Task Ready for Assignment',
-                `A new task '${service.name}' by ${newTaskData.customer} is paid and ready for assignment.`,
+                `A new task '${newTaskData.service}' by ${newTaskData.customer} is paid and ready for assignment.`,
                 `/dashboard`
             );
         }
@@ -2169,61 +2199,106 @@ export default function DashboardPage() {
         }
 
         const taskRef = doc(db, "tasks", taskId);
-        const adminRef = doc(db, "vles", user.uid); // The currently logged-in admin
+        const historyEntry = {
+            timestamp: new Date().toISOString(),
+            actorId: user.uid,
+            actorRole: 'Admin',
+            action: 'Task Assigned to VLE',
+            details: `Task assigned to VLE ${vleName} for acceptance.`
+        };
 
         try {
-            await runTransaction(db, async (transaction) => {
-                const taskDoc = await transaction.get(taskRef);
-                if (!taskDoc.exists()) throw new Error("Task does not exist!");
-                
-                const taskData = taskDoc.data();
-                if (taskData.status !== 'Unassigned' || !taskData.totalPaid || taskData.totalPaid <= 0) {
-                     throw new Error("Task cannot be assigned or has no fee to process.");
-                }
-
-                // Credit the admin's wallet for the task fee.
-                const adminDoc = await transaction.get(adminRef);
-                if (!adminDoc.exists()) throw new Error("Admin profile not found!");
-                const adminBalance = adminDoc.data().walletBalance || 0;
-                const newAdminBalance = adminBalance + parseFloat(taskData.totalPaid);
-                transaction.update(adminRef, { walletBalance: newAdminBalance });
-                
-                // Finally, update the task to be assigned.
-                const historyEntry = {
-                    timestamp: new Date().toISOString(),
-                    actorId: user.uid,
-                    actorRole: 'Admin',
-                    action: 'Task Assigned',
-                    details: `Task assigned to VLE ID: ${vleId}. Fee of ₹${taskData.totalPaid.toFixed(2)} processed.`
-                };
-
-                transaction.update(taskRef, { 
-                    status: 'Assigned', 
-                    assignedVleId: vleId, 
-                    assignedVleName: vleName,
-                    history: arrayUnion(historyEntry)
-                });
+            await updateDoc(taskRef, { 
+                status: 'Pending VLE Acceptance', 
+                assignedVleId: vleId, 
+                assignedVleName: vleName,
+                assigningAdminId: user.uid, // Store which admin assigned it
+                history: arrayUnion(historyEntry)
             });
 
-            // If transaction is successful, notify the VLE
             await createNotification(
                 vleId,
-                'New Task Assigned',
-                `You have been assigned a new task: ${taskId.slice(-6).toUpperCase()}.`,
-                `/dashboard/task/${taskId}`
+                'New Task Invitation',
+                `You have been invited to work on task: ${taskId.slice(-6).toUpperCase()}.`,
+                `/dashboard`
             );
-            // The success toast is handled in the calling dialog.
+            // Success toast is handled in the calling dialog.
         } catch (error: any) {
-            console.error("Task assignment transaction failed:", error);
+            console.error("Task assignment failed:", error);
             toast({
                 title: 'Assignment Failed',
                 description: error.message || 'Could not assign the task.',
                 variant: 'destructive',
             });
-            // Re-throw to prevent dialog from closing
-            throw error;
+            throw error; // Re-throw to prevent dialog from closing
         }
     }
+
+    const handleTaskAccept = async (taskId: string) => {
+        if (!user) return;
+        const taskRef = doc(db, "tasks", taskId);
+        
+        try {
+            await runTransaction(db, async (transaction) => {
+                const taskDoc = await transaction.get(taskRef);
+                if (!taskDoc.exists() || taskDoc.data().status !== 'Pending VLE Acceptance') {
+                    throw new Error("Task is no longer available for acceptance.");
+                }
+                const taskData = taskDoc.data();
+                
+                const historyEntry = {
+                    timestamp: new Date().toISOString(),
+                    actorId: user.uid,
+                    actorRole: 'VLE',
+                    action: 'Task Accepted',
+                    details: `VLE has accepted the task.`
+                };
+    
+                transaction.update(taskRef, { 
+                    status: 'Assigned',
+                    history: arrayUnion(historyEntry)
+                });
+            });
+    
+            toast({ title: 'Task Accepted', description: 'You can now begin work on this task.' });
+            
+        } catch (error: any) {
+            console.error("Task acceptance failed:", error);
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        }
+    }
+
+    const handleTaskReject = async (taskId: string) => {
+        if (!user) return;
+        const taskRef = doc(db, "tasks", taskId);
+
+        try {
+            const historyEntry = {
+                timestamp: new Date().toISOString(),
+                actorId: user.uid,
+                actorRole: 'VLE',
+                action: 'Task Rejected',
+                details: `VLE has rejected the task. It has been returned to the assignment queue.`
+            };
+            
+            await updateDoc(taskRef, {
+                status: 'Unassigned',
+                assignedVleId: null,
+                assignedVleName: null,
+                assigningAdminId: null,
+                history: arrayUnion(historyEntry)
+            });
+
+            toast({ title: 'Task Rejected', description: 'The task has been returned to the admin.' });
+            await createNotificationForAdmins(
+                'Task Rejected by VLE',
+                `Task ${taskId.slice(-6).toUpperCase()} was rejected and needs to be reassigned.`
+            );
+        } catch (error: any) {
+            console.error("Task rejection failed:", error);
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        }
+    };
     
     const handleUpdateVleBalance = async (vleId: string, amountToAdd: number) => {
         const vleRef = doc(db, "vles", vleId);
@@ -2374,24 +2449,28 @@ export default function DashboardPage() {
                 const assignedVleBalance = assignedVleDoc.data().walletBalance || 0;
 
                 const totalPaid = parseFloat(task.totalPaid);
-                const governmentFee = parseFloat(task.governmentFee || 0);
+                const governmentFee = parseFloat(task.governmentFeeApplicable || 0);
 
                 const serviceProfit = totalPaid - governmentFee;
                 const vleCommission = serviceProfit * 0.8;
-                const payoutAmount = governmentFee + vleCommission;
+                const adminCommission = serviceProfit * 0.2;
+                
+                const amountToVle = governmentFee + vleCommission;
 
-                if (adminBalance < payoutAmount) {
+                // The admin already received the `totalPaid` when the VLE accepted.
+                // Now, the admin pays the VLE their share from the admin's wallet.
+                if (adminBalance < amountToVle) {
                     throw new Error("Admin wallet has insufficient funds to process this payout.");
                 }
 
-                const newAdminBalance = adminBalance - payoutAmount;
-                const newAssignedVleBalance = assignedVleBalance + payoutAmount;
+                const newAdminBalance = adminBalance - amountToVle;
+                const newAssignedVleBalance = assignedVleBalance + amountToVle;
 
                 transaction.update(adminRef, { walletBalance: newAdminBalance });
                 transaction.update(assignedVleRef, { walletBalance: newAssignedVleBalance });
                 
-                const historyDetails = `Payout of ₹${payoutAmount.toFixed(2)} approved. VLE Commission: ₹${vleCommission.toFixed(2)}, Govt. Fee reimbursement: ₹${governmentFee.toFixed(2)}.`;
-                payoutDetailsToast = `Paid out ₹${payoutAmount.toFixed(2)} to ${task.assignedVleName}.`;
+                const historyDetails = `Payout of ₹${amountToVle.toFixed(2)} approved. VLE Commission: ₹${vleCommission.toFixed(2)}, Govt. Fee: ₹${governmentFee.toFixed(2)}.`;
+                payoutDetailsToast = `Paid out ₹${amountToVle.toFixed(2)} to ${task.assignedVleName}. Admin profit: ₹${adminCommission.toFixed(2)}.`;
 
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
@@ -2435,7 +2514,7 @@ export default function DashboardPage() {
             case 'admin':
                 return <AdminDashboard allTasks={allTasks} vles={vles} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} />;
             case 'vle':
-                return <VLEDashboard assignedTasks={assignedTasks} myLeads={myLeads} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} />;
+                return <VLEDashboard assignedTasks={assignedTasks} myLeads={myLeads} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} onTaskAccept={handleTaskAccept} onTaskReject={handleTaskReject} />;
             case 'customer':
                 return <CustomerDashboard tasks={customerTasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
             default:

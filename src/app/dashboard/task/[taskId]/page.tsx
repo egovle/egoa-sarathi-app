@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, FileText, History, MessageSquarePlus, CheckCircle, Send, UploadCloud, Camera, FileUp, PenSquare, Wallet } from 'lucide-react';
+import { ArrowLeft, Loader2, FileText, History, MessageSquarePlus, CheckCircle, Send, UploadCloud, Camera, FileUp, PenSquare, Wallet, CheckCircle2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -630,7 +630,7 @@ export default function TaskDetailPage() {
                                 <Label>Assigned VLE</Label>
                                 <p>
                                     {canSeeFullHistory && task.assignedVleName 
-                                        ? `${task.assignedVleName} (ID: ${task.assignedVleId.slice(-6).toUpperCase()})` 
+                                        ? `${task.assignedVleName} (ID: ${task.assignedVleId ? task.assignedVleId.slice(-6).toUpperCase() : 'N/A'})` 
                                         : (task.assignedVleName ? 'Assigned' : 'N/A')
                                     }
                                 </p>
@@ -692,7 +692,7 @@ export default function TaskDetailPage() {
                                             {
                                                 canSeeFullHistory || entry.action !== 'Task Assigned'
                                                 ? entry.details
-                                                : `Task has been assigned for processing. Fee of ₹${task.totalPaid.toFixed(2)} processed.`
+                                                : `Task has been assigned for processing. Fee of ₹${task.totalPaid?.toFixed(2) || '0.00'} processed.`
                                             }
                                         </p>
                                         <p className="text-xs text-muted-foreground mt-1">{format(new Date(entry.timestamp), "dd/MM/yyyy, p")}</p>
@@ -727,7 +727,7 @@ export default function TaskDetailPage() {
                                </div>
                            ) : null }
                            
-                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress) && task.status !== 'Completed' && task.status !== 'Pending Price Approval' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
+                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress) && task.status !== 'Completed' && task.status !== 'Pending VLE Acceptance' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
                            )}
                         </CardContent>
