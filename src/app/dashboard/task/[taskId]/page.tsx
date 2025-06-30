@@ -100,7 +100,7 @@ const SetPriceDialog = ({ taskId, customerId, onPriceSet, adminId }: { taskId: s
         try {
             await updateDoc(taskRef, {
                 status: 'Awaiting Payment',
-                rate: finalRate,
+                totalPaid: finalRate, // Use totalPaid to align with new model
                 history: arrayUnion(historyEntry)
             });
             await createNotification(
@@ -300,6 +300,114 @@ const SubmitAcknowledgementDialog = ({ taskId, vleId, customerId }: { taskId: st
     );
 };
 
+const UploadCertificateDialog = ({ taskId, vleId, customerId, onUploadComplete }: { taskId: string, vleId: string, customerId: string, onUploadComplete: () => void }) => {
+    const { toast } = useToast();
+    const [open, setOpen] = useState(false);
+    const [selectedCertificate, setSelectedCertificate] = useState<File | null>(null);
+    const [isCertUploading, setIsCertUploading] = useState(false);
+    const vleFileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleVleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const validation = validateFiles([file]);
+            if (!validation.isValid) {
+                toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+                return;
+            }
+            setSelectedCertificate(file);
+        }
+    };
+
+    const handleCertificateUpload = async () => {
+        if (!selectedCertificate || !vleId) {
+            toast({ title: "Cannot Upload", description: "Please select a certificate file.", variant: "destructive" });
+            return;
+        }
+        setIsCertUploading(true);
+        
+        try {
+            const storageRef = ref(storage, `tasks/${taskId}/certificate/${selectedCertificate.name}`);
+            const metadata = { customMetadata: { uploaderId: vleId } };
+            await uploadBytes(storageRef, selectedCertificate, metadata);
+            const downloadURL = await getDownloadURL(storageRef);
+            const finalCertificate = { name: selectedCertificate.name, url: downloadURL };
+
+            const taskRef = doc(db, 'tasks', taskId as string);
+            const historyEntry = {
+                timestamp: new Date().toISOString(),
+                actorId: vleId,
+                actorRole: 'VLE',
+                action: 'Task Completed & Certificate Uploaded',
+                details: `Uploaded: ${finalCertificate.name}`,
+            };
+            
+            await updateDoc(taskRef, {
+                finalCertificate: finalCertificate,
+                status: 'Completed',
+                history: arrayUnion(historyEntry),
+            });
+
+            await createNotification(
+                customerId,
+                'Your Certificate is Ready!',
+                `The final certificate for task ${String(taskId).slice(-6).toUpperCase()} is available.`,
+                `/dashboard/task/${taskId}`
+            );
+            
+            toast({ title: "Certificate Uploaded", description: "The customer has been notified and the task is now complete." });
+            setOpen(false);
+            onUploadComplete();
+        } catch (error: any) {
+            console.error("Error uploading certificate:", error);
+            toast({ title: "Upload Failed", description: "There was an error uploading the certificate.", variant: "destructive" });
+        } finally {
+            setIsCertUploading(false);
+        }
+    };
+    
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            setSelectedCertificate(null);
+            setIsCertUploading(false);
+        }
+        setOpen(isOpen);
+    }
+    
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>
+                <Button><UploadCloud /> Upload Final Certificate</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Upload Final Certificate</DialogTitle>
+                    <DialogDescription>Upload the final document for the customer. This will mark the task as "Completed".</DialogDescription>
+                </DialogHeader>
+                 <div className="py-4 space-y-2">
+                    <Button type="button" onClick={() => vleFileInputRef.current?.click()} size="sm" variant="secondary" className='w-full'>
+                        <FileUp /> Choose File
+                    </Button>
+                    <Input id="vle-documents" type="file" onChange={handleVleFileChange} ref={vleFileInputRef} className="hidden" />
+                    {selectedCertificate && (
+                        <div className="text-xs text-muted-foreground space-y-1 pt-1">
+                            <p className='font-medium'>Selected file:</p>
+                            <div className="flex items-center gap-2"><FileText className="h-3 w-3" /><span>{selectedCertificate.name}</span></div>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleCertificateUpload} disabled={isCertUploading || !selectedCertificate} className='w-full'>
+                        {isCertUploading ? <Loader2 className="animate-spin" /> : <UploadCloud />}
+                        Upload & Complete Task
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+
 export default function TaskDetailPage() {
     const { taskId } = useParams();
     const { user, userProfile, loading: authLoading } = useAuth();
@@ -314,11 +422,6 @@ export default function TaskDetailPage() {
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    
-    // State for VLE final certificate upload
-    const [selectedCertificate, setSelectedCertificate] = useState<File | null>(null);
-    const [isCertUploading, setIsCertUploading] = useState(false);
-    const vleFileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (!taskId) return;
@@ -410,65 +513,6 @@ export default function TaskDetailPage() {
             setIsUploading(false);
         }
     };
-
-    const handleVleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            const validation = validateFiles([file]);
-            if (!validation.isValid) {
-                toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
-                return;
-            }
-            setSelectedCertificate(file);
-        }
-    };
-
-    const handleCertificateUpload = async () => {
-        if (!selectedCertificate || !user || !userProfile) {
-            toast({ title: "Cannot Upload", description: "Please select a certificate file and ensure you are logged in.", variant: "destructive" });
-            return;
-        }
-        setIsCertUploading(true);
-        
-        try {
-            const storageRef = ref(storage, `tasks/${taskId}/certificate/${selectedCertificate.name}`);
-            const metadata = { customMetadata: { uploaderId: user.uid } };
-            await uploadBytes(storageRef, selectedCertificate, metadata);
-            const downloadURL = await getDownloadURL(storageRef);
-            const finalCertificate = { name: selectedCertificate.name, url: downloadURL };
-
-            const taskRef = doc(db, 'tasks', taskId as string);
-            const historyEntry = {
-                timestamp: new Date().toISOString(),
-                actorId: user.uid,
-                actorRole: 'VLE',
-                action: 'Task Completed & Certificate Uploaded',
-                details: `Uploaded: ${finalCertificate.name}`,
-            };
-            
-            await updateDoc(taskRef, {
-                finalCertificate: finalCertificate,
-                status: 'Completed',
-                history: arrayUnion(historyEntry),
-            });
-
-            await createNotification(
-                task.creatorId,
-                'Your Certificate is Ready!',
-                `The final certificate for task ${String(taskId).slice(-6).toUpperCase()} is available.`,
-                `/dashboard/task/${taskId}`
-            );
-            
-            toast({ title: "Certificate Uploaded", description: "The customer has been notified and the task is now complete." });
-            setSelectedCertificate(null);
-
-        } catch (error: any) {
-            console.error("Error uploading certificate:", error);
-            toast({ title: "Upload Failed", description: "There was an error uploading the certificate.", variant: "destructive" });
-        } finally {
-            setIsCertUploading(false);
-        }
-    };
     
     const handlePayment = async () => {
         if (!userProfile || !user) {
@@ -491,11 +535,11 @@ export default function TaskDetailPage() {
                 }
 
                 const customerBalance = customerDoc.data().walletBalance || 0;
-                if (customerBalance < task.rate) {
+                if (customerBalance < task.totalPaid) {
                     throw new Error("Insufficient wallet balance.");
                 }
 
-                const newCustomerBalance = customerBalance - task.rate;
+                const newCustomerBalance = customerBalance - task.totalPaid;
                 transaction.update(customerRef, { walletBalance: newCustomerBalance });
 
                 const historyEntry = {
@@ -503,7 +547,7 @@ export default function TaskDetailPage() {
                     actorId: user.uid,
                     actorRole: userProfile.role === 'vle' ? 'VLE' : 'Customer',
                     action: 'Payment Completed',
-                    details: `Paid ₹${task.rate.toFixed(2)}.`,
+                    details: `Paid ₹${task.totalPaid.toFixed(2)}.`,
                 };
                 transaction.update(taskRef, {
                     status: 'Unassigned',
@@ -511,7 +555,7 @@ export default function TaskDetailPage() {
                 });
             });
 
-            toast({ title: 'Payment Successful!', description: `₹${task.rate.toFixed(2)} has been deducted from your wallet.` });
+            toast({ title: 'Payment Successful!', description: `₹${task.totalPaid.toFixed(2)} has been deducted from your wallet.` });
             
             await createNotificationForAdmins(
                 'Task Paid & Ready for Assignment',
@@ -591,7 +635,7 @@ export default function TaskDetailPage() {
                                     }
                                 </p>
                             </div>
-                             {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.rate?.toFixed(2)}</p></div>}
+                             {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.totalPaid?.toFixed(2)}</p></div>}
                             {task.acknowledgementNumber && (
                                 <div className="sm:col-span-2"><Label>Acknowledgement #</Label><p>{task.acknowledgementNumber}</p></div>
                             )}
@@ -604,10 +648,10 @@ export default function TaskDetailPage() {
                                 <CardTitle>Action Required: Complete Payment</CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="mb-4">The final price for this service has been set to <strong>₹{task.rate.toFixed(2)}</strong>. Please approve and pay to proceed.</p>
+                                <p className="mb-4">The final price for this service has been set to <strong>₹{task.totalPaid.toFixed(2)}</strong>. Please approve and pay to proceed.</p>
                                  <Button onClick={handlePayment} disabled={isPaying}>
                                     {isPaying ? <Loader2 className="animate-spin" /> : <Wallet />}
-                                    Approve & Pay ₹{task.rate.toFixed(2)}
+                                    Approve & Pay ₹{task.totalPaid.toFixed(2)}
                                 </Button>
                             </CardContent>
                         </Card>
@@ -648,7 +692,7 @@ export default function TaskDetailPage() {
                                             {
                                                 canSeeFullHistory || entry.action !== 'Task Assigned'
                                                 ? entry.details
-                                                : `Task has been assigned for processing. Fee of ₹${task.rate.toFixed(2)} processed.`
+                                                : `Task has been assigned for processing. Fee of ₹${task.totalPaid.toFixed(2)} processed.`
                                             }
                                         </p>
                                         <p className="text-xs text-muted-foreground mt-1">{format(new Date(entry.timestamp), "dd/MM/yyyy, p")}</p>
@@ -676,32 +720,12 @@ export default function TaskDetailPage() {
                                 </div>
                            ) : null }
                            
-                           {isVleInProgress && (
-                               <Card className="bg-muted/50">
-                                   <CardHeader className="p-4">
-                                       <CardTitle className="text-base">Upload Final Certificate</CardTitle>
-                                       <CardDescription className="text-xs">Upload the final document for the customer.</CardDescription>
-                                   </CardHeader>
-                                   <CardContent className="p-4 pt-0 space-y-2">
-                                       <Button type="button" onClick={() => vleFileInputRef.current?.click()} size="sm" variant="secondary" className='w-full'>
-                                           <FileUp /> Choose File
-                                       </Button>
-                                       <Input id="vle-documents" type="file" onChange={handleVleFileChange} ref={vleFileInputRef} className="hidden" />
-                                       {selectedCertificate && (
-                                           <div className="text-xs text-muted-foreground space-y-1 pt-1">
-                                               <p className='font-medium'>Selected file:</p>
-                                               <div className="flex items-center gap-2"><FileText className="h-3 w-3" /><span>{selectedCertificate.name}</span></div>
-                                           </div>
-                                       )}
-                                   </CardContent>
-                                   <CardFooter className="p-4 pt-0">
-                                       <Button onClick={handleCertificateUpload} disabled={isCertUploading || !selectedCertificate} className='w-full'>
-                                           {isCertUploading ? <Loader2 className="animate-spin" /> : <UploadCloud />}
-                                           Upload & Complete Task
-                                       </Button>
-                                   </CardFooter>
-                               </Card>
-                           )}
+                           {isVleInProgress && user ? (
+                               <div className='flex flex-col gap-2'>
+                                   <RequestInfoDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
+                                   <UploadCertificateDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} onUploadComplete={() => {}} />
+                               </div>
+                           ) : null }
                            
                            {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress) && task.status !== 'Completed' && task.status !== 'Pending Price Approval' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>

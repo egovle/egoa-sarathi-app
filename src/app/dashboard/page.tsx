@@ -1461,6 +1461,11 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
     
+    // Counts for badges
+    const pendingVleCount = useMemo(() => pendingVles.length, [pendingVles]);
+    const unassignedTaskCount = useMemo(() => allTasks.filter(t => t.status === 'Unassigned').length, [allTasks]);
+    const openComplaintsCount = useMemo(() => complaints.filter(c => c.status === 'Open').length, [complaints]);
+
     // Search states
     const [vleSearch, setVleSearch] = useState('');
     const [customerSearch, setCustomerSearch] = useState('');
@@ -1519,14 +1524,21 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
         </Card>
     );
 
+    const TabTriggerWithBadge = ({ value, label, count }: { value: string, label: string, count: number }) => (
+        <TabsTrigger value={value} className="relative">
+            {label}
+            {count > 0 && <Badge className="absolute -top-2 -right-2 h-5 w-5 justify-center rounded-full p-0">{count}</Badge>}
+        </TabsTrigger>
+    );
+
     return (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="vle-management">VLEs</TabsTrigger>
+                <TabTriggerWithBadge value="vle-management" label="VLEs" count={pendingVleCount} />
                 <TabsTrigger value="customer-management">Customers</TabsTrigger>
-                <TabsTrigger value="all-tasks">Tasks</TabsTrigger>
-                <TabsTrigger value="complaints">Complaints</TabsTrigger>
+                <TabTriggerWithBadge value="all-tasks" label="Tasks" count={unassignedTaskCount} />
+                <TabTriggerWithBadge value="complaints" label="Complaints" count={openComplaintsCount} />
             </TabsList>
 
             <TabsContent value="overview" className="mt-4 space-y-4">
