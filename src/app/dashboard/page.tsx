@@ -766,6 +766,15 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest, services
     const { toast } = useToast();
     const [userProfile, setUserProfile] = useState<any>(profileData);
     
+    // Profile Edit State
+    const [isEditingProfile, setIsEditingProfile] = useState(false);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [profileFormState, setProfileFormState] = useState({
+        name: profileData?.name || '',
+        mobile: profileData?.mobile || '',
+        location: profileData?.location || '',
+    });
+
     // Bank Accounts state
     const [bankAccounts, setBankAccounts] = useState<any[]>(profileData?.bankAccounts || []);
     const [isEditingBankAccount, setIsEditingBankAccount] = useState(false);
@@ -783,7 +792,46 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest, services
         setUserProfile(profileData);
         setBankAccounts(profileData?.bankAccounts || []);
         setOfferedServices(profileData?.offeredServices || []);
+        setProfileFormState({
+            name: profileData?.name || '',
+            mobile: profileData?.mobile || '',
+            location: profileData?.location || '',
+        });
     }, [userId, profileData]);
+
+    const handleProfileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { id, value } = e.target;
+        setProfileFormState(prevState => ({ ...prevState, [id]: value }));
+    };
+
+    const handleSaveProfile = async () => {
+        setIsSavingProfile(true);
+        const collectionName = userType === 'Customer' ? 'users' : 'vles';
+        const docRef = doc(db, collectionName, userId);
+        try {
+            await updateDoc(docRef, {
+                name: profileFormState.name,
+                mobile: profileFormState.mobile,
+                location: profileFormState.location,
+            });
+            toast({ title: "Profile Updated", description: "Your details have been successfully saved." });
+            setIsEditingProfile(false);
+        } catch (error) {
+            console.error("Error updating profile:", error);
+            toast({ title: "Error", description: "Could not update your profile.", variant: "destructive" });
+        } finally {
+            setIsSavingProfile(false);
+        }
+    };
+
+    const handleCancelEditProfile = () => {
+        setProfileFormState({
+            name: userProfile.name,
+            mobile: userProfile.mobile,
+            location: userProfile.location,
+        });
+        setIsEditingProfile(false);
+    };
 
     const handleBankInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -917,24 +965,63 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest, services
                     <CardHeader>
                         <CardTitle className="flex items-center justify-between">
                             <span>Profile Details</span>
-                            <Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button>
+                            {!isEditingProfile && (
+                                <Button variant="ghost" size="icon" onClick={() => setIsEditingProfile(true)}><Edit className="h-4 w-4" /></Button>
+                            )}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                         <div className="space-y-2">
-                            <Label htmlFor="profile-name">Full Name</Label>
-                            <Input id="profile-name" defaultValue={userProfile.name} readOnly className="bg-muted/50" />
-                         </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="profile-email">Email Address</Label>
-                            <Input id="profile-email" type="email" defaultValue={userProfile.email} readOnly className="bg-muted/50" />
-                         </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="profile-mobile">Mobile Number</Label>
-                            <Input id="profile-mobile" defaultValue={userProfile.mobile} readOnly className="bg-muted/50" />
-                         </div>
+                        {isEditingProfile ? (
+                            <>
+                                <div className="space-y-2">
+                                    <Label htmlFor="name">Full Name</Label>
+                                    <Input id="name" value={profileFormState.name} onChange={handleProfileInputChange} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">Email Address</Label>
+                                    <Input id="email" type="email" value={userProfile.email} readOnly disabled className="bg-muted/50" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="mobile">Mobile Number</Label>
+                                    <Input id="mobile" value={profileFormState.mobile} onChange={handleProfileInputChange} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="location">Location</Label>
+                                    <Input id="location" value={profileFormState.location} onChange={handleProfileInputChange} />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="space-y-2">
+                                    <Label>Full Name</Label>
+                                    <p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{userProfile.name}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Email Address</Label>
+                                    <p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{userProfile.email}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Mobile Number</Label>
+                                    <p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{userProfile.mobile}</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Location</Label>
+                                    <p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{userProfile.location}</p>
+                                </div>
+                            </>
+                        )}
                     </CardContent>
+                    {isEditingProfile && (
+                        <CardFooter className="justify-end gap-2">
+                            <Button variant="outline" onClick={handleCancelEditProfile}>Cancel</Button>
+                            <Button onClick={handleSaveProfile} disabled={isSavingProfile}>
+                                {isSavingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Save Changes
+                            </Button>
+                        </CardFooter>
+                    )}
                 </Card>
+
                 {userType === 'VLE' && (
                     <Card>
                         <CardHeader>
