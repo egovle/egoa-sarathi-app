@@ -1599,7 +1599,7 @@ const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintRespon
     }, [vlesForManagement, vleSearch]);
 
     const filteredCustomers = useMemo(() => {
-        if (!customerSearch) return allUsers;
+        if (!customerSearch) return customersForManagement;
         const query = customerSearch.toLowerCase();
         
         const tasksByCustomer: {[key: string]: string[]} = {};
@@ -1610,13 +1610,13 @@ const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintRespon
             tasksByCustomer[task.creatorId].push(task.id);
         });
 
-        return allUsers.filter(user => 
+        return customersForManagement.filter(user => 
             user.name.toLowerCase().includes(query) ||
             user.email.toLowerCase().includes(query) ||
-            user.mobile.includes(query) ||
+            (user.mobile && user.mobile.includes(query)) ||
             (tasksByCustomer[user.id] || []).some(taskId => taskId.toLowerCase().includes(query))
         );
-    }, [allUsers, allTasks, customerSearch]);
+    }, [customersForManagement, allTasks, customerSearch]);
 
     const filteredTasks = useMemo(() => {
         if (!taskSearch) return allTasks;
@@ -1891,7 +1891,7 @@ const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintRespon
                     <div className="flex items-center justify-between">
                         <div>
                            <CardTitle>Customer Management</CardTitle>
-                           <CardDescription>View all registered customers and VLEs in the system.</CardDescription>
+                           <CardDescription>View all registered customers in the system.</CardDescription>
                         </div>
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1912,7 +1912,6 @@ const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintRespon
                             <TableHead>Email</TableHead>
                             <TableHead>Mobile</TableHead>
                             <TableHead>Location</TableHead>
-                             <TableHead>Role</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1922,7 +1921,6 @@ const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintRespon
                             <TableCell>{user.email}</TableCell>
                             <TableCell>{user.mobile}</TableCell>
                             <TableCell>{user.location}</TableCell>
-                             <TableCell><Badge variant={user.role === 'vle' ? 'secondary' : 'outline'}>{user.role}</Badge></TableCell>
                         </TableRow>
                         ))}
                     </TableBody>
@@ -1957,6 +1955,7 @@ const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintRespon
                                     <TableHead>Task ID</TableHead>
                                     <TableHead>Customer</TableHead>
                                     <TableHead>Service</TableHead>
+                                    <TableHead>Type</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>Assigned VLE</TableHead>
                                     <TableHead>Date</TableHead>
@@ -1975,6 +1974,11 @@ const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintRespon
                                             <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
                                             <TableCell>{task.customer}</TableCell>
                                             <TableCell>{task.service}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={task.type === 'VLE Lead' ? 'secondary' : 'outline'}>
+                                                    {task.type || 'Customer Request'}
+                                                </Badge>
+                                            </TableCell>
                                             <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                                             <TableCell>{task.assignedVleName || 'N/A'}</TableCell>
                                             <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
