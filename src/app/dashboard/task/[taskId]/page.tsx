@@ -7,6 +7,7 @@ import { doc, onSnapshot, updateDoc, arrayUnion, addDoc, collection, runTransact
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
+import { createNotification, createNotificationForAdmins } from '@/app/dashboard/page';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -23,39 +24,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-
-// --- NOTIFICATION HELPERS ---
-async function createNotification(userId: string, title: string, description: string, link?: string) {
-    if (!userId) return;
-    await addDoc(collection(db, "notifications"), {
-        userId,
-        title,
-        description,
-        link: link || '/dashboard',
-        read: false,
-        date: new Date().toISOString(),
-    });
-}
-
-async function createNotificationForAdmins(title: string, description: string, link?: string) {
-    try {
-        const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true));
-        const adminSnapshot = await getDocs(adminsQuery);
-        
-        if (adminSnapshot.empty) {
-            console.log("No admin users found to notify.");
-            return;
-        }
-
-        const notificationPromises = adminSnapshot.docs.map(adminDoc => {
-            return createNotification(adminDoc.id, title, description, link);
-        });
-
-        await Promise.all(notificationPromises);
-    } catch (error) {
-        console.error("Error creating notifications for admins:", error);
-    }
-}
 
 // --- FILE VALIDATION ---
 const fileValidationConfig = {
@@ -715,6 +683,74 @@ export default function TaskDetailPage() {
         }
     }
 
+    const handleApprovePayout = async (task: any) => {
+        if (!user || !userProfile?.isAdmin || !task.assignedVleId || !task.totalPaid) {
+            toast({ title: 'Error', description: 'Cannot process payout. Missing required information.', variant: 'destructive' });
+            return;
+        }
+    
+        const adminRef = doc(db, "vles", user.uid);
+        const assignedVleRef = doc(db, "vles", task.assignedVleId);
+        const taskRef = doc(db, "tasks", task.id);
+    
+        try {
+            let payoutDetailsToast = '';
+            
+            await runTransaction(db, async (transaction) => {
+                const adminDoc = await transaction.get(adminRef);
+                const assignedVleDoc = await transaction.get(assignedVleRef);
+    
+                if (!adminDoc.exists()) throw new Error("Admin profile not found.");
+                if (!assignedVleDoc.exists()) throw new Error("Assigned VLE profile not found.");
+    
+                const adminBalance = adminDoc.data().walletBalance || 0;
+                const assignedVleBalance = assignedVleDoc.data().walletBalance || 0;
+
+                const totalPaid = parseFloat(task.totalPaid);
+                const governmentFee = parseFloat(task.governmentFeeApplicable || 0);
+
+                const serviceProfit = totalPaid - governmentFee;
+                const vleCommission = serviceProfit * 0.8;
+                const adminCommission = serviceProfit * 0.2;
+                
+                const amountToVle = governmentFee + vleCommission;
+
+                if (adminBalance < amountToVle) {
+                    throw new Error("Admin wallet has insufficient funds to process this payout.");
+                }
+
+                const newAdminBalance = adminBalance - amountToVle;
+                const newAssignedVleBalance = assignedVleBalance + amountToVle;
+
+                transaction.update(adminRef, { walletBalance: newAdminBalance });
+                transaction.update(assignedVleRef, { walletBalance: newAssignedVleBalance });
+                
+                const historyDetails = `Payout of ₹${amountToVle.toFixed(2)} approved. VLE Commission: ₹${vleCommission.toFixed(2)}, Govt. Fee: ₹${governmentFee.toFixed(2)}.`;
+                payoutDetailsToast = `Paid out ₹${amountToVle.toFixed(2)} to ${task.assignedVleName}. Admin profit: ₹${adminCommission.toFixed(2)}.`;
+
+                const historyEntry = {
+                    timestamp: new Date().toISOString(),
+                    actorId: user.uid,
+                    actorRole: 'Admin',
+                    action: 'Payout Approved',
+                    details: historyDetails
+                };
+    
+                transaction.update(taskRef, {
+                    status: 'Paid Out',
+                    history: arrayUnion(historyEntry)
+                });
+            });
+    
+            toast({ title: 'Payout Approved!', description: payoutDetailsToast });
+            await createNotification(task.assignedVleId, 'Payment Received', `You have received a payment for task ${task.id.slice(-6).toUpperCase()}.`);
+    
+        } catch (error: any) {
+            console.error("Payout transaction failed:", error);
+            toast({ title: 'Payout Failed', description: error.message || 'An unknown error occurred.', variant: 'destructive' });
+        }
+    };
+
 
     if (authLoading || loading) {
         return (
@@ -748,6 +784,7 @@ export default function TaskDetailPage() {
     const canVleTakeAction = isAssignedVle && (task.status === 'Assigned');
     const isVleInProgress = isAssignedVle && task.status === 'In Progress';
     const canAdminSetPrice = isAdmin && task.status === 'Pending Price Approval';
+    const canAdminApprovePayout = isAdmin && task.status === 'Completed';
     const canCustomerPay = isTaskCreator && task.status === 'Awaiting Payment';
     const canUploadMoreDocs = (isTaskCreator || isAdmin) && task.status === 'Awaiting Documents';
     
@@ -902,7 +939,13 @@ export default function TaskDetailPage() {
                                </div>
                            ) : null }
                            
-                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress && !canAdminSetPrice) && task.status !== 'Completed' && task.status !== 'Pending VLE Acceptance' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
+                           {canAdminApprovePayout && (
+                               <Button onClick={() => handleApprovePayout(task)}>
+                                   <CircleDollarSign className="mr-2 h-4 w-4" /> Approve Payout
+                               </Button>
+                           )}
+                           
+                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress && !canAdminSetPrice && !canAdminApprovePayout) && task.status !== 'Completed' && task.status !== 'Pending VLE Acceptance' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
                            )}
                         </CardContent>

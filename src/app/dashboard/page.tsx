@@ -1428,7 +1428,7 @@ const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger
     )
 }
 
-const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.ReactNode, vleName: string, onAddBalance: (amount: number) => void }) => {
+const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.ReactNode, vleName: string, onAddBalance: (vleId: string, amount: number) => void }) => {
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState('');
@@ -1440,7 +1440,7 @@ const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.R
             toast({ title: 'Invalid Amount', description: 'Please enter a valid positive number.', variant: 'destructive' });
             return;
         }
-        onAddBalance(amountToAdd);
+        onAddBalance(vleName, amountToAdd);
         toast({ title: 'Balance Added', description: `₹${amountToAdd.toFixed(2)} has been added to ${vleName}'s wallet.` });
         setOpen(false);
     };
@@ -1970,6 +1970,22 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
     )
 };
 
+const GovernmentDashboard = () => {
+    // This is a placeholder for the Government view on the main dashboard page.
+    // Since their primary interactions are with camps, we will redirect them.
+    const router = useRouter();
+    useEffect(() => {
+        router.replace('/dashboard/camps');
+    }, [router]);
+
+    return (
+        <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="ml-4">Redirecting to Camp Management...</p>
+        </div>
+    );
+};
+
 export default function DashboardPage() {
     const { toast } = useToast();
     const { user, userProfile, loading } = useAuth();
@@ -2060,7 +2076,7 @@ export default function DashboardPage() {
                 setMyLeads(fetched);
             }));
 
-        } else { // Customer
+        } else if (primaryRole === 'customer'){ // Customer
             const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
             unsubscribers.push(onSnapshot(tasksQuery, (snapshot) => {
                  const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -2411,7 +2427,7 @@ export default function DashboardPage() {
 
         try {
             // Clear collections
-            const collectionsToClear = ['tasks', 'camps', 'notifications', 'paymentRequests', 'services'];
+            const collectionsToClear = ['tasks', 'camps', 'notifications', 'paymentRequests', 'services', 'campSuggestions'];
             for (const collectionName of collectionsToClear) {
                 await processInBatches(collection(db, collectionName), 'delete');
             }
@@ -2528,6 +2544,8 @@ export default function DashboardPage() {
                 return <VLEDashboard assignedTasks={assignedTasks} myLeads={myLeads} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} onTaskAccept={handleTaskAccept} onTaskReject={handleTaskReject} />;
             case 'customer':
                 return <CustomerDashboard tasks={customerTasks} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
+            case 'government':
+                return <GovernmentDashboard />;
             default:
                  return (
                     <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
