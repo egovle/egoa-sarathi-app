@@ -2111,19 +2111,32 @@ export default function DashboardPage() {
             );
         } else {
             const rate = taskWithDocs.totalPaid;
+            const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true), limit(1));
+            const adminSnapshot = await getDocs(adminsQuery);
+            if (adminSnapshot.empty) {
+                throw new Error("No admin account configured to receive payments.");
+            }
+            const adminRef = adminSnapshot.docs[0].ref;
             
             await runTransaction(db, async (transaction) => {
                 const creatorCollection = realtimeProfile.role === 'vle' ? 'vles' : 'users';
                 const creatorRef = doc(db, creatorCollection, user.uid);
-
                 const creatorDoc = await transaction.get(creatorRef);
+                const adminDoc = await transaction.get(adminRef);
+
                 if (!creatorDoc.exists()) throw new Error("Could not find your user profile to process payment.");
+                if (!adminDoc.exists()) throw new Error("Could not find the admin profile to process payment.");
                 
                 const creatorBalance = creatorDoc.data().walletBalance || 0;
                 if (creatorBalance < rate) throw new Error("Insufficient wallet balance.");
+                
+                const adminBalance = adminDoc.data().walletBalance || 0;
 
                 const newCreatorBalance = creatorBalance - rate;
+                const newAdminBalance = adminBalance + rate;
+
                 transaction.update(creatorRef, { walletBalance: newCreatorBalance });
+                transaction.update(adminRef, { walletBalance: newAdminBalance });
 
                 const taskWithStatus = { ...taskWithDocs, status: 'Unassigned' };
                 transaction.set(doc(db, "tasks", taskId), taskWithStatus);
@@ -2212,7 +2225,6 @@ export default function DashboardPage() {
                 status: 'Pending VLE Acceptance', 
                 assignedVleId: vleId, 
                 assignedVleName: vleName,
-                assigningAdminId: user.uid, // Store which admin assigned it
                 history: arrayUnion(historyEntry)
             });
 
@@ -2244,7 +2256,6 @@ export default function DashboardPage() {
                 if (!taskDoc.exists() || taskDoc.data().status !== 'Pending VLE Acceptance') {
                     throw new Error("Task is no longer available for acceptance.");
                 }
-                const taskData = taskDoc.data();
                 
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
@@ -2285,7 +2296,6 @@ export default function DashboardPage() {
                 status: 'Unassigned',
                 assignedVleId: null,
                 assignedVleName: null,
-                assigningAdminId: null,
                 history: arrayUnion(historyEntry)
             });
 
@@ -2457,7 +2467,7 @@ export default function DashboardPage() {
                 
                 const amountToVle = governmentFee + vleCommission;
 
-                // The admin already received the `totalPaid` when the VLE accepted.
+                // The admin's wallet was credited when the task was created.
                 // Now, the admin pays the VLE their share from the admin's wallet.
                 if (adminBalance < amountToVle) {
                     throw new Error("Admin wallet has insufficient funds to process this payout.");

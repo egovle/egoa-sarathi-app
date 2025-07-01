@@ -515,12 +515,21 @@ export default function TaskDetailPage() {
     };
     
     const handlePayment = async () => {
-        if (!userProfile || !user) {
+        if (!userProfile || !user || !task) {
             toast({ title: 'Error', description: 'User profile not loaded. Please try again.', variant: 'destructive' });
             setIsPaying(false);
             return;
         }
         setIsPaying(true);
+
+        const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true), limit(1));
+        const adminSnapshot = await getDocs(adminsQuery);
+        if (adminSnapshot.empty) {
+            toast({ title: "System Error", description: "No admin account configured to receive payments.", variant: "destructive"});
+            setIsPaying(false);
+            return;
+        }
+        const adminRef = adminSnapshot.docs[0].ref;
 
         try {
             await runTransaction(db, async (transaction) => {
@@ -529,18 +538,21 @@ export default function TaskDetailPage() {
                 const taskRef = doc(db, 'tasks', taskId as string);
 
                 const customerDoc = await transaction.get(customerRef);
+                const adminDoc = await transaction.get(adminRef);
 
-                if (!customerDoc.exists()) {
-                    throw new Error("User profile not found.");
-                }
+                if (!customerDoc.exists()) throw new Error("User profile not found.");
+                if (!adminDoc.exists()) throw new Error("Admin profile not found.");
 
                 const customerBalance = customerDoc.data().walletBalance || 0;
-                if (customerBalance < task.totalPaid) {
-                    throw new Error("Insufficient wallet balance.");
-                }
+                if (customerBalance < task.totalPaid) throw new Error("Insufficient wallet balance.");
+                
+                const adminBalance = adminDoc.data().walletBalance || 0;
 
                 const newCustomerBalance = customerBalance - task.totalPaid;
+                const newAdminBalance = adminBalance + task.totalPaid;
+
                 transaction.update(customerRef, { walletBalance: newCustomerBalance });
+                transaction.update(adminRef, { walletBalance: newAdminBalance });
 
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
