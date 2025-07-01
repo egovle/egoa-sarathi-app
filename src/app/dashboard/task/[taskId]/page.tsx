@@ -3,7 +3,7 @@
 
 import { useEffect, useState, type FormEvent, useRef, type ChangeEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, updateDoc, arrayUnion, addDoc, collection, runTransaction, query, where, limit, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, addDoc, collection, runTransaction, query, where, limit, getDocs, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -15,11 +15,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, FileText, History, MessageSquarePlus, CheckCircle, Send, UploadCloud, Camera, FileUp, PenSquare, Wallet, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, FileText, History, MessageSquarePlus, CheckCircle, Send, UploadCloud, Camera, FileUp, PenSquare, Wallet, CheckCircle2, XCircle, KeyRound, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { cn } from '@/lib/utils';
 
 // --- NOTIFICATION HELPERS ---
 async function createNotification(userId: string, title: string, description: string, link?: string) {
@@ -74,6 +76,93 @@ const validateFiles = (files: File[]): { isValid: boolean, message?: string } =>
 
 
 // --- TASK DETAIL PAGE DIALOGS ---
+
+const RequestOtpDialog = ({ taskId, vleId, customerId }: { taskId: string, vleId: string, customerId: string }) => {
+    const [open, setOpen] = useState(false);
+    const [otpType, setOtpType] = useState<'mobile' | 'email' | ''>('');
+    const { toast } = useToast();
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        if (!otpType) {
+            toast({ title: "Selection Required", description: "Please select OTP type (Mobile or Email).", variant: "destructive" });
+            return;
+        }
+
+        const taskRef = doc(db, "tasks", taskId);
+        const historyEntry = {
+            timestamp: new Date().toISOString(),
+            actorId: vleId,
+            actorRole: 'VLE',
+            action: 'OTP Requested',
+            details: `VLE requested ${otpType} OTP from the customer.`,
+        };
+
+        try {
+            await updateDoc(taskRef, {
+                otpRequest: {
+                    type: otpType,
+                    status: 'pending',
+                    requestedAt: new Date().toISOString()
+                },
+                history: arrayUnion(historyEntry)
+            });
+            await createNotification(
+                customerId,
+                'OTP Required for Your Task',
+                `The VLE working on task ${taskId.slice(-6).toUpperCase()} needs an OTP to proceed.`,
+                `/dashboard/task/${taskId}`
+            );
+            toast({ title: 'OTP Request Sent', description: 'The customer has been notified.' });
+            setOpen(false);
+        } catch (error) {
+            console.error("Error requesting OTP:", error);
+            toast({ title: "Error", description: "Failed to send OTP request.", variant: "destructive" });
+        }
+    };
+    
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            setOtpType('');
+        }
+        setOpen(isOpen);
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>
+                <Button variant="outline"><KeyRound />Request OTP</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <form onSubmit={handleSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>Request OTP</DialogTitle>
+                        <DialogDescription>
+                            The portal will notify the customer that you need an OTP. They will contact you directly to provide it. This request will be logged.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Label>What type of OTP do you need?</Label>
+                        <RadioGroup value={otpType} onValueChange={(value) => setOtpType(value as 'mobile' | 'email')} className="mt-2">
+                             <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="mobile" id="otp-mobile" />
+                                <Label htmlFor="otp-mobile">Mobile OTP</Label>
+                            </div>
+                             <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="email" id="otp-email" />
+                                <Label htmlFor="otp-email">Email OTP</Label>
+                            </div>
+                        </RadioGroup>
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit"><Send /> Send Request</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 
 const SetPriceDialog = ({ taskId, customerId, onPriceSet, adminId }: { taskId: string, customerId: string, onPriceSet: () => void, adminId: string }) => {
     const [open, setOpen] = useState(false);
@@ -417,6 +506,7 @@ export default function TaskDetailPage() {
     const [task, setTask] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
     const [isPaying, setIsPaying] = useState(false);
+    const [vleContact, setVleContact] = useState<string | null>(null);
     
     // State for additional document uploads
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -441,6 +531,23 @@ export default function TaskDetailPage() {
 
         return () => unsubscribe();
     }, [taskId]);
+    
+    const isTaskCreator = user?.uid === task?.creatorId;
+    const isAssignedVle = user?.uid === task?.assignedVleId;
+    const isAdmin = userProfile?.isAdmin;
+
+     useEffect(() => {
+        if (task?.assignedVleId && (isTaskCreator || isAdmin)) {
+            const getVleContact = async () => {
+                const vleDocRef = doc(db, 'vles', task.assignedVleId);
+                const vleDocSnap = await getDoc(vleDocRef);
+                if (vleDocSnap.exists()) {
+                    setVleContact(vleDocSnap.data().mobile);
+                }
+            };
+            getVleContact();
+        }
+    }, [task, isTaskCreator, isAdmin]);
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -582,6 +689,31 @@ export default function TaskDetailPage() {
             setIsPaying(false);
         }
     };
+    
+    const handleFulfillOtp = async () => {
+        if (!user || !task) return;
+        const taskRef = doc(db, "tasks", taskId as string);
+
+        const historyEntry = {
+            timestamp: new Date().toISOString(),
+            actorId: user.uid,
+            actorRole: 'VLE',
+            action: 'OTP Request Fulfilled',
+            details: 'VLE confirmed receipt of OTP.',
+        };
+
+        try {
+            await updateDoc(taskRef, {
+                otpRequest: null,
+                history: arrayUnion(historyEntry)
+            });
+            toast({ title: 'OTP Confirmed', description: 'You can now proceed with the task.' });
+        } catch (error) {
+            console.error("Error fulfilling OTP:", error);
+            toast({ title: "Error", description: "Failed to update task.", variant: "destructive" });
+        }
+    }
+
 
     if (authLoading || loading) {
         return (
@@ -600,9 +732,6 @@ export default function TaskDetailPage() {
         )
     }
 
-    const isTaskCreator = user?.uid === task.creatorId;
-    const isAssignedVle = user?.uid === task.assignedVleId;
-    const isAdmin = userProfile?.isAdmin;
     const canSeeFullHistory = isAdmin || isAssignedVle;
 
     if (!isTaskCreator && !isAssignedVle && !isAdmin) {
@@ -620,11 +749,28 @@ export default function TaskDetailPage() {
     const canAdminSetPrice = isAdmin && task.status === 'Pending Price Approval';
     const canCustomerPay = isTaskCreator && task.status === 'Awaiting Payment';
     const canUploadMoreDocs = (isTaskCreator || isAdmin) && task.status === 'Awaiting Documents';
+    
+    const isOtpRequestPending = task.otpRequest?.status === 'pending';
 
     const displayStatus = task.status === 'Paid Out' && isTaskCreator ? 'Completed' : task.status;
 
     return (
         <div className="w-full space-y-6">
+            {isTaskCreator && isOtpRequestPending && (
+                <Alert variant="default" className="border-yellow-500/50 bg-yellow-500/10 text-yellow-800">
+                    <KeyRound className="h-4 w-4 !text-yellow-600" />
+                    <AlertTitle className="font-bold">Action Required: OTP Needed by VLE</AlertTitle>
+                    <AlertDescription>
+                        <p className="mb-2">The VLE needs an OTP to proceed with your request. Please contact them directly to provide the code.</p>
+                        {vleContact && (
+                            <div className="flex items-center gap-2 font-medium">
+                                <p>VLE: {task.assignedVleName}</p>
+                                <a href={`tel:${vleContact}`} className="flex items-center gap-1.5 text-primary hover:underline"><Phone className="h-3 w-3" />{vleContact}</a>
+                            </div>
+                        )}
+                    </AlertDescription>
+                </Alert>
+            )}
              <div className="flex items-center gap-4">
                 <p className="text-sm text-muted-foreground">Task ID: {task.id.slice(-6).toUpperCase()}</p>
             </div>
@@ -725,21 +871,30 @@ export default function TaskDetailPage() {
                            {canAdminSetPrice && user && (
                                 <SetPriceDialog taskId={task.id} customerId={task.creatorId} onPriceSet={() => {}} adminId={user.uid} />
                            )}
-                           {canVleTakeAction && user ? (
+                           
+                           {isOtpRequestPending && isAssignedVle && (
+                                <Button onClick={handleFulfillOtp} className="w-full">
+                                    <CheckCircle /> Mark OTP as Received
+                                </Button>
+                           )}
+
+                           {!isOtpRequestPending && canVleTakeAction && user ? (
                                 <div className='flex flex-col gap-2'>
                                     <RequestInfoDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
                                     <SubmitAcknowledgementDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
+                                    <RequestOtpDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
                                 </div>
                            ) : null }
                            
-                           {isVleInProgress && user ? (
+                           {!isOtpRequestPending && isVleInProgress && user ? (
                                <div className='flex flex-col gap-2'>
                                    <RequestInfoDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
                                    <UploadCertificateDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} onUploadComplete={() => {}} />
+                                    <RequestOtpDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
                                </div>
                            ) : null }
                            
-                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress) && task.status !== 'Completed' && task.status !== 'Pending VLE Acceptance' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
+                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress && !canAdminSetPrice) && task.status !== 'Completed' && task.status !== 'Pending VLE Acceptance' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
                            )}
                         </CardContent>
