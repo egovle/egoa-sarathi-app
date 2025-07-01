@@ -33,7 +33,11 @@ const AdminReports = ({ tasks, vles }: { tasks: any[], vles: any[] }) => {
         return vles.filter(v => !v.isAdmin).map(vle => {
             const assignedTasks = tasks.filter(t => t.assignedVleId === vle.id);
             const completedTasks = assignedTasks.filter(t => t.status === 'Completed' || t.status === 'Paid Out');
-            const totalCommission = completedTasks.reduce((sum, task) => sum + (task.rate || 0), 0);
+            const totalCommission = completedTasks.reduce((sum, task) => {
+                const profit = (task.totalPaid || 0) - (task.governmentFeeApplicable || 0);
+                const commission = profit * 0.8;
+                return sum + commission;
+            }, 0);
             return {
                 ...vle,
                 tasksAssigned: assignedTasks.length,
@@ -47,8 +51,9 @@ const AdminReports = ({ tasks, vles }: { tasks: any[], vles: any[] }) => {
         const data: { [key: string]: number } = {};
         tasks.filter(t => t.status === 'Paid Out' || t.status === 'Completed').forEach(task => {
             const month = format(new Date(task.date), 'yyyy-MM');
-            const fee = task.rate || 0;
-            data[month] = (data[month] || 0) + fee;
+            const profit = (task.totalPaid || 0) - (task.governmentFeeApplicable || 0);
+            const adminRevenue = profit * 0.2;
+            data[month] = (data[month] || 0) + adminRevenue;
         });
         return Object.entries(data)
             .map(([month, revenue]) => ({ month: format(new Date(month), 'MMM yy'), revenue }))
@@ -121,7 +126,7 @@ Here is your performance summary:
 
 - Tasks Assigned: ${vle.tasksAssigned}
 - Tasks Completed: ${vle.tasksCompleted}
-- Total Fees Processed: ₹${vle.totalCommission.toFixed(2)}
+- Total Commission Earned: ₹${vle.totalCommission.toFixed(2)}
 
 Keep up the great work!
 
@@ -183,7 +188,7 @@ eGoa Sarathi Admin Team
                                     <TableHead>VLE Name</TableHead>
                                     <TableHead>Tasks Assigned</TableHead>
                                     <TableHead>Tasks Completed</TableHead>
-                                    <TableHead>Fees Processed</TableHead>
+                                    <TableHead>Commission Earned</TableHead>
                                     <TableHead className="text-right">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -210,9 +215,9 @@ eGoa Sarathi Admin Team
                 <Card>
                     <CardHeader className="flex flex-row items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle>Revenue Over Time</CardTitle>
+                        <CardTitle>Admin Revenue Over Time</CardTitle>
                     </CardHeader>
-                    <CardDescription className="px-6 -mt-4">Based on fees from completed tasks.</CardDescription>
+                    <CardDescription className="px-6 -mt-4">Based on 20% commission from completed tasks.</CardDescription>
                     <CardContent>
                         <ChartContainer config={revenueChartConfig} className="min-h-[250px] w-full pt-4">
                             <BarChart data={revenueByMonth}>
@@ -260,27 +265,22 @@ const VleReports = ({ tasks, userProfile }: { tasks: any[], userProfile: any }) 
     const assignedTasks = useMemo(() => tasks.filter(t => t.assignedVleId === userProfile.id), [tasks, userProfile.id]);
     
     const stats = useMemo(() => {
-        const completed = assignedTasks.filter(t => t.status === 'Completed' || t.status === 'Paid Out').length;
-        const pending = assignedTasks.length - completed;
-        const totalCommission = assignedTasks
-            .filter(t => t.status === 'Completed' || t.status === 'Paid Out')
-            .reduce((sum, task) => {
-                const fee = task.rate || 0;
-                if (task.type === 'VLE Lead') {
-                    // VLE gets 40% if they are the assignee but not creator, 80% if they are both
-                    return sum + (fee * (task.creatorId === task.assignedVleId ? 0.8 : 0.4));
-                }
-                // VLE gets 80% for customer requests
-                return sum + (fee * 0.8);
-            }, 0);
+        const completedTasks = assignedTasks.filter(t => t.status === 'Completed' || t.status === 'Paid Out');
+        const pending = assignedTasks.length - completedTasks.length;
+        
+        const totalCommission = completedTasks.reduce((sum, task) => {
+            const serviceProfit = (task.totalPaid || 0) - (task.governmentFeeApplicable || 0);
+            const commission = serviceProfit * 0.8;
+            return sum + commission;
+        }, 0);
         
         return {
             total: assignedTasks.length,
-            completed,
+            completed: completedTasks.length,
             pending,
             totalCommission,
         };
-    }, [assignedTasks, userProfile]);
+    }, [assignedTasks]);
 
     return (
         <div className="space-y-6">
@@ -344,7 +344,7 @@ const VleReports = ({ tasks, userProfile }: { tasks: any[], userProfile: any }) 
                                     <TableCell>{task.id.slice(-6).toUpperCase()}</TableCell>
                                     <TableCell>{task.service}</TableCell>
                                     <TableCell>{task.status}</TableCell>
-                                    <TableCell>₹{task.rate?.toFixed(2) || '0.00'}</TableCell>
+                                    <TableCell>₹{(task.totalPaid || 0).toFixed(2)}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -410,7 +410,7 @@ export default function ReportsPage() {
     
     if (!userProfile) return null;
 
-    if (userProfile.role === 'customer') {
+    if (userProfile.role === 'customer' || userProfile.role === 'government') {
         return (
              <Card>
                 <CardHeader>

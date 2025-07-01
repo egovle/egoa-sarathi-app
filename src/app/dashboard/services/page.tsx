@@ -215,7 +215,7 @@ export default function ServiceManagementPage() {
 
     // Effect for handling authorization and redirection
     useEffect(() => {
-        if (!authLoading && userProfile && !userProfile.isAdmin) {
+        if (!authLoading && userProfile && (!userProfile.isAdmin || userProfile.role === 'government')) {
             toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
             router.push('/dashboard');
         }
