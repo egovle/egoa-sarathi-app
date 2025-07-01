@@ -1482,12 +1482,13 @@ const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.R
 };
 
 
-const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData, onApprovePayout }: { allTasks: any[], vles: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void, onResetData: () => Promise<void>, onApprovePayout: (task: any) => Promise<void> }) => {
-    const vlesForManagement = vles.filter(v => !v.isAdmin);
+const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData, onApprovePayout }: { allTasks: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void, onResetData: () => Promise<void>, onApprovePayout: (task: any) => Promise<void> }) => {
+    const vlesForManagement = allUsers.filter(u => u.role === 'vle' && !u.isAdmin);
+    const customersForManagement = allUsers.filter(u => u.role === 'customer');
+    
     const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
     const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
-    const feedback = allTasks.filter(t => t.feedback).map(t => ({...t.feedback, taskId: t.id, customer: t.customer, date: t.date, service: t.service}));
     const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
     
@@ -1575,7 +1576,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <StatCard title="Total Tasks" value={allTasks.length.toString()} icon={Briefcase} description="All tasks in the system" />
                     <StatCard title="Total VLEs" value={vlesForManagement.length.toString()} icon={Users} description="Registered VLEs" />
-                    <StatCard title="Total Customers" value={allUsers.length.toString()} icon={Users2} description="Registered customers" />
+                    <StatCard title="Total Customers" value={customersForManagement.length.toString()} icon={Users2} description="Registered customers" />
                     <StatCard title="Open Complaints" value={complaints.filter(c => c.status === 'Open').length.toString()} icon={AlertTriangle} description="Awaiting admin response" />
                     <StatCard title="Pending Pricing" value={pricingTasks.length.toString()} icon={Wallet} description="Tasks needing price approval" />
                 </div>
@@ -1803,7 +1804,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
                     <div className="flex items-center justify-between">
                         <div>
                            <CardTitle>Customer Management</CardTitle>
-                           <CardDescription>View all registered customers in the system.</CardDescription>
+                           <CardDescription>View all registered customers and VLEs in the system.</CardDescription>
                         </div>
                         <div className="relative">
                             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -1824,6 +1825,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
                             <TableHead>Email</TableHead>
                             <TableHead>Mobile</TableHead>
                             <TableHead>Location</TableHead>
+                             <TableHead>Role</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1833,6 +1835,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
                             <TableCell>{user.email}</TableCell>
                             <TableCell>{user.mobile}</TableCell>
                             <TableCell>{user.location}</TableCell>
+                             <TableCell><Badge variant={user.role === 'vle' ? 'secondary' : 'outline'}>{user.role}</Badge></TableCell>
                         </TableRow>
                         ))}
                     </TableBody>
@@ -1875,7 +1878,7 @@ const AdminDashboard = ({ allTasks, vles, allUsers, paymentRequests, onComplaint
                             </TableHeader>
                             <TableBody>
                                 {filteredTasks.map(task => {
-                                    const availableVles = vles.filter(vle => 
+                                    const availableVles = vlesForManagement.filter(vle => 
                                         vle.status === 'Approved' && 
                                         vle.available && 
                                         vle.id !== task.creatorId // Exclude the VLE who created the task
@@ -1994,8 +1997,7 @@ export default function DashboardPage() {
     
     // Admin state
     const [allTasks, setAllTasks] = useState<any[]>([]);
-    const [vles, setVles] = useState<any[]>([]);
-    const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [allUsers, setAllUsers] = useState<any[]>([]); // Will contain both customers and VLEs
     const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
     
     // VLE state
@@ -2058,8 +2060,18 @@ export default function DashboardPage() {
 
         if (primaryRole === 'admin') {
             unsubscribers.push(onSnapshot(query(collection(db, "tasks"), orderBy("date", "desc")), (s) => setAllTasks(s.docs.map(d => ({ id: d.id, ...d.data() })))));
-            unsubscribers.push(onSnapshot(query(collection(db, "vles")), (s) => setVles(s.docs.map(d => ({ id: d.id, ...d.data() })))));
-            unsubscribers.push(onSnapshot(query(collection(db, "users")), (s) => setAllUsers(s.docs.map(d => ({ id: d.id, ...d.data() })))));
+            
+            // Fetch both VLEs and Customers for the All Users list
+            const unsubUsers = onSnapshot(query(collection(db, "users")), (userSnapshot) => {
+                 const customerData = userSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                 const unsubVles = onSnapshot(query(collection(db, "vles")), (vleSnapshot) => {
+                    const vleData = vleSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setAllUsers([...customerData, ...vleData]);
+                 });
+                 unsubscribers.push(unsubVles);
+            });
+            unsubscribers.push(unsubUsers);
+            
             unsubscribers.push(onSnapshot(query(collection(db, "paymentRequests"), where("status", "==", "pending")), (s) => setPaymentRequests(s.docs.map(d => ({ id: d.id, ...d.data() })))));
         } else if (primaryRole === 'vle') {
             const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
@@ -2484,8 +2496,6 @@ export default function DashboardPage() {
                 
                 const amountToVle = governmentFee + vleCommission;
 
-                // The admin's wallet was credited when the task was created.
-                // Now, the admin pays the VLE their share from the admin's wallet.
                 if (adminBalance < amountToVle) {
                     throw new Error("Admin wallet has insufficient funds to process this payout.");
                 }
@@ -2539,7 +2549,7 @@ export default function DashboardPage() {
 
         switch (primaryRole) {
             case 'admin':
-                return <AdminDashboard allTasks={allTasks} vles={vles} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} />;
+                return <AdminDashboard allTasks={allTasks} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} />;
             case 'vle':
                 return <VLEDashboard assignedTasks={assignedTasks} myLeads={myLeads} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} onTaskAccept={handleTaskAccept} onTaskReject={handleTaskReject} />;
             case 'customer':
