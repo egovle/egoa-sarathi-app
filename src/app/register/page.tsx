@@ -104,7 +104,7 @@ export default function RegisterPage() {
     
   }, [pincode, toast]);
 
-  const validateEmail = (emailToValidate: string): boolean => {
+  const validateEmailFormat = (emailToValidate: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (emailRegex.test(emailToValidate)) {
       setEmailError('');
@@ -116,7 +116,7 @@ export default function RegisterPage() {
 
   const handleEmailBlur = () => {
     if (email) {
-      validateEmail(email);
+      validateEmailFormat(email);
     }
   };
 
@@ -124,7 +124,7 @@ export default function RegisterPage() {
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     
-    if (!email || !validateEmail(email)) {
+    if (!email || !validateEmailFormat(email)) {
       if (!email) {
         setEmailError('Email is required.');
       }
@@ -325,4 +325,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
