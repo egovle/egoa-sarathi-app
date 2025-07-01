@@ -2272,6 +2272,7 @@ export default function DashboardPage() {
             });
     
             toast({ title: 'Task Accepted', description: 'You can now begin work on this task.' });
+            await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile?.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`);
             
         } catch (error: any) {
             console.error("Task acceptance failed:", error);

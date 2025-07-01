@@ -15,13 +15,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, FileText, History, MessageSquarePlus, CheckCircle, Send, UploadCloud, Camera, FileUp, PenSquare, Wallet, CheckCircle2, XCircle, KeyRound, Phone } from 'lucide-react';
+import { ArrowLeft, Loader2, FileText, History, MessageSquarePlus, CheckCircle, Send, UploadCloud, Camera, FileUp, PenSquare, Wallet, CheckCircle2, XCircle, KeyRound, Phone, CircleDollarSign } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 // --- NOTIFICATION HELPERS ---
 async function createNotification(userId: string, title: string, description: string, link?: string) {
@@ -753,6 +754,13 @@ export default function TaskDetailPage() {
     const isOtpRequestPending = task.otpRequest?.status === 'pending';
 
     const displayStatus = task.status === 'Paid Out' && isTaskCreator ? 'Completed' : task.status;
+    
+    const getEarningsDetails = () => {
+        const governmentFee = task.governmentFeeApplicable || 0;
+        const serviceProfit = (task.totalPaid || 0) - governmentFee;
+        const vleCommission = serviceProfit * 0.8;
+        return { governmentFee, vleCommission };
+    };
 
     return (
         <div className="w-full space-y-6">
@@ -899,6 +907,30 @@ export default function TaskDetailPage() {
                            )}
                         </CardContent>
                     </Card>
+
+                    {isAssignedVle && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><CircleDollarSign className="h-5 w-5"/>Your Earnings</CardTitle>
+                                <CardDescription>This is a breakdown of what you will receive upon task completion.</CardDescription>
+                            </CardHeader>
+                             <CardContent className="text-sm space-y-2">
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Govt. Fee (if any)</span>
+                                    <span>+ ₹{getEarningsDetails().governmentFee.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Your Commission (80%)</span>
+                                    <span>+ ₹{getEarningsDetails().vleCommission.toFixed(2)}</span>
+                                </div>
+                                <Separator className="my-2"/>
+                                 <div className="flex justify-between font-bold">
+                                    <span>Total Payout</span>
+                                    <span>₹{(getEarningsDetails().governmentFee + getEarningsDetails().vleCommission).toFixed(2)}</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                     
                      {canUploadMoreDocs && userProfile && (
                         <Card>
