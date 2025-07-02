@@ -31,6 +31,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; suggestion?: any; vles: any[]; onFinished: () => void; }) => {
     const { toast } = useToast();
+    const { userProfile } = useAuth();
     const initialData = camp || suggestion || {};
     
     // If it's a suggestion, create a better default name than "Suggested by..."
@@ -54,12 +55,12 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
     }, [vles, vleSearch]);
 
     const minDate = useMemo(() => {
-        // Only apply the 7-day rule for NEW camps or suggestions, not for editing existing camps.
+        // Only apply the 7-day rule for NEW camps or suggestions, not for editing existing camps where admin might need to override.
         if (camp && userProfile?.isAdmin) {
              return undefined; 
         }
         return addDays(new Date(), 7);
-    }, [camp]);
+    }, [camp, userProfile]);
 
 
     const handleSubmit = async (e: FormEvent) => {
@@ -132,8 +133,6 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
             }
         });
     };
-
-    const { userProfile } = useAuth();
 
     return (
         <form onSubmit={handleSubmit}>
@@ -469,13 +468,25 @@ export default function CampManagementPage() {
 
     const myInvitations = useMemo(() => {
         if (userProfile?.role !== 'vle') return [];
-        return upcomingCamps.filter(camp => {
+        return allCamps.filter(camp => {
+            const isUpcoming = new Date(camp.date) >= today;
+            if (!isUpcoming) return false;
+
             if (!Array.isArray(camp.assignedVles)) return false;
             return camp.assignedVles.some(vle => vle.id === userProfile.id && vle.status === 'pending');
         });
-    }, [upcomingCamps, userProfile]);
+    }, [allCamps, userProfile, today]);
 
-    const myConfirmedCamps = useMemo(() => userProfile?.role === 'vle' ? upcomingCamps.filter(c => c.assignedVles?.some((v:any) => v.id === userProfile.id && v.status === 'accepted')) : [], [upcomingCamps, userProfile]);
+    const myConfirmedCamps = useMemo(() => {
+        if (userProfile?.role !== 'vle') return [];
+        return allCamps.filter(camp => {
+            const isUpcoming = new Date(camp.date) >= today;
+            if (!isUpcoming) return false;
+
+            if (!Array.isArray(camp.assignedVles)) return false;
+            return camp.assignedVles.some(vle => vle.id === userProfile.id && vle.status === 'accepted');
+        });
+    }, [allCamps, userProfile, today]);
 
     // --- Handlers ---
     const handleEdit = (camp: any) => {
@@ -623,7 +634,7 @@ export default function CampManagementPage() {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem onClick={() => handleEdit(camp)}><UserCog className="mr-2 h-4 w-4"/>Manage VLEs / Edit</DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleDelete(camp)} className="text-destructive"><Trash className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleDelete(camp)} className="text-destructive focus:text-destructive"><Trash className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>
@@ -942,3 +953,4 @@ export default function CampManagementPage() {
     
 
     
+
