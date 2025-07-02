@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogTrigger, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -463,24 +463,19 @@ export default function CampManagementPage() {
     const { upcomingCamps, pastCamps } = useMemo(() => {
         const upcoming: any[] = [];
         const past: any[] = [];
+        
+        // Use a string comparison for dates to avoid timezone issues.
+        // Format today's date as YYYY-MM-DD
         const today = new Date();
-        const todayY = today.getFullYear();
-        const todayM = today.getMonth();
-        const todayD = today.getDate();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
         for (const c of allCamps) {
             if (!c.date || typeof c.date !== 'string' || c.date.length < 10) continue;
             
-            // Get Y, M, D from the ISO string 'YYYY-MM-DDTHH:...'
-            const year = parseInt(c.date.substring(0, 4), 10);
-            const month = parseInt(c.date.substring(5, 7), 10) - 1; // JS month is 0-indexed
-            const day = parseInt(c.date.substring(8, 10), 10);
+            // Get just the date part of the ISO string: 'YYYY-MM-DD'
+            const campDateStr = c.date.substring(0, 10);
             
-            const campIsPast = year < todayY ||
-                              (year === todayY && month < todayM) ||
-                              (year === todayY && month === todayM && day < todayD);
-            
-            if (campIsPast) {
+            if (campDateStr < todayStr) {
                 past.push(c);
             } else {
                 upcoming.push(c);
