@@ -55,10 +55,11 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
     }, [vles, vleSearch]);
 
     const minDate = useMemo(() => {
-        // Only apply the 7-day rule for NEW camps or suggestions, not for editing existing camps where admin might need to override.
+        // Admin can override date for existing camps, but not for new ones.
         if (camp && userProfile?.isAdmin) {
              return undefined; 
         }
+        // All new camps/suggestions must be at least 7 days in the future.
         return addDays(new Date(), 7);
     }, [camp, userProfile]);
 
@@ -468,14 +469,24 @@ export default function CampManagementPage() {
 
     const myInvitations = useMemo(() => {
         if (userProfile?.role !== 'vle') return [];
-        return allCamps.filter(camp => {
-            const isUpcoming = new Date(camp.date) >= today;
-            if (!isUpcoming) return false;
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Start of today
 
-            if (!Array.isArray(camp.assignedVles)) return false;
+        return allCamps.filter(camp => {
+            if (!camp.date || !Array.isArray(camp.assignedVles)) {
+                return false;
+            }
+            const campDate = new Date(camp.date);
+            campDate.setHours(0, 0, 0, 0); // Normalize camp date to start of day
+
+            const isUpcoming = campDate >= now;
+            if (!isUpcoming) {
+                return false;
+            }
+
             return camp.assignedVles.some(vle => vle.id === userProfile.id && vle.status === 'pending');
         });
-    }, [allCamps, userProfile, today]);
+    }, [allCamps, userProfile]);
 
     const myConfirmedCamps = useMemo(() => {
         if (userProfile?.role !== 'vle') return [];
@@ -953,4 +964,5 @@ export default function CampManagementPage() {
     
 
     
+
 
