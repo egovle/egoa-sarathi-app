@@ -3,9 +3,9 @@
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
 import { db, storage } from '@/lib/firebase';
-import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction, limit, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy, getDoc, setDoc, where, getDocs, arrayUnion, runTransaction, limit, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { PlusCircle, User, FilePlus, Wallet, ToggleRight, UserCheck, Star, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent, Trash2, CircleDollarSign, XCircle } from 'lucide-react';
+import { PlusCircle, User, FilePlus, Wallet, ToggleRight, UserCheck, Star, Edit, Banknote, Camera, FileUp, AtSign, Trash, Send, FileText, CheckCircle2, Loader2, Users, MoreHorizontal, Eye, GitFork, UserPlus, ShieldAlert, StarIcon, MessageCircleMore, PenSquare, Briefcase, Users2, AlertTriangle, Mail, Phone, Search, Tent, Trash2, CircleDollarSign, XCircle, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,7 +26,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { services as seedServices } from '@/lib/seed';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -429,7 +429,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // File upload state - Changed to an object to hold files by key
   const [selectedFiles, setSelectedFiles] = useState<{ [key: string]: File | null }>({});
 
   const parentServices = useMemo(() => services.filter(s => !s.parentId), [services]);
@@ -457,7 +456,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
   useEffect(() => {
       setSelectedSubCategory('');
-      setSelectedFiles({}); // Reset files when category changes
+      setSelectedFiles({});
   }, [selectedCategory])
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>, key: string) => {
@@ -480,7 +479,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
     const mobile = form.mobile.value;
     const email = form.email.value;
 
-    // --- Validation ---
     if (mobile.length !== 10) {
         toast({ title: 'Invalid Mobile Number', description: 'Please enter a valid 10-digit mobile number.', variant: 'destructive' });
         setIsSubmitting(false);
@@ -506,7 +504,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         setIsSubmitting(false);
         return;
     }
-    // --- End Validation ---
     
     try {
         const isVleLead = creatorProfile.role === 'vle';
@@ -520,12 +517,10 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             service: selectedService.name,
             serviceId: selectedService.id,
             date: new Date().toISOString(),
-            // Financials
             totalPaid: totalPaid,
             governmentFeeApplicable: selectedService.governmentFee || 0,
             customerRate: selectedService.customerRate,
             vleRate: selectedService.vleRate,
-            // History & Status
             history: [{
                 timestamp: new Date().toISOString(),
                 actorId: creatorId,
@@ -644,27 +639,33 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                 {selectedService?.documents?.length > 0 && (
                     <div className="space-y-4 rounded-md border p-4">
                         <h4 className="font-medium text-sm text-muted-foreground">Required Documents</h4>
-                        {selectedService.documents.map((doc: any) => (
-                            <div key={doc.key} className="grid grid-cols-3 items-center gap-4">
-                                <Label htmlFor={`doc-${doc.key}`} className="text-right col-span-1 text-xs sm:text-sm">
-                                    {doc.label}
-                                </Label>
-                                <div className="col-span-2">
-                                    <Input
-                                        id={`doc-${doc.key}`}
-                                        type="file"
-                                        onChange={(e) => handleFileChange(e, doc.key)}
-                                        className="text-xs h-9"
-                                    />
-                                    {selectedFiles[doc.key] && (
-                                        <p className="text-xs text-muted-foreground mt-1 truncate" title={selectedFiles[doc.key]?.name}>
-                                            <FileText className="h-3 w-3 inline-block mr-1" />
-                                            {selectedFiles[doc.key]?.name}
-                                        </p>
-                                    )}
+                        {selectedService.documents.map((doc: any, index: number) => {
+                            const isObject = typeof doc === 'object' && doc !== null && doc.key && doc.label;
+                            const key = isObject ? doc.key : doc.toString().toLowerCase().replace(/\s+/g, '_');
+                            const label = isObject ? doc.label : doc;
+
+                            return (
+                                <div key={key || index} className="grid grid-cols-3 items-center gap-4">
+                                    <Label htmlFor={`doc-${key}`} className="text-right col-span-1 text-xs sm:text-sm">
+                                        {label}
+                                    </Label>
+                                    <div className="col-span-2">
+                                        <Input
+                                            id={`doc-${key}`}
+                                            type="file"
+                                            onChange={(e) => handleFileChange(e, key)}
+                                            className="text-xs h-9"
+                                        />
+                                        {selectedFiles[key] && (
+                                            <p className="text-xs text-muted-foreground mt-1 truncate" title={selectedFiles[key]?.name}>
+                                                <FileText className="h-3 w-3 inline-block mr-1" />
+                                                {selectedFiles[key]?.name}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
                 
@@ -2384,7 +2385,6 @@ export default function DashboardPage() {
                 `You have been invited to work on task: ${taskId.slice(-6).toUpperCase()}.`,
                 `/dashboard`
             );
-            // Success toast is handled in the calling dialog.
         } catch (error: any) {
             console.error("Task assignment failed:", error);
             toast({
@@ -2392,7 +2392,7 @@ export default function DashboardPage() {
                 description: error.message || 'Could not assign the task.',
                 variant: 'destructive',
             });
-            throw error; // Re-throw to prevent dialog from closing
+            throw error; 
         }
     }
 
