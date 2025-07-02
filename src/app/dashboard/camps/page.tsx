@@ -53,6 +53,15 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
         );
     }, [vles, vleSearch]);
 
+    const minDate = useMemo(() => {
+        // Only apply the 7-day rule for NEW camps or suggestions, not for editing existing camps.
+        if (camp) {
+            return undefined; // No restriction for editing
+        }
+        return addDays(new Date(), 7);
+    }, [camp]);
+
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -147,7 +156,7 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
-                            <DayPicker mode="single" selected={date} onSelect={setDate} initialFocus />
+                            <DayPicker mode="single" selected={date} onSelect={setDate} initialFocus fromDate={minDate} />
                         </PopoverContent>
                     </Popover>
                 </div>
@@ -186,12 +195,16 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
                                                 <div 
                                                     key={vle.id} 
                                                     className="flex items-center space-x-2 p-2 cursor-pointer hover:bg-accent"
-                                                    onClick={() => toggleVleSelection(vle)}
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        toggleVleSelection(vle);
+                                                    }}
                                                 >
                                                     <Checkbox
                                                         id={`vle-${vle.id}`}
                                                         checked={isSelected}
                                                         readOnly
+                                                        tabIndex={-1}
                                                     />
                                                     <Label htmlFor={`vle-${vle.id}`} className="font-normal cursor-pointer">
                                                         {vle.name} ({vle.location})
@@ -442,11 +455,18 @@ export default function CampManagementPage() {
         return () => unsubServices();
     }, []);
     
-    const upcomingCamps = useMemo(() => allCamps.filter(c => new Date(c.date) >= new Date()), [allCamps]);
-    const pastCamps = useMemo(() => allCamps.filter(c => new Date(c.date) < new Date()), [allCamps]);
+    // Stable date for comparisons to avoid re-renders
+    const today = useMemo(() => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        return d;
+    }, []);
 
-    const myInvitations = useMemo(() => userProfile?.role === 'vle' ? allCamps.filter(c => c.assignedVles?.some((v:any) => v.id === userProfile.id && v.status === 'pending')) : [], [allCamps, userProfile]);
-    const myConfirmedCamps = useMemo(() => userProfile?.role === 'vle' ? allCamps.filter(c => c.assignedVles?.some((v:any) => v.id === userProfile.id && v.status === 'accepted')) : [], [allCamps, userProfile]);
+    const upcomingCamps = useMemo(() => allCamps.filter(c => new Date(c.date) >= today), [allCamps, today]);
+    const pastCamps = useMemo(() => allCamps.filter(c => new Date(c.date) < today), [allCamps, today]);
+
+    const myInvitations = useMemo(() => userProfile?.role === 'vle' ? upcomingCamps.filter(c => c.assignedVles?.some((v:any) => v.id === userProfile.id && v.status === 'pending')) : [], [upcomingCamps, userProfile]);
+    const myConfirmedCamps = useMemo(() => userProfile?.role === 'vle' ? upcomingCamps.filter(c => c.assignedVles?.some((v:any) => v.id === userProfile.id && v.status === 'accepted')) : [], [upcomingCamps, userProfile]);
 
     const handleEdit = (camp: any) => {
         setSelectedCamp(camp);
