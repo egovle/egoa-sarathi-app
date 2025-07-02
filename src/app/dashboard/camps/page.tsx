@@ -170,18 +170,23 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
                                                 <CommandItem
                                                     key={vle.id}
                                                     value={vle.name}
-                                                    onSelect={() => toggleVleSelection(vle)}
-                                                    className="flex items-center space-x-2"
+                                                    onSelect={() => {
+                                                        // This handles keyboard selection
+                                                        toggleVleSelection(vle);
+                                                    }}
+                                                    onMouseDown={(e) => {
+                                                        // This handles mouse selection and prevents the popover from closing
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        toggleVleSelection(vle);
+                                                    }}
+                                                    className="flex items-center space-x-2 cursor-pointer"
                                                 >
                                                     <Checkbox
-                                                        id={`vle-check-${vle.id}`}
                                                         checked={isSelected}
-                                                        onCheckedChange={() => toggleVleSelection(vle)}
-                                                        onClick={(e) => e.stopPropagation()} 
+                                                        className="pointer-events-none" // The parent item handles interaction
                                                     />
-                                                    <Label htmlFor={`vle-check-${vle.id}`} className="flex-1 cursor-pointer">
-                                                    {vle.name} ({vle.location})
-                                                    </Label>
+                                                    <span>{vle.name} ({vle.location})</span>
                                                 </CommandItem>
                                                 )
                                             })}
