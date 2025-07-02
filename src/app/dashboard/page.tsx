@@ -494,7 +494,11 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         setIsSubmitting(false);
         return;
     }
-    if (selectedService?.documents?.some((doc: any) => !selectedFiles[doc.key])) {
+    if (selectedService?.documents?.some((doc: any) => {
+        const isObject = typeof doc === 'object' && doc !== null && doc.key && doc.label;
+        const key = isObject ? doc.key : doc.toString().toLowerCase().replace(/\s+/g, '_');
+        return !selectedFiles[key];
+    })) {
         toast({ title: "Documents Required", description: "Please upload all required documents for the selected service.", variant: 'destructive' });
         setIsSubmitting(false);
         return;
