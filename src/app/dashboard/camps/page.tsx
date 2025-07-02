@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ import { DayPicker } from 'react-day-picker';
 import "react-day-picker/dist/style.css";
 import { createNotification, createNotificationForAdmins } from '@/app/dashboard/page';
 import { cn } from '@/lib/utils';
-import { format, startOfDay, isBefore } from 'date-fns';
+import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -460,21 +460,34 @@ export default function CampManagementPage() {
     }, []);
     
     // --- Data Derivations ---
-    const today = useMemo(() => startOfDay(new Date()), []);
+    const { upcomingCamps, pastCamps } = useMemo(() => {
+        const upcoming: any[] = [];
+        const past: any[] = [];
+        const today = new Date();
+        const todayY = today.getFullYear();
+        const todayM = today.getMonth();
+        const todayD = today.getDate();
 
-    const upcomingCamps = useMemo(() => {
-        return allCamps.filter(c => {
-            if (!c.date) return false;
-            return !isBefore(startOfDay(new Date(c.date)), today);
-        });
-    }, [allCamps, today]);
-    
-    const pastCamps = useMemo(() => {
-        return allCamps.filter(c => {
-            if (!c.date) return false;
-            return isBefore(startOfDay(new Date(c.date)), today);
-        });
-    }, [allCamps, today]);
+        for (const c of allCamps) {
+            if (!c.date || typeof c.date !== 'string' || c.date.length < 10) continue;
+            
+            // Get Y, M, D from the ISO string 'YYYY-MM-DDTHH:...'
+            const year = parseInt(c.date.substring(0, 4), 10);
+            const month = parseInt(c.date.substring(5, 7), 10) - 1; // JS month is 0-indexed
+            const day = parseInt(c.date.substring(8, 10), 10);
+            
+            const campIsPast = year < todayY ||
+                              (year === todayY && month < todayM) ||
+                              (year === todayY && month === todayM && day < todayD);
+            
+            if (campIsPast) {
+                past.push(c);
+            } else {
+                upcoming.push(c);
+            }
+        }
+        return { upcomingCamps: upcoming, pastCamps: past };
+    }, [allCamps]);
     
     const myInvitations = useMemo(() => {
         if (!userProfile || userProfile.role !== 'vle') return [];
@@ -963,3 +976,5 @@ export default function CampManagementPage() {
     }
     return <CustomerView />;
 }
+
+    
