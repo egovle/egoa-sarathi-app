@@ -22,7 +22,7 @@ import { DayPicker } from 'react-day-picker';
 import "react-day-picker/dist/style.css";
 import { createNotification, createNotificationForAdmins } from '@/app/dashboard/page';
 import { cn } from '@/lib/utils';
-import { format, addDays } from 'date-fns';
+import { format, startOfDay, isBefore } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -460,78 +460,47 @@ export default function CampManagementPage() {
     }, []);
     
     // --- Data Derivations ---
-    // A normalized date for today to ensure consistent comparisons
-    const today = useMemo(() => {
-        const d = new Date();
-        d.setHours(0, 0, 0, 0);
-        return d;
-    }, []);
+    const today = useMemo(() => startOfDay(new Date()), []);
 
     const upcomingCamps = useMemo(() => {
         return allCamps.filter(c => {
             if (!c.date) return false;
-            const campDate = new Date(c.date);
-            campDate.setHours(0, 0, 0, 0);
-            return campDate.getTime() >= today.getTime();
+            return !isBefore(startOfDay(new Date(c.date)), today);
         });
     }, [allCamps, today]);
     
     const pastCamps = useMemo(() => {
         return allCamps.filter(c => {
             if (!c.date) return false;
-            const campDate = new Date(c.date);
-            campDate.setHours(0, 0, 0, 0);
-            return campDate.getTime() < today.getTime();
+            return isBefore(startOfDay(new Date(c.date)), today);
         });
     }, [allCamps, today]);
     
     const myInvitations = useMemo(() => {
         if (!userProfile || userProfile.role !== 'vle') return [];
 
-        const todayForFilter = new Date();
-        todayForFilter.setHours(0, 0, 0, 0);
-
-        return allCamps.filter(camp => {
-            if (!camp.date || !Array.isArray(camp.assignedVles)) {
+        return upcomingCamps.filter(camp => {
+            if (!Array.isArray(camp.assignedVles)) {
                 return false;
             }
-
-            const campDate = new Date(camp.date);
-            campDate.setHours(0, 0, 0, 0);
-
-            if (campDate.getTime() < todayForFilter.getTime()) {
-                return false; // Not an upcoming camp
-            }
-
             return camp.assignedVles.some(vle => 
                 vle.id === userProfile.id && vle.status === 'pending'
             );
         });
-    }, [allCamps, userProfile]);
+    }, [upcomingCamps, userProfile]);
 
     const myConfirmedCamps = useMemo(() => {
         if (!userProfile || userProfile.role !== 'vle') return [];
         
-        const todayForFilter = new Date();
-        todayForFilter.setHours(0, 0, 0, 0);
-        
-        return allCamps.filter(camp => {
-            if (!camp.date || !Array.isArray(camp.assignedVles)) {
+        return upcomingCamps.filter(camp => {
+            if (!Array.isArray(camp.assignedVles)) {
                 return false;
             }
-            
-            const campDate = new Date(camp.date);
-            campDate.setHours(0, 0, 0, 0);
-
-            if (campDate.getTime() < todayForFilter.getTime()) {
-                 return false;
-            }
-            
             return camp.assignedVles.some(vle => 
                 vle.id === userProfile.id && vle.status === 'accepted'
             );
         });
-    }, [allCamps, userProfile]);
+    }, [upcomingCamps, userProfile]);
 
     // --- Handlers ---
     const handleEdit = (camp: any) => {
