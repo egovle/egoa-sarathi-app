@@ -2555,7 +2555,7 @@ export default function DashboardPage() {
 
         try {
             // Clear collections
-            const collectionsToClear = ['tasks', 'camps', 'notifications', 'paymentRequests', 'services', 'campSuggestions'];
+            const collectionsToClear = ['tasks', 'camps', 'notifications', 'paymentRequests', 'services', 'campSuggestions', 'taskChats'];
             for (const collectionName of collectionsToClear) {
                 await processInBatches(collection(db, collectionName), 'delete');
             }

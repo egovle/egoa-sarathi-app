@@ -971,7 +971,9 @@ export default function TaskDetailPage() {
                         </Card>
                     )}
 
-                    <TaskChat taskId={taskId as string} task={task} user={user} userProfile={userProfile} />
+                    {user && userProfile && (
+                        <TaskChat taskId={taskId as string} task={task} user={user} userProfile={userProfile} />
+                    )}
 
                     <Card>
                         <CardHeader>

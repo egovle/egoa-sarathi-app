@@ -24,6 +24,8 @@ type PostOffice = {
   State: string;
 };
 
+const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
 export default function RegisterPage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -104,19 +106,13 @@ export default function RegisterPage() {
     
   }, [pincode, toast]);
 
-  const validateEmailFormat = (emailToValidate: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (emailRegex.test(emailToValidate)) {
-      setEmailError('');
-      return true;
-    }
-    setEmailError('Please enter a valid email address.');
-    return false;
-  };
-
   const handleEmailBlur = () => {
     if (email) {
-      validateEmailFormat(email);
+      if (validateEmail(email)) {
+        setEmailError('');
+      } else {
+        setEmailError('Please enter a valid email address.');
+      }
     }
   };
 
@@ -124,10 +120,9 @@ export default function RegisterPage() {
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     
-    if (!email || !validateEmailFormat(email)) {
-      if (!email) {
-        setEmailError('Email is required.');
-      }
+    if (!email || !validateEmail(email)) {
+      if (!email) setEmailError('Email is required.');
+      else setEmailError('Please enter a valid email address.');
       return;
     }
 
