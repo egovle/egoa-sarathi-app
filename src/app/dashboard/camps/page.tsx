@@ -55,8 +55,8 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
 
     const minDate = useMemo(() => {
         // Only apply the 7-day rule for NEW camps or suggestions, not for editing existing camps.
-        if (camp) {
-            return undefined; // No restriction for editing
+        if (camp && userProfile?.isAdmin) {
+             return undefined; 
         }
         return addDays(new Date(), 7);
     }, [camp]);
@@ -132,6 +132,8 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
             }
         });
     };
+
+    const { userProfile } = useAuth();
 
     return (
         <form onSubmit={handleSubmit}>
@@ -455,7 +457,7 @@ export default function CampManagementPage() {
         return () => unsubServices();
     }, []);
     
-    // Stable date for comparisons to avoid re-renders
+    // --- Data Derivations ---
     const today = useMemo(() => {
         const d = new Date();
         d.setHours(0, 0, 0, 0);
@@ -465,9 +467,17 @@ export default function CampManagementPage() {
     const upcomingCamps = useMemo(() => allCamps.filter(c => new Date(c.date) >= today), [allCamps, today]);
     const pastCamps = useMemo(() => allCamps.filter(c => new Date(c.date) < today), [allCamps, today]);
 
-    const myInvitations = useMemo(() => userProfile?.role === 'vle' ? upcomingCamps.filter(c => c.assignedVles?.some((v:any) => v.id === userProfile.id && v.status === 'pending')) : [], [upcomingCamps, userProfile]);
+    const myInvitations = useMemo(() => {
+        if (userProfile?.role !== 'vle') return [];
+        return upcomingCamps.filter(camp => {
+            if (!Array.isArray(camp.assignedVles)) return false;
+            return camp.assignedVles.some(vle => vle.id === userProfile.id && vle.status === 'pending');
+        });
+    }, [upcomingCamps, userProfile]);
+
     const myConfirmedCamps = useMemo(() => userProfile?.role === 'vle' ? upcomingCamps.filter(c => c.assignedVles?.some((v:any) => v.id === userProfile.id && v.status === 'accepted')) : [], [upcomingCamps, userProfile]);
 
+    // --- Handlers ---
     const handleEdit = (camp: any) => {
         setSelectedCamp(camp);
         setIsFormOpen(true);
@@ -928,5 +938,7 @@ export default function CampManagementPage() {
     }
     return <CustomerView />;
 }
+
+    
 
     
