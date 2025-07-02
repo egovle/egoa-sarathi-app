@@ -56,7 +56,9 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
 
     const minDate = useMemo(() => {
         // All new camps/suggestions must be at least 7 days in the future.
-        return addDays(new Date(), 7);
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        return d;
     }, []);
 
 
@@ -259,7 +261,11 @@ const SuggestCampDialog = ({ onFinished, services }: { onFinished: () => void; s
     const [selectedServices, setSelectedServices] = useState<any[]>([]);
     const [otherServices, setOtherServices] = useState('');
 
-    const minDate = addDays(new Date(), 7);
+    const minDate = useMemo(() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 7);
+        return d;
+    }, []);
     
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -454,38 +460,78 @@ export default function CampManagementPage() {
     }, []);
     
     // --- Data Derivations ---
-    const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+    // A normalized date for today to ensure consistent comparisons
+    const today = useMemo(() => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        return d;
+    }, []);
 
-    const upcomingCamps = useMemo(() => allCamps.filter(c => c.date && format(new Date(c.date), 'yyyy-MM-dd') >= todayStr), [allCamps, todayStr]);
-    const pastCamps = useMemo(() => allCamps.filter(c => c.date && format(new Date(c.date), 'yyyy-MM-dd') < todayStr), [allCamps, todayStr]);
-
+    const upcomingCamps = useMemo(() => {
+        return allCamps.filter(c => {
+            if (!c.date) return false;
+            const campDate = new Date(c.date);
+            campDate.setHours(0, 0, 0, 0);
+            return campDate.getTime() >= today.getTime();
+        });
+    }, [allCamps, today]);
+    
+    const pastCamps = useMemo(() => {
+        return allCamps.filter(c => {
+            if (!c.date) return false;
+            const campDate = new Date(c.date);
+            campDate.setHours(0, 0, 0, 0);
+            return campDate.getTime() < today.getTime();
+        });
+    }, [allCamps, today]);
+    
     const myInvitations = useMemo(() => {
-        if (userProfile?.role !== 'vle') return [];
+        if (!userProfile || userProfile.role !== 'vle') return [];
+
+        const todayForFilter = new Date();
+        todayForFilter.setHours(0, 0, 0, 0);
+
         return allCamps.filter(camp => {
             if (!camp.date || !Array.isArray(camp.assignedVles)) {
                 return false;
             }
-            const isUpcoming = format(new Date(camp.date), 'yyyy-MM-dd') >= todayStr;
-            if (!isUpcoming) {
-                return false;
+
+            const campDate = new Date(camp.date);
+            campDate.setHours(0, 0, 0, 0);
+
+            if (campDate.getTime() < todayForFilter.getTime()) {
+                return false; // Not an upcoming camp
             }
-            return camp.assignedVles.some(vle => vle.id === userProfile.id && vle.status === 'pending');
+
+            return camp.assignedVles.some(vle => 
+                vle.id === userProfile.id && vle.status === 'pending'
+            );
         });
-    }, [allCamps, userProfile, todayStr]);
+    }, [allCamps, userProfile]);
 
     const myConfirmedCamps = useMemo(() => {
-        if (userProfile?.role !== 'vle') return [];
+        if (!userProfile || userProfile.role !== 'vle') return [];
+        
+        const todayForFilter = new Date();
+        todayForFilter.setHours(0, 0, 0, 0);
+        
         return allCamps.filter(camp => {
             if (!camp.date || !Array.isArray(camp.assignedVles)) {
                 return false;
             }
-            const isUpcoming = format(new Date(camp.date), 'yyyy-MM-dd') >= todayStr;
-            if (!isUpcoming) {
+            
+            const campDate = new Date(camp.date);
+            campDate.setHours(0, 0, 0, 0);
+
+            if (campDate.getTime() < todayForFilter.getTime()) {
                  return false;
             }
-            return camp.assignedVles.some(vle => vle.id === userProfile.id && vle.status === 'accepted');
+            
+            return camp.assignedVles.some(vle => 
+                vle.id === userProfile.id && vle.status === 'accepted'
+            );
         });
-    }, [allCamps, userProfile, todayStr]);
+    }, [allCamps, userProfile]);
 
     // --- Handlers ---
     const handleEdit = (camp: any) => {
