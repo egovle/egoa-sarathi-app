@@ -104,6 +104,17 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
         }
         setLoading(false);
     };
+    
+    const toggleVleSelection = (vle: any) => {
+        setAssignedVles(currentVles => {
+            const isSelected = currentVles.some(s => s.id === vle.id);
+            if (isSelected) {
+                return currentVles.filter(s => s.id !== vle.id);
+            } else {
+                return [...currentVles, vle];
+            }
+        });
+    };
 
     return (
         <form onSubmit={handleSubmit}>
@@ -159,19 +170,14 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
                                                 <CommandItem
                                                     key={vle.id}
                                                     value={vle.name}
-                                                    onSelect={() => {
-                                                        if (isSelected) {
-                                                            setAssignedVles(assignedVles.filter(s => s.id !== vle.id));
-                                                        } else {
-                                                            setAssignedVles([...assignedVles, vle]);
-                                                        }
-                                                    }}
+                                                    onSelect={() => toggleVleSelection(vle)}
                                                     className="flex items-center space-x-2"
                                                 >
                                                     <Checkbox
                                                         id={`vle-check-${vle.id}`}
                                                         checked={isSelected}
-                                                        readOnly
+                                                        onCheckedChange={() => toggleVleSelection(vle)}
+                                                        onClick={(e) => e.stopPropagation()} 
                                                     />
                                                     <Label htmlFor={`vle-check-${vle.id}`} className="flex-1 cursor-pointer">
                                                     {vle.name} ({vle.location})
