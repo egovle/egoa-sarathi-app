@@ -422,14 +422,14 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
     );
 };
 
-const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any, service: any, filesToUpload: {[key: string]: File}) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
+const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [selectedFiles, setSelectedFiles] = useState<{ [key: string]: File | null }>({});
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const parentServices = useMemo(() => services.filter(s => !s.parentId), [services]);
   const subServices = useMemo(() => {
@@ -456,18 +456,18 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
   useEffect(() => {
       setSelectedSubCategory('');
-      setSelectedFiles({});
+      setSelectedFiles([]);
   }, [selectedCategory])
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, key: string) => {
-    if (e.target.files && e.target.files.length > 0) {
-        const file = e.target.files[0];
-        const validation = validateFiles([file]);
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+        const files = Array.from(e.target.files);
+        const validation = validateFiles(files);
         if (!validation.isValid) {
             toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
             return;
         }
-        setSelectedFiles(prev => ({ ...prev, [key]: file }));
+        setSelectedFiles(prev => [...prev, ...files]);
     }
   };
 
@@ -494,15 +494,13 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         setIsSubmitting(false);
         return;
     }
-    if (selectedService?.documents?.some((doc: any) => {
-        const isObject = typeof doc === 'object' && doc !== null && doc.key && doc.label;
-        const key = isObject ? doc.key : doc.toString().toLowerCase().replace(/\s+/g, '_');
-        return !selectedFiles[key];
-    })) {
-        toast({ title: "Documents Required", description: "Please upload all required documents for the selected service.", variant: 'destructive' });
+    
+    if (selectedFiles.length === 0) {
+        toast({ title: "Documents Required", description: "Please upload at least one document for the selected service.", variant: 'destructive' });
         setIsSubmitting(false);
         return;
     }
+
     if (!selectedService || (!selectedService.isVariable && (!selectedService.customerRate || selectedService.customerRate <= 0))) {
         toast({ title: 'Specific Service Required', description: 'This appears to be a category. Please select a specific sub-service to proceed.', variant: 'destructive' });
         setIsSubmitting(false);
@@ -542,7 +540,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             finalCertificate: null,
         };
 
-        await onTaskCreated(newTaskData, selectedService, selectedFiles as {[key: string]: File});
+        await onTaskCreated(newTaskData, selectedService, selectedFiles);
         setDialogOpen(false); 
     } catch (error: any) {
         console.error("Error creating task:", error);
@@ -561,7 +559,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
       if (!isOpen) {
           setSelectedCategory('');
           setSelectedSubCategory('');
-          setSelectedFiles({});
+          setSelectedFiles([]);
           setIsSubmitting(false);
       }
   }
@@ -640,45 +638,27 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                     )}
                 </div>
 
-                {selectedService?.documents?.length > 0 && (
-                    <div className="space-y-4 rounded-md border p-4">
-                        <h4 className="font-medium text-sm text-muted-foreground">Required Documents</h4>
-                        {selectedService.documents.map((doc: any, index: number) => {
-                            const isObject = typeof doc === 'object' && doc !== null && doc.key && doc.label;
-                            const key = isObject ? doc.key : doc.toString().toLowerCase().replace(/\s+/g, '_');
-                            const label = isObject ? doc.label : doc;
-
-                            return (
-                                <div key={key || index} className="grid grid-cols-3 items-center gap-4">
-                                    <Label htmlFor={`doc-${key}`} className="text-right col-span-1 text-xs sm:text-sm">
-                                        {label}
-                                    </Label>
-                                    <div className="col-span-2">
-                                        <Input
-                                            id={`doc-${key}`}
-                                            type="file"
-                                            onChange={(e) => handleFileChange(e, key)}
-                                            className="text-xs h-9"
-                                        />
-                                        {selectedFiles[key] && (
-                                            <p className="text-xs text-muted-foreground mt-1 truncate" title={selectedFiles[key]?.name}>
-                                                <FileText className="h-3 w-3 inline-block mr-1" />
-                                                {selectedFiles[key]?.name}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-                
-                {selectedService && !selectedService?.documents?.length && (
-                    <Alert>
-                        <AlertDescription>No specific documents are pre-configured for this service. If needed, the VLE will request them later.</AlertDescription>
-                    </Alert>
-                )}
-
+                <div className="space-y-2">
+                    <Label htmlFor="documents">Attach Documents</Label>
+                    <Input
+                        id="documents"
+                        type="file"
+                        multiple
+                        onChange={handleFileChange}
+                        className="text-xs h-9"
+                    />
+                     {selectedFiles.length > 0 && (
+                        <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                            <p className='font-medium'>Selected files:</p>
+                            {selectedFiles.map((file, i) => (
+                                <p key={i} className="truncate" title={file.name}>
+                                    <FileText className="h-3 w-3 inline-block mr-1" />
+                                    {file.name}
+                                </p>
+                            ))}
+                        </div>
+                    )}
+                </div>
 
                {selectedService && creatorProfile && (
                  <Card className="bg-muted/50 p-4 mt-2">
@@ -1169,7 +1149,7 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest, services
 )};
 
 
-const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: {[key: string]: File}) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -1309,7 +1289,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
     );
 }
 
-const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange, onTaskAccept, onTaskReject }: { assignedTasks: any[], myLeads: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: {[key: string]: File}) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, onTaskAccept: (taskId: string) => void, onTaskReject: (taskId: string) => void }) => {
+const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange, onTaskAccept, onTaskReject }: { assignedTasks: any[], myLeads: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, onTaskAccept: (taskId: string) => void, onTaskReject: (taskId: string) => void }) => {
     const [searchQuery, setSearchQuery] = useState('');
 
     const invitations = useMemo(() => assignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), [assignedTasks]);
@@ -2228,25 +2208,21 @@ export default function DashboardPage() {
     }, [user, realtimeProfile]);
 
 
-    const handleCreateTask = async (newTaskData: any, service: any, filesToUpload: {[key: string]: File}) => {
+    const handleCreateTask = async (newTaskData: any, service: any, filesToUpload: File[]) => {
         if (!user || !realtimeProfile) {
             throw new Error("Profile not loaded");
         }
     
         const taskId = doc(collection(db, "tasks")).id;
-        const uploadedDocuments: { [key: string]: { name: string, url: string } } = {};
+        const uploadedDocuments: { name: string, url: string }[] = [];
     
-        // 1. Upload files to storage with metadata and organized paths
-        if (Object.keys(filesToUpload).length > 0) {
-            for (const key in filesToUpload) {
-                const file = filesToUpload[key];
-                if (file) {
-                    const storageRef = ref(storage, `tasks/${taskId}/${key}/${file.name}`);
-                    const metadata = { customMetadata: { creatorId: user.uid, docKey: key } };
-                    await uploadBytes(storageRef, file, metadata);
-                    const downloadURL = await getDownloadURL(storageRef);
-                    uploadedDocuments[key] = { name: file.name, url: downloadURL };
-                }
+        if (filesToUpload.length > 0) {
+            for (const file of filesToUpload) {
+                const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
+                const metadata = { customMetadata: { creatorId: user.uid } };
+                await uploadBytes(storageRef, file, metadata);
+                const downloadURL = await getDownloadURL(storageRef);
+                uploadedDocuments.push({ name: file.name, url: downloadURL });
             }
         }
         

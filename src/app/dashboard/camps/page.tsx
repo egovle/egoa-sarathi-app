@@ -153,28 +153,32 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
                                     <CommandList>
                                         <CommandEmpty>No VLE found.</CommandEmpty>
                                         <CommandGroup>
-                                            {vles.map((vle) => (
+                                            {vles.map((vle) => {
+                                                const isSelected = assignedVles.some(s => s.id === vle.id);
+                                                return (
                                                 <CommandItem
                                                     key={vle.id}
                                                     value={vle.name}
                                                     onSelect={() => {
-                                                        const isSelected = assignedVles.some(s => s.id === vle.id);
                                                         if (isSelected) {
                                                             setAssignedVles(assignedVles.filter(s => s.id !== vle.id));
                                                         } else {
                                                             setAssignedVles([...assignedVles, vle]);
                                                         }
                                                     }}
+                                                    className="flex items-center space-x-2"
                                                 >
-                                                    <Check
-                                                        className={cn(
-                                                            "mr-2 h-4 w-4",
-                                                            assignedVles.some(s => s.id === vle.id) ? "opacity-100" : "opacity-0"
-                                                        )}
+                                                    <Checkbox
+                                                        id={`vle-check-${vle.id}`}
+                                                        checked={isSelected}
+                                                        readOnly
                                                     />
+                                                    <Label htmlFor={`vle-check-${vle.id}`} className="flex-1 cursor-pointer">
                                                     {vle.name} ({vle.location})
+                                                    </Label>
                                                 </CommandItem>
-                                            ))}
+                                                )
+                                            })}
                                         </CommandGroup>
                                     </CommandList>
                                 </Command>
