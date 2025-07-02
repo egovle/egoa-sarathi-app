@@ -15,7 +15,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Database, Search } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
@@ -61,10 +60,22 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
     const [customerRate, setCustomerRate] = useState(service?.customerRate || '');
     const [vleRate, setVleRate] = useState(service?.vleRate || '');
     const [governmentFee, setGovernmentFee] = useState(service?.governmentFee || '');
-    const [documents, setDocuments] = useState(service?.documents?.join(', ') || '');
     const [parentId, setParentId] = useState(service?.parentId || 'none');
     const [isVariable, setIsVariable] = useState(service?.isVariable || false);
     const [loading, setLoading] = useState(false);
+
+    const initialDocs = useMemo(() => {
+        if (!service?.documents) return [];
+        // Convert old string array to new object array for editing
+        return service.documents.map((doc: any) => {
+            if (typeof doc === 'string') {
+                return { key: doc.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, ''), label: doc };
+            }
+            return doc; // It's already an object {key, label}
+        });
+    }, [service]);
+
+    const [documents, setDocuments] = useState<{key: string; label: string}[]>(initialDocs);
     
     useEffect(() => {
         if (isVariable) {
@@ -75,16 +86,48 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
     
     const isSubCategory = parentId !== 'none';
 
+    const handleDocChange = (index: number, field: 'key' | 'label', value: string) => {
+        const newDocs = [...documents];
+        const currentDoc = { ...newDocs[index], [field]: value };
+        // For the key field, sanitize the input to prevent invalid characters
+        if (field === 'key') {
+            currentDoc.key = value.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+        }
+        newDocs[index] = currentDoc;
+        setDocuments(newDocs);
+    };
+
+    const addDoc = () => {
+        setDocuments([...documents, { key: '', label: '' }]);
+    };
+
+    const removeDoc = (index: number) => {
+        const newDocs = documents.filter((_, i) => i !== index);
+        setDocuments(newDocs);
+    };
+
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
+
+        const filteredDocuments = documents.filter(doc => doc.key.trim() && doc.label.trim());
+
+        if (filteredDocuments.some(doc => !doc.key || !doc.label)) {
+            toast({
+                title: 'Invalid Document Fields',
+                description: 'Both a Key and a Label are required for each document.',
+                variant: 'destructive',
+            });
+            setLoading(false);
+            return;
+        }
 
         const serviceData = {
             name,
             customerRate: parseFloat(customerRate) || 0,
             vleRate: parseFloat(vleRate) || 0,
             governmentFee: parseFloat(governmentFee) || 0,
-            documents: documents.split(',').map(d => d.trim()).filter(d => d),
+            documents: filteredDocuments,
             parentId: parentId === 'none' ? null : parentId,
             isVariable: isVariable
         };
@@ -178,15 +221,33 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
                     <Input id="governmentFee" type="number" value={governmentFee} onChange={(e) => setGovernmentFee(e.target.value)} placeholder="e.g., 107 (optional)" className="col-span-3"/>
                 </div>
                  <div className="grid grid-cols-4 items-start gap-4">
-                    <Label htmlFor="documents" className="text-right pt-2">Required Documents</Label>
-                    <div className="col-span-3">
-                         <Textarea
-                            id="documents"
-                            value={documents}
-                            onChange={(e) => setDocuments(e.target.value)}
-                            placeholder="Aadhar Card, PAN Card, Photo"
-                        />
-                        <p className="text-xs text-muted-foreground pt-1">Enter document names separated by a comma.</p>
+                    <Label className="text-right pt-2">Required Documents</Label>
+                    <div className="col-span-3 space-y-2">
+                         {documents.map((doc, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                                <Input 
+                                    placeholder="Key (e.g., aadhar_card)" 
+                                    value={doc.key} 
+                                    onChange={(e) => handleDocChange(index, 'key', e.target.value)} 
+                                    className="flex-1"
+                                    required
+                                />
+                                <Input 
+                                    placeholder="Label (e.g., Aadhaar Card)" 
+                                    value={doc.label} 
+                                    onChange={(e) => handleDocChange(index, 'label', e.target.value)} 
+                                    className="flex-1"
+                                    required
+                                />
+                                <Button type="button" variant="ghost" size="icon" onClick={() => removeDoc(index)}>
+                                    <Trash className="h-4 w-4 text-destructive" />
+                                </Button>
+                            </div>
+                        ))}
+                        <Button type="button" variant="outline" size="sm" onClick={addDoc}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Document
+                        </Button>
+                        <p className="text-xs text-muted-foreground pt-1">The 'Key' is a unique ID for the system (no spaces). The 'Label' is what the user will see.</p>
                     </div>
                 </div>
             </div>
