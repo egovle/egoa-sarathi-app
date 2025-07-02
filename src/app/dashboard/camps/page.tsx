@@ -55,13 +55,9 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
     }, [vles, vleSearch]);
 
     const minDate = useMemo(() => {
-        // Admin can override date for existing camps, but not for new ones.
-        if (camp && userProfile?.isAdmin) {
-             return undefined; 
-        }
         // All new camps/suggestions must be at least 7 days in the future.
         return addDays(new Date(), 7);
-    }, [camp, userProfile]);
+    }, []);
 
 
     const handleSubmit = async (e: FormEvent) => {
@@ -458,46 +454,38 @@ export default function CampManagementPage() {
     }, []);
     
     // --- Data Derivations ---
-    const today = useMemo(() => {
-        const d = new Date();
-        d.setHours(0, 0, 0, 0);
-        return d;
-    }, []);
+    const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
 
-    const upcomingCamps = useMemo(() => allCamps.filter(c => new Date(c.date) >= today), [allCamps, today]);
-    const pastCamps = useMemo(() => allCamps.filter(c => new Date(c.date) < today), [allCamps, today]);
+    const upcomingCamps = useMemo(() => allCamps.filter(c => c.date && format(new Date(c.date), 'yyyy-MM-dd') >= todayStr), [allCamps, todayStr]);
+    const pastCamps = useMemo(() => allCamps.filter(c => c.date && format(new Date(c.date), 'yyyy-MM-dd') < todayStr), [allCamps, todayStr]);
 
     const myInvitations = useMemo(() => {
         if (userProfile?.role !== 'vle') return [];
-        const now = new Date();
-        now.setHours(0, 0, 0, 0); // Start of today
-
         return allCamps.filter(camp => {
             if (!camp.date || !Array.isArray(camp.assignedVles)) {
                 return false;
             }
-            const campDate = new Date(camp.date);
-            campDate.setHours(0, 0, 0, 0); // Normalize camp date to start of day
-
-            const isUpcoming = campDate >= now;
+            const isUpcoming = format(new Date(camp.date), 'yyyy-MM-dd') >= todayStr;
             if (!isUpcoming) {
                 return false;
             }
-
             return camp.assignedVles.some(vle => vle.id === userProfile.id && vle.status === 'pending');
         });
-    }, [allCamps, userProfile]);
+    }, [allCamps, userProfile, todayStr]);
 
     const myConfirmedCamps = useMemo(() => {
         if (userProfile?.role !== 'vle') return [];
         return allCamps.filter(camp => {
-            const isUpcoming = new Date(camp.date) >= today;
-            if (!isUpcoming) return false;
-
-            if (!Array.isArray(camp.assignedVles)) return false;
+            if (!camp.date || !Array.isArray(camp.assignedVles)) {
+                return false;
+            }
+            const isUpcoming = format(new Date(camp.date), 'yyyy-MM-dd') >= todayStr;
+            if (!isUpcoming) {
+                 return false;
+            }
             return camp.assignedVles.some(vle => vle.id === userProfile.id && vle.status === 'accepted');
         });
-    }, [allCamps, userProfile, today]);
+    }, [allCamps, userProfile, todayStr]);
 
     // --- Handlers ---
     const handleEdit = (camp: any) => {
@@ -960,9 +948,3 @@ export default function CampManagementPage() {
     }
     return <CustomerView />;
 }
-
-    
-
-    
-
-
