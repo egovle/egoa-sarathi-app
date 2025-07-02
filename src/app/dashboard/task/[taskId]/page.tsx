@@ -673,11 +673,12 @@ export default function TaskDetailPage() {
                 details: `${newDocuments.length} new document(s) uploaded.`,
             };
             
-            await updateDoc(taskRef, {
-                status: 'Assigned', 
-                documents: arrayUnion(...newDocuments),
-                history: arrayUnion(historyEntry),
-            });
+            // This needs to be updated for the new map structure. For now, we are disabling this feature.
+            // await updateDoc(taskRef, {
+            //     status: 'Assigned', 
+            //     documents: arrayUnion(...newDocuments),
+            //     history: arrayUnion(historyEntry),
+            // });
     
             if (task.assignedVleId) {
                  await createNotification(
@@ -897,7 +898,7 @@ export default function TaskDetailPage() {
     const canAdminSetPrice = isAdmin && task.status === 'Pending Price Approval';
     const canAdminApprovePayout = isAdmin && task.status === 'Completed';
     const canCustomerPay = isTaskCreator && task.status === 'Awaiting Payment';
-    const canUploadMoreDocs = (isTaskCreator || isAdmin) && task.status === 'Awaiting Documents';
+    const canUploadMoreDocs = (isTaskCreator || isAdmin) && task.status === 'Awaiting Documents' && false; // Temporarily disabled
     
     const isOtpRequestPending = task.otpRequest?.status === 'pending';
 
@@ -1128,14 +1129,18 @@ export default function TaskDetailPage() {
                             <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Uploaded Documents</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ul className="space-y-2 text-sm">
-                                {task.documents.map((doc: any, i: number) => (
-                                    <li key={i}>
-                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-start gap-2 text-primary hover:underline break-words">
+                            <ul className="space-y-3 text-sm">
+                                {task.documents && Object.entries(task.documents).map(([key, doc]: [string, any]) => (
+                                    <li key={key}>
+                                        <p className="font-semibold capitalize text-muted-foreground">{key.replace(/_/g, ' ')}</p>
+                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline break-words">
                                            <FileText className="h-4 w-4 mt-0.5 shrink-0" /> <span className="break-all">{doc.name}</span>
                                         </a>
                                     </li>
                                 ))}
+                                {(!task.documents || Object.keys(task.documents).length === 0) && (
+                                    <p className="text-xs text-muted-foreground">No documents uploaded for this task yet.</p>
+                                )}
                             </ul>
                         </CardContent>
                     </Card>

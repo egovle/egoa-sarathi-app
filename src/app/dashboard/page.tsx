@@ -422,17 +422,15 @@ const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, 
     );
 };
 
-const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
+const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any, service: any, filesToUpload: {[key: string]: File}) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // File upload state
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // File upload state - Changed to an object to hold files by key
+  const [selectedFiles, setSelectedFiles] = useState<{ [key: string]: File | null }>({});
 
   const parentServices = useMemo(() => services.filter(s => !s.parentId), [services]);
   const subServices = useMemo(() => {
@@ -459,27 +457,19 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
 
   useEffect(() => {
       setSelectedSubCategory('');
+      setSelectedFiles({}); // Reset files when category changes
   }, [selectedCategory])
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-        const files = Array.from(e.target.files);
-        const validation = validateFiles(files);
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, key: string) => {
+    if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        const validation = validateFiles([file]);
         if (!validation.isValid) {
             toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
             return;
         }
-        setSelectedFiles((prev) => [...prev, ...files]);
+        setSelectedFiles(prev => ({ ...prev, [key]: file }));
     }
-  };
-    
-  const handleCameraCapture = (file: File) => {
-    const validation = validateFiles([file]);
-    if (!validation.isValid) {
-        toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
-        return;
-    }
-    setSelectedFiles(prevFiles => [...prevFiles, file]);
   };
 
   const handleDialogSubmit = async (e: FormEvent) => {
@@ -506,8 +496,8 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
         setIsSubmitting(false);
         return;
     }
-    if (selectedFiles.length === 0) {
-        toast({ title: "Documents Required", description: "You must upload at least one document to create a task.", variant: 'destructive' });
+    if (selectedService?.documents?.some((doc: any) => !selectedFiles[doc.key])) {
+        toast({ title: "Documents Required", description: "Please upload all required documents for the selected service.", variant: 'destructive' });
         setIsSubmitting(false);
         return;
     }
@@ -553,7 +543,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
             finalCertificate: null,
         };
 
-        await onTaskCreated(newTaskData, selectedService, selectedFiles);
+        await onTaskCreated(newTaskData, selectedService, selectedFiles as {[key: string]: File});
         setDialogOpen(false); 
     } catch (error: any) {
         console.error("Error creating task:", error);
@@ -572,7 +562,7 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
       if (!isOpen) {
           setSelectedCategory('');
           setSelectedSubCategory('');
-          setSelectedFiles([]);
+          setSelectedFiles({});
           setIsSubmitting(false);
       }
   }
@@ -651,24 +641,39 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
                     )}
                 </div>
 
-                <div className="space-y-2">
-                    <Label>Attach Required Documents</Label>
-                    <div className="flex gap-2">
-                        <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="outline">
-                            <FileUp className="mr-2 h-4 w-4"/> Choose Files
-                        </Button>
-                        <Button type="button" variant="outline" onClick={() => setIsCameraOpen(true)} size="sm">
-                            <Camera className="mr-2 h-4 w-4" /> Use Camera
-                        </Button>
+                {selectedService?.documents?.length > 0 && (
+                    <div className="space-y-4 rounded-md border p-4">
+                        <h4 className="font-medium text-sm text-muted-foreground">Required Documents</h4>
+                        {selectedService.documents.map((doc: any) => (
+                            <div key={doc.key} className="grid grid-cols-3 items-center gap-4">
+                                <Label htmlFor={`doc-${doc.key}`} className="text-right col-span-1 text-xs sm:text-sm">
+                                    {doc.label}
+                                </Label>
+                                <div className="col-span-2">
+                                    <Input
+                                        id={`doc-${doc.key}`}
+                                        type="file"
+                                        onChange={(e) => handleFileChange(e, doc.key)}
+                                        className="text-xs h-9"
+                                    />
+                                    {selectedFiles[doc.key] && (
+                                        <p className="text-xs text-muted-foreground mt-1 truncate" title={selectedFiles[doc.key]?.name}>
+                                            <FileText className="h-3 w-3 inline-block mr-1" />
+                                            {selectedFiles[doc.key]?.name}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                    <Input id="documents" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
-                    {selectedFiles.length > 0 && (
-                        <div className="text-xs text-muted-foreground space-y-1 pt-2">
-                            <p className='font-medium'>Selected files:</p>
-                            {selectedFiles.map((file, i) => <div key={i} className="flex items-center gap-2"><FileText className="h-3 w-3" /><span>{file.name}</span></div>)}
-                        </div>
-                    )}
-                </div>
+                )}
+                
+                {selectedService && !selectedService?.documents?.length && (
+                    <Alert>
+                        <AlertDescription>No specific documents are pre-configured for this service. If needed, the VLE will request them later.</AlertDescription>
+                    </Alert>
+                )}
+
 
                {selectedService && creatorProfile && (
                  <Card className="bg-muted/50 p-4 mt-2">
@@ -704,7 +709,6 @@ const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, crea
           </form>
         </DialogContent>
       </Dialog>
-      <CameraUploadDialog open={isCameraOpen} onOpenChange={setIsCameraOpen} onCapture={handleCameraCapture} />
     </>
   );
 };
@@ -1160,7 +1164,7 @@ const ProfileView = ({ userType, userId, profileData, onBalanceRequest, services
 )};
 
 
-const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
+const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: {[key: string]: File}) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) => {
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -1300,7 +1304,7 @@ const CustomerDashboard = ({ tasks, userId, userProfile, services, onTaskCreated
     );
 }
 
-const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange, onTaskAccept, onTaskReject }: { assignedTasks: any[], myLeads: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, onTaskAccept: (taskId: string) => void, onTaskReject: (taskId: string) => void }) => {
+const VLEDashboard = ({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange, onTaskAccept, onTaskReject }: { assignedTasks: any[], myLeads: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: {[key: string]: File}) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, onTaskAccept: (taskId: string) => void, onTaskReject: (taskId: string) => void }) => {
     const [searchQuery, setSearchQuery] = useState('');
 
     const invitations = useMemo(() => assignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), [assignedTasks]);
@@ -2219,24 +2223,26 @@ export default function DashboardPage() {
     }, [user, realtimeProfile]);
 
 
-    const handleCreateTask = async (newTaskData: any, service: any, filesToUpload: File[]) => {
+    const handleCreateTask = async (newTaskData: any, service: any, filesToUpload: {[key: string]: File}) => {
         if (!user || !realtimeProfile) {
             throw new Error("Profile not loaded");
         }
     
         const taskId = doc(collection(db, "tasks")).id;
-        let uploadedDocuments: { name: string, url: string }[] = [];
+        const uploadedDocuments: { [key: string]: { name: string, url: string } } = {};
     
-        // 1. Upload files to storage with metadata
-        if (filesToUpload.length > 0) {
-            const uploadPromises = filesToUpload.map(async (file) => {
-                const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-                const metadata = { customMetadata: { creatorId: user.uid } };
-                await uploadBytes(storageRef, file, metadata);
-                const downloadURL = await getDownloadURL(storageRef);
-                return { name: file.name, url: downloadURL };
-            });
-            uploadedDocuments = await Promise.all(uploadPromises);
+        // 1. Upload files to storage with metadata and organized paths
+        if (Object.keys(filesToUpload).length > 0) {
+            for (const key in filesToUpload) {
+                const file = filesToUpload[key];
+                if (file) {
+                    const storageRef = ref(storage, `tasks/${taskId}/${key}/${file.name}`);
+                    const metadata = { customMetadata: { creatorId: user.uid, docKey: key } };
+                    await uploadBytes(storageRef, file, metadata);
+                    const downloadURL = await getDownloadURL(storageRef);
+                    uploadedDocuments[key] = { name: file.name, url: downloadURL };
+                }
+            }
         }
         
         const taskWithDocs = { ...newTaskData, documents: uploadedDocuments };
