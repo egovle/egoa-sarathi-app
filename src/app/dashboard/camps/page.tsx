@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Tent, UserPlus, ChevronsUpDown, Check, X, UserCog, CheckCircle2, XCircle, Phone } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash, MoreHorizontal, Tent, UserPlus, ChevronsUpDown, Check, X, UserCog, CheckCircle2, XCircle, Phone, Search } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -24,7 +24,6 @@ import { createNotification, createNotificationForAdmins } from '@/app/dashboard
 import { cn } from '@/lib/utils';
 import { format, addDays } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Checkbox } from '@/components/ui/checkbox';
 
@@ -44,6 +43,15 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
     
     const [assignedVles, setAssignedVles] = useState<any[]>(camp?.assignedVles || []);
     const [isVlePopoverOpen, setIsVlePopoverOpen] = useState(false);
+    const [vleSearch, setVleSearch] = useState('');
+
+    const filteredVles = useMemo(() => {
+        if (!vleSearch) return vles;
+        return vles.filter(vle => 
+            vle.name.toLowerCase().includes(vleSearch.toLowerCase()) ||
+            vle.location.toLowerCase().includes(vleSearch.toLowerCase())
+        );
+    }, [vles, vleSearch]);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -159,40 +167,42 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                <Command>
-                                    <CommandInput placeholder="Search VLEs..." />
-                                    <CommandList>
-                                        <CommandEmpty>No VLE found.</CommandEmpty>
-                                        <CommandGroup>
-                                            {vles.map((vle) => {
-                                                const isSelected = assignedVles.some(s => s.id === vle.id);
-                                                return (
-                                                <CommandItem
-                                                    key={vle.id}
-                                                    value={vle.name}
-                                                    onSelect={() => {
-                                                        // This handles keyboard selection
-                                                        toggleVleSelection(vle);
-                                                    }}
-                                                    onMouseDown={(e) => {
-                                                        // This handles mouse selection and prevents the popover from closing
-                                                        e.preventDefault();
-                                                        e.stopPropagation();
-                                                        toggleVleSelection(vle);
-                                                    }}
-                                                    className="flex items-center space-x-2 cursor-pointer"
+                                <div className="p-2">
+                                    <div className="relative">
+                                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
+                                        <Input 
+                                            placeholder="Search VLEs..." 
+                                            value={vleSearch}
+                                            onChange={(e) => setVleSearch(e.target.value)}
+                                            className="pl-8"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="max-h-[200px] overflow-y-auto">
+                                    {filteredVles.length > 0 ? (
+                                        filteredVles.map((vle) => {
+                                            const isSelected = assignedVles.some(s => s.id === vle.id);
+                                            return (
+                                                <div 
+                                                    key={vle.id} 
+                                                    className="flex items-center space-x-2 p-2 cursor-pointer hover:bg-accent"
+                                                    onClick={() => toggleVleSelection(vle)}
                                                 >
                                                     <Checkbox
+                                                        id={`vle-${vle.id}`}
                                                         checked={isSelected}
-                                                        className="pointer-events-none" // The parent item handles interaction
+                                                        readOnly
                                                     />
-                                                    <span>{vle.name} ({vle.location})</span>
-                                                </CommandItem>
-                                                )
-                                            })}
-                                        </CommandGroup>
-                                    </CommandList>
-                                </Command>
+                                                    <Label htmlFor={`vle-${vle.id}`} className="font-normal cursor-pointer">
+                                                        {vle.name} ({vle.location})
+                                                    </Label>
+                                                </div>
+                                            )
+                                        })
+                                    ) : (
+                                        <p className="p-4 text-center text-sm text-muted-foreground">No VLEs found.</p>
+                                    )}
+                                </div>
                             </PopoverContent>
                         </Popover>
                         <div className="flex flex-wrap gap-1">
@@ -898,3 +908,5 @@ export default function CampManagementPage() {
     }
     return <CustomerView />;
 }
+
+    
