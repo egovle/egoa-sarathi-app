@@ -45,6 +45,7 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
     const [assignedVles, setAssignedVles] = useState<any[]>(camp?.assignedVles || []);
     const [isVlePopoverOpen, setIsVlePopoverOpen] = useState(false);
     const [vleSearch, setVleSearch] = useState('');
+    const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
 
     const filteredVles = useMemo(() => {
         if (!vleSearch) return vles;
@@ -159,14 +160,20 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
                 </div>
                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="date" className="text-right">Date</Label>
-                    <Popover>
+                    <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
                         <PopoverTrigger asChild>
                             <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !date && "text-muted-foreground")}>
                                 {date ? format(date, "dd/MM/yyyy") : <span>Pick a date</span>}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
-                            <DayPicker mode="single" selected={date} onSelect={setDate} initialFocus fromDate={minDate} />
+                            <DayPicker 
+                                mode="single" 
+                                selected={date} 
+                                onSelect={(d) => { setDate(d); setIsDatePopoverOpen(false); }} 
+                                initialFocus 
+                                fromDate={minDate} 
+                            />
                         </PopoverContent>
                     </Popover>
                 </div>
@@ -250,13 +257,13 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
                 </div>
 
             </div>
-            <DialogFooter>
-                <Button type="submit" disabled={loading} form="camp-form">
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {camp ? 'Save Changes' : (suggestion ? 'Approve & Create Camp' : 'Create Camp')}
-                </Button>
-            </DialogFooter>
         </form>
+        <DialogFooter>
+            <Button type="submit" disabled={loading} form="camp-form">
+                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {camp ? 'Save Changes' : (suggestion ? 'Approve & Create Camp' : 'Create Camp')}
+            </Button>
+        </DialogFooter>
         </DialogContent>
     );
 };
@@ -268,9 +275,9 @@ const SuggestCampDialog = ({ onFinished, services }: { onFinished: () => void; s
     const [date, setDate] = useState<Date | undefined>();
     const [loading, setLoading] = useState(false);
     
-    // New state for services
     const [selectedServices, setSelectedServices] = useState<any[]>([]);
     const [otherServices, setOtherServices] = useState('');
+    const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
 
     const minDate = useMemo(() => {
         const d = new Date();
@@ -314,74 +321,82 @@ const SuggestCampDialog = ({ onFinished, services }: { onFinished: () => void; s
     };
 
     return (
-        <form onSubmit={handleSubmit}>
-            <DialogHeader>
-                <DialogTitle>Suggest a New Camp</DialogTitle>
-                 <DialogDescription>Fill in the details for a potential camp. An admin will review your suggestion.</DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="location" className="text-right">Location</Label>
-                    <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Ponda Market" required className="col-span-3"/>
-                </div>
-                 <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="date" className="text-right">Proposed Date</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !date && "text-muted-foreground")}>
-                                {date ? format(date, "dd/MM/yyyy") : <span>Pick a date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                            <DayPicker mode="single" selected={date} onSelect={setDate} initialFocus fromDate={minDate} />
-                        </PopoverContent>
-                    </Popover>
-                </div>
-                <div className="grid grid-cols-4 items-start gap-4 pt-2">
-                    <Label className="text-right pt-2">Services</Label>
-                    <div className="col-span-3">
-                        <Card>
-                            <CardContent className="p-4 space-y-2 max-h-48 overflow-y-auto">
-                                {services.filter(s => s.customerRate > 0 || s.isVariable).map((service) => (
-                                    <div key={service.id} className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id={`service-${service.id}`}
-                                            checked={selectedServices.some(s => s.id === service.id)}
-                                            onCheckedChange={(checked) => {
-                                                setSelectedServices(prev => 
-                                                    checked 
-                                                        ? [...prev, service]
-                                                        : prev.filter(s => s.id !== service.id)
-                                                );
-                                            }}
-                                        />
-                                        <Label htmlFor={`service-${service.id}`} className="font-normal cursor-pointer">{service.name}</Label>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                        <p className="text-xs text-muted-foreground pt-1">Select all services that will be offered.</p>
+        <DialogContent className="sm:max-w-lg">
+            <form onSubmit={handleSubmit}>
+                <DialogHeader>
+                    <DialogTitle>Suggest a New Camp</DialogTitle>
+                    <DialogDescription>Fill in the details for a potential camp. An admin will review your suggestion.</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="location" className="text-right">Location</Label>
+                        <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g., Ponda Market" required className="col-span-3"/>
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="date" className="text-right">Proposed Date</Label>
+                        <Popover open={isDatePopoverOpen} onOpenChange={setIsDatePopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !date && "text-muted-foreground")}>
+                                    {date ? format(date, "dd/MM/yyyy") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <DayPicker 
+                                    mode="single" 
+                                    selected={date} 
+                                    onSelect={(d) => { setDate(d); setIsDatePopoverOpen(false); }} 
+                                    initialFocus 
+                                    fromDate={minDate}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                    <div className="grid grid-cols-4 items-start gap-4 pt-2">
+                        <Label className="text-right pt-2">Services</Label>
+                        <div className="col-span-3">
+                            <Card>
+                                <CardContent className="p-4 space-y-2 max-h-48 overflow-y-auto">
+                                    {services.filter(s => s.customerRate > 0 || s.isVariable).map((service) => (
+                                        <div key={service.id} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`service-${service.id}`}
+                                                checked={selectedServices.some(s => s.id === service.id)}
+                                                onCheckedChange={(checked) => {
+                                                    setSelectedServices(prev => 
+                                                        checked 
+                                                            ? [...prev, service]
+                                                            : prev.filter(s => s.id !== service.id)
+                                                    );
+                                                }}
+                                            />
+                                            <Label htmlFor={`service-${service.id}`} className="font-normal cursor-pointer">{service.name}</Label>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                            <p className="text-xs text-muted-foreground pt-1">Select all services that will be offered.</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="otherServices" className="text-right">Other</Label>
+                        <Input 
+                            id="otherServices" 
+                            value={otherServices} 
+                            onChange={(e) => setOtherServices(e.target.value)} 
+                            placeholder="e.g., Blood Pressure Check"
+                            className="col-span-3"
+                        />
                     </div>
                 </div>
-
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="otherServices" className="text-right">Other</Label>
-                    <Input 
-                        id="otherServices" 
-                        value={otherServices} 
-                        onChange={(e) => setOtherServices(e.target.value)} 
-                        placeholder="e.g., Blood Pressure Check"
-                        className="col-span-3"
-                    />
-                </div>
-            </div>
-            <DialogFooter>
-                <Button type="submit" disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Send Suggestion
-                </Button>
-            </DialogFooter>
-        </form>
+                <DialogFooter>
+                    <Button type="submit" disabled={loading}>
+                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Send Suggestion
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
     );
 };
 
@@ -402,9 +417,6 @@ export default function CampManagementPage() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedCamp, setSelectedCamp] = useState<any | null>(null);
     const [selectedSuggestion, setSelectedSuggestion] = useState<any | null>(null);
-
-    const [upcomingCamps, setUpcomingCamps] = useState<any[]>([]);
-    const [pastCamps, setPastCamps] = useState<any[]>([]);
 
     // Effect for authorization
     useEffect(() => {
@@ -455,38 +467,6 @@ export default function CampManagementPage() {
         
         return () => { unsubCamps(); unsubServices(); unsubSuggestions(); unsubVles(); };
     }, [userProfile]);
-
-    // DERIVED STATE: Calculate upcoming and past camps when allCamps changes.
-    // This is the robust, timezone-proof way to handle date comparisons.
-    useEffect(() => {
-        if (!allCamps.length) {
-            setUpcomingCamps([]);
-            setPastCamps([]);
-            return;
-        }
-
-        // Get today's date in 'YYYY-MM-DD' format, which is immune to timezone issues.
-        const todayStr = new Date().toLocaleDateString('en-CA'); 
-
-        const upcoming: any[] = [];
-        const past: any[] = [];
-
-        for (const camp of allCamps) {
-            if (!camp.date) continue;
-            
-            // Get the camp's date in 'YYYY-MM-DD' format directly from the ISO string.
-            const campDateStr = camp.date.substring(0, 10);
-            
-            if (campDateStr >= todayStr) {
-                upcoming.push(camp);
-            } else {
-                past.push(camp);
-            }
-        }
-        setUpcomingCamps(upcoming);
-        setPastCamps(past.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-        
-    }, [allCamps]);
 
     // --- Handlers ---
     const handleEdit = (camp: any) => {
@@ -650,7 +630,12 @@ export default function CampManagementPage() {
         </Card>
     );
 
-    const AdminView = () => (
+    const AdminView = () => {
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const upcomingCamps = allCamps.filter(camp => camp.date && camp.date.substring(0, 10) >= todayStr);
+        const pastCamps = allCamps.filter(camp => camp.date && camp.date.substring(0, 10) < todayStr).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+        return (
         <div className="space-y-4">
             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
                 <AlertDialogContent>
@@ -736,22 +721,33 @@ export default function CampManagementPage() {
                 </TabsContent>
             </Tabs>
         </div>
-    );
+    )};
     
     const VleView = () => {
-        const myInvitations = useMemo(() => {
-            if (!userProfile) return [];
-            return upcomingCamps.filter(camp => 
-                camp.assignedVles?.some((vle: any) => vle.id === userProfile.id && vle.status === 'pending')
-            );
-        }, [upcomingCamps, userProfile]);
-    
-        const myConfirmedCamps = useMemo(() => {
-            if (!userProfile) return [];
-            return upcomingCamps.filter(camp => 
-                camp.assignedVles?.some((vle: any) => vle.id === userProfile.id && vle.status === 'accepted')
-            );
-        }, [upcomingCamps, userProfile]);
+        const { myInvitations, myConfirmedCamps } = useMemo(() => {
+            if (!userProfile) return { myInvitations: [], myConfirmedCamps: [] };
+
+            const todayStr = new Date().toLocaleDateString('en-CA');
+            const invitations: any[] = [];
+            const confirmed: any[] = [];
+
+            for (const camp of allCamps) {
+                if (!camp.date) continue;
+                
+                const campDateStr = camp.date.substring(0, 10);
+                if (campDateStr < todayStr) continue; // Skip past camps
+
+                const myAssignment = camp.assignedVles?.find((vle: any) => vle.id === userProfile.id);
+                if (myAssignment) {
+                    if (myAssignment.status === 'pending') {
+                        invitations.push(camp);
+                    } else if (myAssignment.status === 'accepted') {
+                        confirmed.push(camp);
+                    }
+                }
+            }
+            return { myInvitations, myConfirmedCamps };
+        }, [allCamps, userProfile]);
 
         return (
          <div className="space-y-6">
@@ -763,9 +759,7 @@ export default function CampManagementPage() {
                             <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-lg">
-                        <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} services={services} />
-                    </DialogContent>
+                    <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} services={services} />
                 </Dialog>
             </div>
              <Tabs defaultValue="invitations">
@@ -845,7 +839,11 @@ export default function CampManagementPage() {
          </div>
     )};
 
-    const CustomerView = () => (
+    const CustomerView = () => {
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const upcomingCamps = allCamps.filter(camp => camp.date && camp.date.substring(0, 10) >= todayStr);
+
+        return (
          <div className="space-y-6">
             <h1 className="text-3xl font-bold tracking-tight">Upcoming Camps</h1>
             <Card>
@@ -882,9 +880,13 @@ export default function CampManagementPage() {
                 </CardContent>
             </Card>
          </div>
-    );
+    )};
 
-    const GovernmentView = () => (
+    const GovernmentView = () => {
+        const todayStr = new Date().toLocaleDateString('en-CA');
+        const upcomingCamps = allCamps.filter(camp => camp.date && camp.date.substring(0, 10) >= todayStr);
+
+        return (
          <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold tracking-tight">Upcoming Camps</h1>
@@ -894,11 +896,7 @@ export default function CampManagementPage() {
                             <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
                         </Button>
                     </DialogTrigger>
-                        <DialogContent
-                        className="sm:max-w-lg"
-                    >
-                        <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} services={services} />
-                    </DialogContent>
+                    <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} services={services} />
                 </Dialog>
             </div>
             <Card>
@@ -939,7 +937,7 @@ export default function CampManagementPage() {
                 </CardContent>
             </Card>
          </div>
-    );
+    )};
     
     if (userProfile.isAdmin) {
         return <AdminView />;
