@@ -15,8 +15,10 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { TaskCreatorDialog } from './shared';
+import type { Task, Service, UserProfile, VLEProfile } from '@/lib/types';
 
-export default function VleDashboard({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange, onTaskAccept, onTaskReject }: { assignedTasks: any[], myLeads: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, onTaskAccept: (taskId: string) => void, onTaskReject: (taskId: string) => void }) {
+
+export default function VleDashboard({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange, onTaskAccept, onTaskReject }: { assignedTasks: Task[], myLeads: Task[], userId: string, userProfile: VLEProfile, services: Service[], onTaskCreated: (task: any, service: Service, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, onTaskAccept: (taskId: string) => void, onTaskReject: (taskId: string) => void }) {
     const [searchQuery, setSearchQuery] = useState('');
 
     const invitations = useMemo(() => assignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), [assignedTasks]);
@@ -31,9 +33,9 @@ export default function VleDashboard({ assignedTasks, myLeads, userId, userProfi
         );
     }, [myLeads, searchQuery]);
 
-    const getCommissionDetails = (task: any) => {
+    const getCommissionDetails = (task: Task) => {
         const governmentFee = task.governmentFeeApplicable || 0;
-        const serviceProfit = (task.totalPaid || 0) - governmentFee;
+        const serviceProfit = task.totalPaid - governmentFee;
         const vleCommission = serviceProfit * 0.8;
         return { governmentFee, vleCommission };
     };

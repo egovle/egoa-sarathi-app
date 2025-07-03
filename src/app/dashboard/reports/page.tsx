@@ -16,9 +16,10 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import type { ChartConfig } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import type { Task, VLEProfile, UserProfile } from '@/lib/types';
 
-// --- Admin Reports ---
-const AdminReports = ({ tasks, vles }: { tasks: any[], vles: any[] }) => {
+
+const AdminReports = ({ tasks, vles }: { tasks: Task[], vles: VLEProfile[] }) => {
     const { toast } = useToast();
     const taskStatusCounts = useMemo(() => {
         return tasks.reduce((acc, task) => {
@@ -260,8 +261,7 @@ eGoa Sarathi Admin Team
     );
 };
 
-// --- VLE Reports ---
-const VleReports = ({ tasks, userProfile }: { tasks: any[], userProfile: any }) => {
+const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEProfile }) => {
     const assignedTasks = useMemo(() => tasks.filter(t => t.assignedVleId === userProfile.id), [tasks, userProfile.id]);
     
     const stats = useMemo(() => {
@@ -359,8 +359,8 @@ export default function ReportsPage() {
     const { userProfile, loading: authLoading } = useAuth();
     const router = useRouter();
     
-    const [tasks, setTasks] = useState<any[]>([]);
-    const [vles, setVles] = useState<any[]>([]);
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [vles, setVles] = useState<VLEProfile[]>([]);
     const [loadingData, setLoadingData] = useState(true);
 
     useEffect(() => {
@@ -378,17 +378,17 @@ export default function ReportsPage() {
         if (userProfile.isAdmin) {
             const tasksQuery = query(collection(db, "tasks"));
             unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
-                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task));
                 setLoadingData(false);
             });
             const vlesQuery = query(collection(db, "vles"));
             unsubVles = onSnapshot(vlesQuery, (snapshot) => {
-                setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as VLEProfile));
             });
-        } else { // VLE
+        } else if (userProfile.role === 'vle') {
             const tasksQuery = query(collection(db, "tasks"), where('assignedVleId', '==', userProfile.id));
              unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
-                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task));
                 setLoadingData(false);
             });
         }
@@ -425,5 +425,5 @@ export default function ReportsPage() {
 
     return userProfile.isAdmin 
         ? <AdminReports tasks={tasks} vles={vles} /> 
-        : <VleReports tasks={tasks} userProfile={userProfile} />;
+        : <VleReports tasks={tasks} userProfile={userProfile as VLEProfile} />;
 }

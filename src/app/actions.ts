@@ -3,7 +3,7 @@
 
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-
+import type { Task } from "@/lib/types";
 
 // --- NOTIFICATION HELPERS ---
 export async function createNotification(userId: string, title: string, description: string, link?: string) {
@@ -40,7 +40,7 @@ export async function createNotificationForAdmins(title: string, description: st
 
 
 // --- CENTRALIZED PAYOUT LOGIC ---
-export async function processPayout(task: any, adminUserId: string) {
+export async function processPayout(task: Task, adminUserId: string) {
     if (!adminUserId || !task.assignedVleId || !task.totalPaid) {
         return { success: false, error: 'Cannot process payout. Missing required information.' };
     }
@@ -62,8 +62,8 @@ export async function processPayout(task: any, adminUserId: string) {
             const adminBalance = adminDoc.data().walletBalance || 0;
             const assignedVleBalance = assignedVleDoc.data().walletBalance || 0;
 
-            const totalPaid = parseFloat(task.totalPaid);
-            const governmentFee = parseFloat(task.governmentFeeApplicable || 0);
+            const totalPaid = parseFloat(task.totalPaid.toString());
+            const governmentFee = parseFloat(task.governmentFeeApplicable?.toString() || '0');
 
             const serviceProfit = totalPaid - governmentFee;
             const vleCommission = serviceProfit * 0.8;

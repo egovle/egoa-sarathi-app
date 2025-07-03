@@ -13,9 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { TaskCreatorDialog, ComplaintDialog, FeedbackDialog } from './shared';
+import type { Task, Service, UserProfile, Complaint } from '@/lib/types';
 
-export default function CustomerDashboard({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: any[], userId: string, userProfile: any, services: any[], onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) {
-    const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, service: t.service}));
+export default function CustomerDashboard({ tasks, userId, userProfile, services, onTaskCreated, onComplaintSubmit, onFeedbackSubmit }: { tasks: Task[], userId: string, userProfile: UserProfile, services: Service[], onTaskCreated: (task: any, service: Service, filesToUpload: File[]) => Promise<void>, onComplaintSubmit: (taskId: string, complaint: any) => void, onFeedbackSubmit: (taskId: string, feedback: any) => void }) {
+    const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...(t.complaint as Complaint), taskId: t.id, service: t.service}));
     const [searchQuery, setSearchQuery] = useState('');
 
     const filteredTasks = useMemo(() => {

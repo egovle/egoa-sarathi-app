@@ -18,6 +18,8 @@ import CustomerDashboard from '@/components/dashboard/CustomerDashboard';
 import GovernmentDashboard from '@/components/dashboard/GovernmentDashboard';
 import ProfileView from '@/components/dashboard/ProfileView';
 
+import type { Task, Service, UserProfile, VLEProfile, CustomerProfile, PaymentRequest } from '@/lib/types';
+
 
 export default function DashboardPage() {
     const { toast } = useToast();
@@ -25,27 +27,17 @@ export default function DashboardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     
-    // Admin state
-    const [allTasks, setAllTasks] = useState<any[]>([]);
-    const [allUsers, setAllUsers] = useState<any[]>([]); // Will contain both customers and VLEs
-    const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
-    const [processingBalanceRequestId, setProcessingBalanceRequestId] = useState<string | null>(null);
+    const [allTasks, setAllTasks] = useState<Task[]>([]);
+    const [allUsers, setAllUsers] = useState<(VLEProfile | CustomerProfile)[]>([]);
+    const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
     
-    // VLE state
-    const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
-    const [myLeads, setMyLeads] = useState<any[]>([]);
-    
-    // Customer state
-    const [customerTasks, setCustomerTasks] = useState<any[]>([]);
-    
-    // Shared state
-    const [services, setServices] = useState<any[]>([]);
+    const [services, setServices] = useState<Service[]>([]);
     
     const activeTab = useMemo(() => {
         const tabFromUrl = searchParams.get('tab');
         if (tabFromUrl) return tabFromUrl;
         if (userProfile?.isAdmin) return 'overview';
-        return 'tasks'; // default for customer/vle
+        return 'tasks';
     }, [searchParams, userProfile]);
 
     useEffect(() => {
@@ -55,58 +47,57 @@ export default function DashboardPage() {
     }, [user, loading, router]);
 
 
-    // Fetch data based on user role
     useEffect(() => {
         if (!user || !userProfile) {
             return;
         }
 
         let unsubscribers: (() => void)[] = [];
-
-        const primaryRole = userProfile.isAdmin ? 'admin' : userProfile.role;
-
-        // All users need to see the list of services
         const servicesQuery = query(collection(db, "services"), orderBy("name"));
         unsubscribers.push(onSnapshot(servicesQuery, (snapshot) => {
-            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
         }));
 
-        if (primaryRole === 'admin') {
-            unsubscribers.push(onSnapshot(query(collection(db, "tasks"), orderBy("date", "desc")), (s) => setAllTasks(s.docs.map(d => ({ id: d.id, ...d.data() })))));
+        if (userProfile.isAdmin) {
+            unsubscribers.push(onSnapshot(query(collection(db, "tasks"), orderBy("date", "desc")), (s) => setAllTasks(s.docs.map(d => ({ id: d.id, ...d.data() }) as Task))));
             
-            // Fetch both VLEs and Customers for the All Users list
             const unsubUsers = onSnapshot(query(collection(db, "users")), (userSnapshot) => {
-                 const customerData = userSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                 const customerData = userSnapshot.docs.map(d => ({ id: d.id, ...d.data() }) as CustomerProfile);
                  const unsubVles = onSnapshot(query(collection(db, "vles")), (vleSnapshot) => {
-                    const vleData = vleSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    const vleData = vleSnapshot.docs.map(d => ({ id: d.id, ...d.data() }) as VLEProfile);
                     setAllUsers([...customerData, ...vleData]);
                  });
                  unsubscribers.push(unsubVles);
             });
             unsubscribers.push(unsubUsers);
             
-            unsubscribers.push(onSnapshot(query(collection(db, "paymentRequests"), where("status", "==", "pending")), (s) => setPaymentRequests(s.docs.map(d => ({ id: d.id, ...d.data() })))));
-        } else if (primaryRole === 'vle') {
+            unsubscribers.push(onSnapshot(query(collection(db, "paymentRequests"), where("status", "==", "pending")), (s) => setPaymentRequests(s.docs.map(d => ({ id: d.id, ...d.data() }) as PaymentRequest))));
+        } else if (userProfile.role === 'vle') {
             const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
             unsubscribers.push(onSnapshot(assignedTasksQuery, (snapshot) => {
-                const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
                 fetched.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setAssignedTasks(fetched);
+                setAllTasks(fetched);
             }));
 
             const myLeadsQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
              unsubscribers.push(onSnapshot(myLeadsQuery, (snapshot) => {
-                const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                fetched.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setMyLeads(fetched);
+                const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
+                // Combine with assigned tasks for a full view
+                setAllTasks(prev => {
+                    const existingIds = new Set(prev.map(p => p.id));
+                    const newLeads = fetched.filter(f => !existingIds.has(f.id));
+                    const updatedTasks = [...prev, ...newLeads];
+                    updatedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                    return updatedTasks;
+                });
             }));
-
-        } else if (primaryRole === 'customer'){ // Customer
+        } else if (userProfile.role === 'customer') {
             const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
             unsubscribers.push(onSnapshot(tasksQuery, (snapshot) => {
-                 const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                 const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
                 fetched.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setCustomerTasks(fetched);
+                setAllTasks(fetched);
             }));
         }
         
@@ -116,7 +107,7 @@ export default function DashboardPage() {
     }, [user, userProfile]);
 
 
-    const handleCreateTask = async (newTaskData: any, service: any, filesToUpload: File[]) => {
+    const handleCreateTask = async (newTaskData: any, service: Service, filesToUpload: File[]) => {
         if (!user || !userProfile) {
             throw new Error("Profile not loaded");
         }
@@ -215,7 +206,7 @@ export default function DashboardPage() {
         const taskRef = doc(db, "tasks", taskId);
         const taskSnap = await getDoc(taskRef);
         if (taskSnap.exists()) {
-            const taskData = taskSnap.data();
+            const taskData = taskSnap.data() as Task;
             const updatedComplaint = { ...taskData.complaint, response, status: 'Responded' };
             await updateDoc(taskRef, { complaint: updatedComplaint });
             await createNotification(
@@ -390,8 +381,7 @@ export default function DashboardPage() {
         await createNotificationForAdmins('New Balance Request', `${userProfile.name} has requested to add ₹${amount.toFixed(2)} to their wallet.`);
     };
     
-     const handleApproveBalanceRequest = async (req: any) => {
-        setProcessingBalanceRequestId(req.id);
+     const handleApproveBalanceRequest = async (req: PaymentRequest) => {
         const userRef = doc(db, req.userRole === 'vle' ? 'vles' : 'users', req.userId);
         const reqRef = doc(db, 'paymentRequests', req.id);
 
@@ -412,8 +402,6 @@ export default function DashboardPage() {
         } catch (error: any) {
             console.error("Failed to approve balance request:", error);
             toast({ title: "Approval Failed", description: error.message || "Could not update the user's balance.", variant: 'destructive' });
-        } finally {
-            setProcessingBalanceRequestId(null);
         }
     };
 
@@ -425,7 +413,7 @@ export default function DashboardPage() {
             operation: 'delete' | 'update',
             updateData?: object
         ) => {
-            const BATCH_SIZE = 499; // Firestore batch limit is 500
+            const BATCH_SIZE = 499;
             const snapshot = await getDocs(query(collectionRef));
             if (snapshot.size === 0) return;
 
@@ -451,17 +439,14 @@ export default function DashboardPage() {
         };
 
         try {
-            // Clear collections
             const collectionsToClear = ['tasks', 'camps', 'notifications', 'paymentRequests', 'services', 'campSuggestions', 'taskChats'];
             for (const collectionName of collectionsToClear) {
                 await processInBatches(collection(db, collectionName), 'delete');
             }
 
-            // Reset user wallets
             await processInBatches(collection(db, 'users'), 'update', { walletBalance: 0 });
             await processInBatches(query(collection(db, 'vles'), where('isAdmin', '==', false)), 'update', { walletBalance: 0 });
 
-            // Re-seed services
             let seedBatch = writeBatch(db);
             seedServices.forEach(service => {
                 const docRef = service.id ? doc(db, "services", service.id) : doc(collection(db, "services"));
@@ -477,10 +462,10 @@ export default function DashboardPage() {
         }
     };
 
-    const handleApprovePayout = async (task: any) => {
+    const handleApprovePayout = async (task: Task) => {
         if (!user || !userProfile?.isAdmin) {
             toast({ title: 'Error', description: 'Permission denied.', variant: 'destructive' });
-            return;
+            return { success: false };
         }
 
         const result = await processPayout(task, user.uid);
@@ -490,6 +475,7 @@ export default function DashboardPage() {
         } else {
             toast({ title: 'Payout Failed', description: result.error, variant: 'destructive' });
         }
+        return { success: result.success };
     };
 
     if (loading || !user || !userProfile) {
@@ -500,19 +486,20 @@ export default function DashboardPage() {
         )
     }
 
-    const primaryRole = userProfile.isAdmin ? 'admin' : userProfile.role;
-    
     const renderContent = () => {
         if (activeTab === 'profile') {
-            return <ProfileView userType={primaryRole === 'vle' ? 'VLE' : 'Customer'} userId={user!.uid} profileData={userProfile} onBalanceRequest={handleBalanceRequest} services={services} />
+            return <ProfileView userType={userProfile.role === 'vle' ? 'VLE' : 'Customer'} userId={user!.uid} profileData={userProfile} onBalanceRequest={handleBalanceRequest} services={services} />
         }
 
-        switch (primaryRole) {
+        switch (userProfile.role) {
             case 'admin':
-                return <AdminDashboard allTasks={allTasks} allUsers={allUsers} paymentRequests={paymentRequests} processingBalanceRequestId={processingBalanceRequestId} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} onVleAvailabilityChange={handleVleAvailabilityChange} />;
+                return <AdminDashboard allTasks={allTasks} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'vle':
+                const assignedTasks = allTasks.filter(t => t.assignedVleId === user.uid);
+                const myLeads = allTasks.filter(t => t.creatorId === user.uid);
                 return <VleDashboard assignedTasks={assignedTasks} myLeads={myLeads} userId={user!.uid} userProfile={userProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} onTaskAccept={handleTaskAccept} onTaskReject={handleTaskReject} />;
             case 'customer':
+                const customerTasks = allTasks.filter(t => t.creatorId === user.uid);
                 return <CustomerDashboard tasks={customerTasks} userId={user!.uid} userProfile={userProfile} services={services} onTaskCreated={handleCreateTask} onComplaintSubmit={handleComplaintSubmit} onFeedbackSubmit={handleFeedbackSubmit} />;
             case 'government':
                 return <GovernmentDashboard />;

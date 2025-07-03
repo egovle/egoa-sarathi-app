@@ -13,10 +13,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Wallet, PlusCircle, Edit, Loader2, Banknote, AtSign, Trash } from 'lucide-react';
 import { AddBalanceRequestDialog } from './shared';
+import type { UserProfile, Service, VLEProfile, BankAccount } from '@/lib/types';
 
-export default function ProfileView({ userType, userId, profileData, onBalanceRequest, services }: {userType: 'Customer' | 'VLE', userId: string, profileData: any, onBalanceRequest: (amount: number) => void, services: any[]}) {
+
+export default function ProfileView({ userId, profileData, onBalanceRequest, services }: {userType: 'Customer' | 'VLE', userId: string, profileData: UserProfile, onBalanceRequest: (amount: number) => void, services: Service[]}) {
     const { toast } = useToast();
-    const [userProfile, setUserProfile] = useState<any>(profileData);
     
     // Profile Edit State
     const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -28,26 +29,26 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
     });
 
     // Bank Accounts state
-    const [bankAccounts, setBankAccounts] = useState<any[]>(profileData?.bankAccounts || []);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(profileData?.bankAccounts || []);
     const [isEditingBankAccount, setIsEditingBankAccount] = useState(false);
-    const [editingAccount, setEditingAccount] = useState<any | null>(null);
+    const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
     const [bankFormState, setBankFormState] = useState<any>({ id: '', bankName: '', accountNumber: '', ifscCode: '', upiId: '' });
 
     // Offered Services state
-    const [offeredServices, setOfferedServices] = useState<string[]>(profileData?.offeredServices || []);
+    const [offeredServices, setOfferedServices] = useState<string[]>((profileData as VLEProfile).offeredServices || []);
     const [isSavingServices, setIsSavingServices] = useState(false);
 
     useEffect(() => {
-        if (!userId) return;
-        setUserProfile(profileData);
-        setBankAccounts(profileData?.bankAccounts || []);
-        setOfferedServices(profileData?.offeredServices || []);
+        setBankAccounts(profileData.bankAccounts || []);
+        if (profileData.role === 'vle') {
+            setOfferedServices(profileData.offeredServices || []);
+        }
         setProfileFormState({
-            name: profileData?.name || '',
-            mobile: profileData?.mobile || '',
-            location: profileData?.location || '',
+            name: profileData.name || '',
+            mobile: profileData.mobile || '',
+            location: profileData.location || '',
         });
     }, [userId, profileData]);
 
@@ -69,7 +70,7 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
             return;
         }
         
-        const collectionName = userType === 'Customer' ? 'users' : 'vles';
+        const collectionName = profileData.role === 'vle' ? 'vles' : 'users';
         const docRef = doc(db, collectionName, userId);
         try {
             await updateDoc(docRef, {
@@ -89,9 +90,9 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
 
     const handleCancelEditProfile = () => {
         setProfileFormState({
-            name: userProfile.name,
-            mobile: userProfile.mobile,
-            location: userProfile.location,
+            name: profileData.name,
+            mobile: profileData.mobile,
+            location: profileData.location,
         });
         setIsEditingProfile(false);
     };
@@ -107,7 +108,7 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
         setIsEditingBankAccount(true);
     };
 
-    const handleEditBankClick = (account: any) => {
+    const handleEditBankClick = (account: BankAccount) => {
         setEditingAccount(account);
         setBankFormState(account);
         setIsEditingBankAccount(true);
@@ -125,10 +126,10 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
             toast({ title: "Bank Account Added", description: "Your new bank account has been added."});
         }
         
-        const collectionName = userType === 'Customer' ? 'users' : 'vles';
+        const collectionName = profileData.role === 'vle' ? 'vles' : 'users';
         const docRef = doc(db, collectionName, userId);
         await updateDoc(docRef, { bankAccounts: updatedAccounts });
-
+        setBankAccounts(updatedAccounts);
         setIsEditingBankAccount(false);
         setEditingAccount(null);
     };
@@ -141,10 +142,10 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
     const confirmDeleteBank = async () => {
         if (accountToDelete) {
             const updatedAccounts = bankAccounts.filter(acc => acc.id !== accountToDelete);
-            const collectionName = userType === 'Customer' ? 'users' : 'vles';
+            const collectionName = profileData.role === 'vle' ? 'vles' : 'users';
             const docRef = doc(db, collectionName, userId);
             await updateDoc(docRef, { bankAccounts: updatedAccounts });
-
+            setBankAccounts(updatedAccounts);
             toast({ title: "Bank Account Removed", description: "The bank account has been removed."});
         }
         setIsDeleteDialogOpen(false);
@@ -184,7 +185,7 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
         })).sort((a,b) => a.name.localeCompare(b.name));
     }, [services]);
 
-    if (!userProfile) {
+    if (!profileData) {
         return <div>Loading profile...</div>;
     }
 
@@ -217,7 +218,7 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
                 />
             </CardHeader>
             <CardContent>
-                <div className="text-3xl font-bold">₹{userProfile.walletBalance?.toFixed(2) || '0.00'}</div>
+                <div className="text-3xl font-bold">₹{profileData.walletBalance?.toFixed(2) || '0.00'}</div>
                 <p className="text-xs text-muted-foreground">Available balance</p>
             </CardContent>
         </Card>
@@ -236,61 +237,31 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
                     <CardContent className="space-y-4">
                         {isEditingProfile ? (
                             <>
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Full Name</Label>
-                                    <Input id="name" value={profileFormState.name} onChange={handleProfileInputChange} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Email Address</Label>
-                                    <Input id="email" type="email" value={userProfile.email} readOnly disabled className="bg-muted/50" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="mobile">Mobile Number</Label>
-                                    <Input id="mobile" value={profileFormState.mobile} onChange={handleProfileInputChange} maxLength={10} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="location">Location</Label>
-                                    <Input id="location" value={profileFormState.location} onChange={handleProfileInputChange} />
-                                </div>
+                                <div className="space-y-2"><Label htmlFor="name">Full Name</Label><Input id="name" value={profileFormState.name} onChange={handleProfileInputChange} /></div>
+                                <div className="space-y-2"><Label htmlFor="email">Email Address</Label><Input id="email" type="email" value={profileData.email} readOnly disabled className="bg-muted/50" /></div>
+                                <div className="space-y-2"><Label htmlFor="mobile">Mobile Number</Label><Input id="mobile" value={profileFormState.mobile} onChange={handleProfileInputChange} maxLength={10} /></div>
+                                <div className="space-y-2"><Label htmlFor="location">Location</Label><Input id="location" value={profileFormState.location} onChange={handleProfileInputChange} /></div>
                             </>
                         ) : (
                             <>
-                                <div className="space-y-2">
-                                    <Label>Full Name</Label>
-                                    <p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{userProfile.name}</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Email Address</Label>
-                                    <p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{userProfile.email}</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Mobile Number</Label>
-                                    <p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{userProfile.mobile}</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Location</Label>
-                                    <p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{userProfile.location}</p>
-                                </div>
+                                <div className="space-y-2"><Label>Full Name</Label><p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{profileData.name}</p></div>
+                                <div className="space-y-2"><Label>Email Address</Label><p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{profileData.email}</p></div>
+                                <div className="space-y-2"><Label>Mobile Number</Label><p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{profileData.mobile}</p></div>
+                                <div className="space-y-2"><Label>Location</Label><p className="text-sm p-2 bg-muted/50 rounded-md min-h-9">{profileData.location}</p></div>
                             </>
                         )}
                     </CardContent>
                     {isEditingProfile && (
                         <CardFooter className="justify-end gap-2">
                             <Button variant="outline" onClick={handleCancelEditProfile}>Cancel</Button>
-                            <Button onClick={handleSaveProfile} disabled={isSavingProfile}>
-                                {isSavingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Save Changes
-                            </Button>
+                            <Button onClick={handleSaveProfile} disabled={isSavingProfile}>{isSavingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes</Button>
                         </CardFooter>
                     )}
                 </Card>
 
-                {userType === 'VLE' && (
+                {profileData.role === 'vle' && (
                     <Card>
-                        <CardHeader>
-                             <CardTitle>My Services</CardTitle>
-                             <CardDescription>Select the services you are qualified to offer.</CardDescription>
-                        </CardHeader>
+                        <CardHeader><CardTitle>My Services</CardTitle><CardDescription>Select the services you are qualified to offer.</CardDescription></CardHeader>
                         <CardContent className="space-y-4 max-h-96 overflow-y-auto pr-2">
                             {serviceCategories.map(category => (
                                 <div key={category.id} className="space-y-3">
@@ -298,11 +269,7 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
                                     <div className="pl-4 space-y-2">
                                         {category.children.map(service => (
                                             <div key={service.id} className="flex items-center space-x-2">
-                                                <Checkbox 
-                                                    id={`service-offer-${service.id}`}
-                                                    checked={offeredServices.includes(service.id)}
-                                                    onCheckedChange={(checked) => handleServiceSelectionChange(service.id, !!checked)}
-                                                />
+                                                <Checkbox id={`service-offer-${service.id}`} checked={offeredServices.includes(service.id)} onCheckedChange={(checked) => handleServiceSelectionChange(service.id, !!checked)} />
                                                 <Label htmlFor={`service-offer-${service.id}`} className="font-normal cursor-pointer">{service.name}</Label>
                                             </div>
                                         ))}
@@ -310,53 +277,23 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
                                 </div>
                             ))}
                         </CardContent>
-                        <CardFooter>
-                            <Button onClick={handleSaveOfferedServices} disabled={isSavingServices}>
-                                {isSavingServices && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Save My Services
-                            </Button>
-                        </CardFooter>
+                        <CardFooter><Button onClick={handleSaveOfferedServices} disabled={isSavingServices}>{isSavingServices && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save My Services</Button></CardFooter>
                     </Card>
                 )}
             </div>
             
             <Card>
-                <CardHeader>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <CardTitle>Bank Details</CardTitle>
-                            <CardDescription>Manage your bank accounts for transactions.</CardDescription>
-                        </div>
-                    </div>
-                </CardHeader>
+                <CardHeader><div className="flex justify-between items-start"><div><CardTitle>Bank Details</CardTitle><CardDescription>Manage your bank accounts for transactions.</CardDescription></div></div></CardHeader>
                 {isEditingBankAccount ? (
                      <form onSubmit={handleSaveBank}>
                         <CardContent className="space-y-4">
                             <h4 className="text-base font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h4>
-                            <div className="space-y-2 pt-2">
-                                <Label htmlFor="bankName">Bank Name</Label>
-                                <Input id="bankName" placeholder="e.g., State Bank of India" value={bankFormState.bankName} onChange={handleBankInputChange} required />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="accountNumber">Account Number</Label>
-                                <Input id="accountNumber" placeholder="Enter your account number" value={bankFormState.accountNumber} onChange={handleBankInputChange} required />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="ifscCode">IFSC Code</Label>
-                                <Input id="ifscCode" placeholder="Enter IFSC Code" value={bankFormState.ifscCode} onChange={handleBankInputChange} required />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="upiId">UPI ID (Optional)</Label>
-                                <div className="relative">
-                                    <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input id="upiId" placeholder="your-name@okbank" className="pl-10" value={bankFormState.upiId} onChange={handleBankInputChange} />
-                                </div>
-                            </div>
+                            <div className="space-y-2 pt-2"><Label htmlFor="bankName">Bank Name</Label><Input id="bankName" placeholder="e.g., State Bank of India" value={bankFormState.bankName} onChange={handleBankInputChange} required /></div>
+                            <div className="space-y-2"><Label htmlFor="accountNumber">Account Number</Label><Input id="accountNumber" placeholder="Enter your account number" value={bankFormState.accountNumber} onChange={handleBankInputChange} required /></div>
+                            <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" placeholder="Enter IFSC Code" value={bankFormState.ifscCode} onChange={handleBankInputChange} required /></div>
+                            <div className="space-y-2"><Label htmlFor="upiId">UPI ID (Optional)</Label><div className="relative"><AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input id="upiId" placeholder="your-name@okbank" className="pl-10" value={bankFormState.upiId} onChange={handleBankInputChange} /></div></div>
                         </CardContent>
-                        <CardFooter className="justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={handleCancelEditBank}>Cancel</Button>
-                            <Button type="submit">Save Changes</Button>
-                        </CardFooter>
+                        <CardFooter className="justify-end gap-2"><Button type="button" variant="outline" onClick={handleCancelEditBank}>Cancel</Button><Button type="submit">Save Changes</Button></CardFooter>
                      </form>
                  ) : (
                      <>
@@ -378,18 +315,9 @@ export default function ProfileView({ userType, userId, profileData, onBalanceRe
                                     </div>
                                 ))}
                                 </div>
-                             ) : (
-                                <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50">
-                                    <Banknote className="h-8 w-8 text-muted-foreground mb-2" />
-                                    <p className="mb-4 text-muted-foreground">No bank account added yet.</p>
-                                </div>
-                             )}
+                             ) : <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50"><Banknote className="h-8 w-8 text-muted-foreground mb-2" /><p className="mb-4 text-muted-foreground">No bank account added yet.</p></div>}
                         </CardContent>
-                        <CardFooter>
-                            <Button onClick={handleAddBankClick} variant={bankAccounts.length > 0 ? 'default' : 'default'}>
-                               <PlusCircle className="mr-2 h-4 w-4"/> {bankAccounts.length > 0 ? 'Add Another Account' : 'Add Bank Account'}
-                            </Button>
-                        </CardFooter>
+                        <CardFooter><Button onClick={handleAddBankClick} variant={bankAccounts.length > 0 ? 'default' : 'default'}><PlusCircle className="mr-2 h-4 w-4"/> {bankAccounts.length > 0 ? 'Add Another Account' : 'Add Bank Account'}</Button></CardFooter>
                      </>
                  )}
             </Card>

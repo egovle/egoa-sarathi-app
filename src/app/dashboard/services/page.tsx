@@ -21,10 +21,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import type { Service } from '@/lib/types';
 
 // --- Client-side Service Functions ---
 
-async function addService(data: any) {
+async function addService(data: Omit<Service, 'id'>) {
     try {
         await addDoc(collection(db, "services"), data);
         return { success: true };
@@ -33,7 +34,7 @@ async function addService(data: any) {
     }
 }
 
-async function updateService(id: string, data: any) {
+async function updateService(id: string, data: Partial<Omit<Service, 'id'>>) {
     try {
         const serviceRef = doc(db, "services", id);
         await updateDoc(serviceRef, data);
@@ -54,24 +55,23 @@ async function deleteService(id: string) {
 
 
 // --- Service Form Dialog ---
-const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: any, parentServices: any[], onFinished: () => void }) => {
+const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: Service, parentServices: Service[], onFinished: () => void }) => {
     const { toast } = useToast();
     const [name, setName] = useState(service?.name || '');
-    const [customerRate, setCustomerRate] = useState(service?.customerRate || '');
-    const [vleRate, setVleRate] = useState(service?.vleRate || '');
-    const [governmentFee, setGovernmentFee] = useState(service?.governmentFee || '');
+    const [customerRate, setCustomerRate] = useState(service?.customerRate?.toString() || '');
+    const [vleRate, setVleRate] = useState(service?.vleRate?.toString() || '');
+    const [governmentFee, setGovernmentFee] = useState(service?.governmentFee?.toString() || '');
     const [parentId, setParentId] = useState(service?.parentId || 'none');
     const [isVariable, setIsVariable] = useState(service?.isVariable || false);
     const [loading, setLoading] = useState(false);
 
     const initialDocs = useMemo(() => {
         if (!service?.documents) return [];
-        // Convert old string array to new object array for editing
         return service.documents.map((doc: any) => {
             if (typeof doc === 'string') {
                 return { key: doc.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, ''), label: doc };
             }
-            return doc; // It's already an object {key, label}
+            return doc;
         });
     }, [service]);
 
@@ -89,7 +89,6 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
     const handleDocChange = (index: number, field: 'key' | 'label', value: string) => {
         const newDocs = [...documents];
         const currentDoc = { ...newDocs[index], [field]: value };
-        // For the key field, sanitize the input to prevent invalid characters
         if (field === 'key') {
             currentDoc.key = value.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
         }
@@ -97,13 +96,12 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
         setDocuments(newDocs);
     };
 
-    const addDoc = () => {
+    const addDocField = () => {
         setDocuments([...documents, { key: '', label: '' }]);
     };
 
-    const removeDoc = (index: number) => {
-        const newDocs = documents.filter((_, i) => i !== index);
-        setDocuments(newDocs);
+    const removeDocField = (index: number) => {
+        setDocuments(documents.filter((_, i) => i !== index));
     };
 
     const handleSubmit = async (e: FormEvent) => {
@@ -122,7 +120,7 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
             return;
         }
 
-        const serviceData = {
+        const serviceData: Omit<Service, 'id'> = {
             name,
             customerRate: parseFloat(customerRate) || 0,
             vleRate: parseFloat(vleRate) || 0,
@@ -239,12 +237,12 @@ const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: 
                                     className="flex-1"
                                     required
                                 />
-                                <Button type="button" variant="ghost" size="icon" onClick={() => removeDoc(index)}>
+                                <Button type="button" variant="ghost" size="icon" onClick={() => removeDocField(index)}>
                                     <Trash className="h-4 w-4 text-destructive" />
                                 </Button>
                             </div>
                         ))}
-                        <Button type="button" variant="outline" size="sm" onClick={addDoc}>
+                        <Button type="button" variant="outline" size="sm" onClick={addDocField}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Add Document
                         </Button>
                         <p className="text-xs text-muted-foreground pt-1">The 'Key' is a unique ID for the system (no spaces). The 'Label' is what the user will see.</p>
@@ -266,23 +264,21 @@ export default function ServiceManagementPage() {
     const router = useRouter();
     const { toast } = useToast();
     
-    const [services, setServices] = useState<any[]>([]);
+    const [services, setServices] = useState<Service[]>([]);
     const [loadingServices, setLoadingServices] = useState(true);
     const [isSeeding, setIsSeeding] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
-    const [selectedService, setSelectedService] = useState<any | null>(null);
+    const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Effect for handling authorization and redirection
     useEffect(() => {
-        if (!authLoading && userProfile && (!userProfile.isAdmin || userProfile.role === 'government')) {
+        if (!authLoading && userProfile && !userProfile.isAdmin) {
             toast({ title: "Access Denied", description: "You don't have permission to view this page.", variant: "destructive" });
             router.push('/dashboard');
         }
     }, [userProfile, authLoading, router, toast]);
 
-    // Effect for fetching data only if user is an admin
     useEffect(() => {
         if (authLoading || !userProfile?.isAdmin) {
             if(!authLoading) setLoadingServices(false);
@@ -292,7 +288,7 @@ export default function ServiceManagementPage() {
         setLoadingServices(true);
         const q = query(collection(db, 'services'));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
-            const servicesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const servicesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service);
             setServices(servicesData);
             setLoadingServices(false);
         }, (error) => {
@@ -305,7 +301,7 @@ export default function ServiceManagementPage() {
     }, [userProfile, authLoading, toast]);
     
     const { orderedServices, parentServices } = useMemo(() => {
-        const parentServices = services.filter(s => !s.parentId);
+        const parents = services.filter(s => !s.parentId);
         const childServicesMap = services.reduce((acc, service) => {
             if (service.parentId) {
                 if (!acc[service.parentId]) {
@@ -314,27 +310,26 @@ export default function ServiceManagementPage() {
                 acc[service.parentId].push(service);
             }
             return acc;
-        }, {} as { [key: string]: any[] });
+        }, {} as { [key: string]: Service[] });
         
-        parentServices.sort((a, b) => a.name.localeCompare(b.name));
+        parents.sort((a, b) => a.name.localeCompare(b.name));
         
-        const orderedServices = parentServices.reduce((acc, parent) => {
+        const ordered = parents.reduce((acc, parent) => {
             acc.push(parent);
             if (childServicesMap[parent.id]) {
                 childServicesMap[parent.id].sort((a, b) => a.name.localeCompare(b.name));
                 acc.push(...childServicesMap[parent.id]);
             }
             return acc;
-        }, [] as any[]);
+        }, [] as Service[]);
         
-        return { orderedServices, parentServices };
+        return { orderedServices: ordered, parentServices: parents };
     }, [services]);
 
     const filteredServices = useMemo(() => {
         if (!searchQuery) return orderedServices;
         const query = searchQuery.toLowerCase();
         
-        // Find parent services that match
         const matchingParentIds = services
             .filter(s => !s.parentId && s.name.toLowerCase().includes(query))
             .map(s => s.id);
@@ -354,12 +349,10 @@ export default function ServiceManagementPage() {
             const existingServicesSnapshot = await getDocs(query(servicesCollectionRef));
     
             const batch = writeBatch(db);
-            // Delete existing services to ensure a clean seed
             existingServicesSnapshot.docs.forEach(doc => batch.delete(doc.ref));
 
-            // Add new services from seed file
             seedServices.forEach(service => {
-                const { id, ...serviceData } = service; // Exclude hardcoded ID from seed data
+                const { id, ...serviceData } = service;
                 const docRef = id ? doc(db, "services", id) : doc(collection(db, "services"));
                 batch.set(docRef, serviceData);
             });
@@ -375,12 +368,12 @@ export default function ServiceManagementPage() {
     };
 
 
-    const handleEdit = (service: any) => {
+    const handleEdit = (service: Service) => {
         setSelectedService(service);
         setIsFormOpen(true);
     };
 
-    const handleDelete = (service: any) => {
+    const handleDelete = (service: Service) => {
         setSelectedService(service);
         setIsAlertOpen(true);
     };

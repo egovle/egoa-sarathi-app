@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -6,10 +7,11 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import type { UserProfile } from '@/lib/types';
 
 interface AuthContextType {
   user: User | null;
-  userProfile: any | null;
+  userProfile: UserProfile | null;
   loading: boolean;
 }
 
@@ -19,7 +21,7 @@ export const useAuth = () => React.useContext(AuthContext);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = React.useState<User | null>(null);
-  const [userProfile, setUserProfile] = React.useState<any | null>(null);
+  const [userProfile, setUserProfile] = React.useState<UserProfile | null>(null);
   const [loading, setLoading] = React.useState(true);
   const router = useRouter();
 
@@ -27,31 +29,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true);
       if (user) {
-        // User is signed in, fetch profile from potential collections
-        let profileDoc = await getDoc(doc(db, 'users', user.uid));
+        let profileDoc;
+        let profileData;
 
-        if (!profileDoc.exists()) {
-          profileDoc = await getDoc(doc(db, 'vles', user.uid));
-        }
-
-        if (!profileDoc.exists()) {
-          // Check for government official role
-          profileDoc = await getDoc(doc(db, 'government', user.uid));
-        }
-
+        profileDoc = await getDoc(doc(db, 'users', user.uid));
         if (profileDoc.exists()) {
-          setUser(user);
-          setUserProfile({ id: profileDoc.id, ...profileDoc.data() });
+          profileData = { id: profileDoc.id, ...profileDoc.data() };
         } else {
-            // This can happen if user exists in Auth but not in Firestore.
-            console.error("Authenticated user not found in Firestore. Logging out.");
+          profileDoc = await getDoc(doc(db, 'vles', user.uid));
+           if (profileDoc.exists()) {
+              profileData = { id: profileDoc.id, ...profileDoc.data() };
+           } else {
+              profileDoc = await getDoc(doc(db, 'government', user.uid));
+              if(profileDoc.exists()){
+                profileData = { id: profileDoc.id, ...profileDoc.data() };
+              }
+           }
+        }
+
+        if (profileData) {
+          setUser(user);
+          setUserProfile(profileData as UserProfile);
+        } else {
+            console.error("Authenticated user not found in any known collection. Logging out.");
             setUserProfile(null);
             setUser(null);
             await auth.signOut();
             router.push('/');
         }
       } else {
-        // User is signed out
         setUser(null);
         setUserProfile(null);
       }
