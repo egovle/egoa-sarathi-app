@@ -1550,7 +1550,7 @@ const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.R
 };
 
 
-const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData, onApprovePayout, onVleAvailabilityChange }: { allTasks: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void, onResetData: () => Promise<void>, onApprovePayout: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
+const AdminDashboard = ({ allTasks, allUsers, paymentRequests, processingBalanceRequestId, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData, onApprovePayout, onVleAvailabilityChange }: { allTasks: any[], allUsers: any[], paymentRequests: any[], processingBalanceRequestId: string | null, onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void, onResetData: () => Promise<void>, onApprovePayout: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
     const vlesForManagement = allUsers.filter(u => u.role === 'vle' && !u.isAdmin);
     const customersForManagement = allUsers.filter(u => u.role === 'customer');
     
@@ -1737,8 +1737,9 @@ const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintRespon
                                                 <TableCell>{req.userName}</TableCell>
                                                 <TableCell>₹{req.amount.toFixed(2)}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="outline" size="sm" onClick={() => onApproveBalanceRequest(req)}>
-                                                        <CheckCircle2 className="mr-2 h-4 w-4" /> Approve
+                                                    <Button variant="outline" size="sm" onClick={() => onApproveBalanceRequest(req)} disabled={processingBalanceRequestId === req.id}>
+                                                        {processingBalanceRequestId === req.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                                                         Approve
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>
@@ -2075,6 +2076,7 @@ export default function DashboardPage() {
     const [allTasks, setAllTasks] = useState<any[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]); // Will contain both customers and VLEs
     const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
+    const [processingBalanceRequestId, setProcessingBalanceRequestId] = useState<string | null>(null);
     
     // VLE state
     const [assignedTasks, setAssignedTasks] = useState<any[]>([]);
@@ -2454,6 +2456,7 @@ export default function DashboardPage() {
     };
     
      const handleApproveBalanceRequest = async (req: any) => {
+        setProcessingBalanceRequestId(req.id);
         const userRef = doc(db, req.userRole === 'vle' ? 'vles' : 'users', req.userId);
         const reqRef = doc(db, 'paymentRequests', req.id);
 
@@ -2474,6 +2477,8 @@ export default function DashboardPage() {
         } catch (error: any) {
             console.error("Failed to approve balance request:", error);
             toast({ title: "Approval Failed", description: error.message || "Could not update the user's balance.", variant: 'destructive' });
+        } finally {
+            setProcessingBalanceRequestId(null);
         }
     };
 
@@ -2569,7 +2574,7 @@ export default function DashboardPage() {
 
         switch (primaryRole) {
             case 'admin':
-                return <AdminDashboard allTasks={allTasks} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} onVleAvailabilityChange={handleVleAvailabilityChange} />;
+                return <AdminDashboard allTasks={allTasks} allUsers={allUsers} paymentRequests={paymentRequests} processingBalanceRequestId={processingBalanceRequestId} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'vle':
                 return <VLEDashboard assignedTasks={assignedTasks} myLeads={myLeads} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} onTaskAccept={handleTaskAccept} onTaskReject={handleTaskReject} />;
             case 'customer':

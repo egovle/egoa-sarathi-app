@@ -457,11 +457,16 @@ export default function CampManagementPage() {
     }, [userProfile]);
 
     // DERIVED STATE: Calculate upcoming and past camps when allCamps changes.
+    // This is the robust, timezone-proof way to handle date comparisons.
     useEffect(() => {
-        if (!allCamps) return;
+        if (!allCamps.length) {
+            setUpcomingCamps([]);
+            setPastCamps([]);
+            return;
+        }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
+        // Get today's date in 'YYYY-MM-DD' format, which is immune to timezone issues.
+        const todayStr = new Date().toLocaleDateString('en-CA'); 
 
         const upcoming: any[] = [];
         const past: any[] = [];
@@ -469,18 +474,17 @@ export default function CampManagementPage() {
         for (const camp of allCamps) {
             if (!camp.date) continue;
             
-            const [year, month, day] = camp.date.substring(0, 10).split('-').map(Number);
-            const campDate = new Date(year, month - 1, day);
-            campDate.setHours(0,0,0,0);
+            // Get the camp's date in 'YYYY-MM-DD' format directly from the ISO string.
+            const campDateStr = camp.date.substring(0, 10);
             
-            if (campDate >= today) {
+            if (campDateStr >= todayStr) {
                 upcoming.push(camp);
             } else {
                 past.push(camp);
             }
         }
         setUpcomingCamps(upcoming);
-        setPastCamps(past);
+        setPastCamps(past.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
         
     }, [allCamps]);
 

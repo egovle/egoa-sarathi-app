@@ -587,6 +587,7 @@ export default function TaskDetailPage() {
     const [loading, setLoading] = useState(true);
     const [isPaying, setIsPaying] = useState(false);
     const [vleContact, setVleContact] = useState<string | null>(null);
+    const [isPayoutProcessing, setIsPayoutProcessing] = useState(false);
     
     // State for additional document uploads
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -800,12 +801,16 @@ export default function TaskDetailPage() {
             return;
         }
         
-        const result = await processPayout(task, user.uid);
-
-        if (result.success) {
-            toast({ title: 'Payout Approved!', description: result.message });
-        } else {
-            toast({ title: 'Payout Failed', description: result.error, variant: 'destructive' });
+        setIsPayoutProcessing(true);
+        try {
+            const result = await processPayout(task, user.uid);
+            if (result.success) {
+                toast({ title: 'Payout Approved!', description: result.message });
+            } else {
+                toast({ title: 'Payout Failed', description: result.error, variant: 'destructive' });
+            }
+        } finally {
+            setIsPayoutProcessing(false);
         }
     };
 
@@ -989,8 +994,9 @@ export default function TaskDetailPage() {
                            ) : null }
                            
                            {canAdminApprovePayout && (
-                               <Button onClick={() => handleApprovePayout(task)}>
-                                   <CircleDollarSign className="mr-2 h-4 w-4" /> Approve Payout
+                               <Button onClick={() => handleApprovePayout(task)} disabled={isPayoutProcessing}>
+                                   {isPayoutProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CircleDollarSign className="mr-2 h-4 w-4" />}
+                                   Approve Payout
                                </Button>
                            )}
                            

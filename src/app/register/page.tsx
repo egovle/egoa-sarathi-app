@@ -48,6 +48,7 @@ export default function RegisterPage() {
   const [isPincodeLoading, setIsPincodeLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [isConfigMissing, setIsConfigMissing] = useState(false);
+  const [isLocationManual, setIsLocationManual] = useState(false);
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -61,11 +62,13 @@ export default function RegisterPage() {
       setCity('');
       setDistrict('');
       setPostOffices([]);
+      setIsLocationManual(false);
       return;
     }
 
       const fetchLocation = async () => {
         setIsPincodeLoading(true);
+        setIsLocationManual(false);
         setCity('');
         setDistrict('');
         setPostOffices([]);
@@ -83,9 +86,10 @@ export default function RegisterPage() {
           } else {
             setPostOffices([]);
             setDistrict('');
+            setIsLocationManual(true);
             toast({
               title: 'Invalid Pincode',
-              description: 'Could not find a location for this pincode.',
+              description: 'Could not find a location for this pincode. Please enter manually.',
               variant: 'destructive',
             });
           }
@@ -93,6 +97,7 @@ export default function RegisterPage() {
           console.error('Failed to fetch pincode data:', error);
           setPostOffices([]);
           setDistrict('');
+          setIsLocationManual(true);
           toast({
             title: 'API Error',
             description: 'Could not fetch location data. Please enter manually.',
@@ -278,7 +283,9 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2 text-left">
                     <Label htmlFor="city">City</Label>
-                     {postOffices.length > 1 ? (
+                     {isLocationManual ? (
+                        <Input id="city" name="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Enter your city" required />
+                     ) : postOffices.length > 1 ? (
                         <Select onValueChange={setCity} value={city} required>
                             <SelectTrigger id="city"><SelectValue placeholder="Select your city" /></SelectTrigger>
                             <SelectContent>
@@ -293,7 +300,11 @@ export default function RegisterPage() {
                 </div>
                 <div className="grid gap-2 text-left">
                     <Label htmlFor="district">District</Label>
-                    <Input id="district" name="district" value={district} placeholder="Auto-populated" readOnly required className="bg-muted/50 cursor-not-allowed" />
+                     {isLocationManual ? (
+                        <Input id="district" name="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Enter your district" required />
+                     ) : (
+                        <Input id="district" name="district" value={district} placeholder="Auto-populated" readOnly required className="bg-muted/50 cursor-not-allowed" />
+                     )}
                 </div>
             </div>
             <div className="grid gap-2 text-left">
