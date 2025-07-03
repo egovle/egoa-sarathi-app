@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogTrigger, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DayPicker } from 'react-day-picker';
 import "react-day-picker/dist/style.css";
-import { createNotification, createNotificationForAdmins } from '@/app/dashboard/page';
+import { createNotification, createNotificationForAdmins } from '@/app/actions';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -57,6 +57,7 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
     const minDate = useMemo(() => {
         const d = new Date();
         d.setDate(d.getDate() + 7);
+        d.setHours(0, 0, 0, 0);
         return d;
     }, []);
 
@@ -133,10 +134,20 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
     };
 
     return (
+        <DialogContent
+            className="sm:max-w-lg"
+            onInteractOutside={(e) => {
+              const target = e.target as HTMLElement;
+              // This is a common pattern to prevent dialog closing when interacting with a popover inside it
+              if (target.closest('[data-radix-popper-content-wrapper]')) {
+                e.preventDefault();
+              }
+            }}
+        >
+        <DialogHeader>
+            <DialogTitle>{camp ? 'Edit Camp' : (suggestion ? 'Approve & Finalize Camp' : 'Create New Camp')}</DialogTitle>
+        </DialogHeader>
         <form onSubmit={handleSubmit} id="camp-form">
-            <DialogHeader>
-                <DialogTitle>{camp ? 'Edit Camp' : (suggestion ? 'Approve & Finalize Camp' : 'Create New Camp')}</DialogTitle>
-            </DialogHeader>
             <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
                 <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="name" className="text-right">Camp Name</Label>
@@ -240,12 +251,13 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
 
             </div>
             <DialogFooter>
-                <Button type="submit" disabled={loading}>
+                <Button type="submit" disabled={loading} form="camp-form">
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     {camp ? 'Save Changes' : (suggestion ? 'Approve & Create Camp' : 'Create Camp')}
                 </Button>
             </DialogFooter>
         </form>
+        </DialogContent>
     );
 };
 
@@ -263,6 +275,7 @@ const SuggestCampDialog = ({ onFinished, services }: { onFinished: () => void; s
     const minDate = useMemo(() => {
         const d = new Date();
         d.setDate(d.getDate() + 7);
+        d.setHours(0,0,0,0);
         return d;
     }, []);
     
@@ -390,11 +403,8 @@ export default function CampManagementPage() {
     const [selectedCamp, setSelectedCamp] = useState<any | null>(null);
     const [selectedSuggestion, setSelectedSuggestion] = useState<any | null>(null);
 
-    // --- NEW STATE FOR DERIVED LISTS ---
     const [upcomingCamps, setUpcomingCamps] = useState<any[]>([]);
     const [pastCamps, setPastCamps] = useState<any[]>([]);
-    const [myInvitations, setMyInvitations] = useState<any[]>([]);
-    const [myConfirmedCamps, setMyConfirmedCamps] = useState<any[]>([]);
 
     // Effect for authorization
     useEffect(() => {
@@ -446,7 +456,7 @@ export default function CampManagementPage() {
         return () => { unsubCamps(); unsubServices(); unsubSuggestions(); unsubVles(); };
     }, [userProfile]);
 
-    // --- NEW EFFECT FOR CALCULATING DERIVED LISTS ---
+    // DERIVED STATE: Calculate upcoming and past camps when allCamps changes.
     useEffect(() => {
         if (!allCamps) return;
 
@@ -458,9 +468,11 @@ export default function CampManagementPage() {
 
         for (const camp of allCamps) {
             if (!camp.date) continue;
-            const campDate = new Date(camp.date);
-            campDate.setHours(0, 0, 0, 0); // Normalize camp date
-
+            
+            const [year, month, day] = camp.date.substring(0, 10).split('-').map(Number);
+            const campDate = new Date(year, month - 1, day);
+            campDate.setHours(0,0,0,0);
+            
             if (campDate >= today) {
                 upcoming.push(camp);
             } else {
@@ -470,18 +482,7 @@ export default function CampManagementPage() {
         setUpcomingCamps(upcoming);
         setPastCamps(past);
         
-        if (userProfile && userProfile.role === 'vle') {
-            const invitations = upcoming.filter(camp => 
-                camp.assignedVles?.some((vle: any) => vle.id === userProfile.id && vle.status === 'pending')
-            );
-            const confirmed = upcoming.filter(camp => 
-                camp.assignedVles?.some((vle: any) => vle.id === userProfile.id && vle.status === 'accepted')
-            );
-            setMyInvitations(invitations);
-            setMyConfirmedCamps(confirmed);
-        }
-
-    }, [allCamps, userProfile]);
+    }, [allCamps]);
 
     // --- Handlers ---
     const handleEdit = (camp: any) => {
@@ -665,22 +666,12 @@ export default function CampManagementPage() {
                 if (!open) handleFormFinished();
                 else setIsFormOpen(open);
             }}>
-                <DialogContent
-                    className="sm:max-w-lg"
-                    onInteractOutside={(e) => {
-                      const target = e.target as HTMLElement;
-                      if (target.closest('[data-radix-popper-content-wrapper]')) {
-                        e.preventDefault();
-                      }
-                    }}
-                >
                     <CampFormDialog 
                         camp={selectedCamp} 
                         suggestion={selectedSuggestion} 
                         vles={vles} 
                         onFinished={handleFormFinished} 
                     />
-                </DialogContent>
             </Dialog>
 
             <div className="flex justify-between items-center">
@@ -743,7 +734,22 @@ export default function CampManagementPage() {
         </div>
     );
     
-    const VleView = () => (
+    const VleView = () => {
+        const myInvitations = useMemo(() => {
+            if (!userProfile) return [];
+            return upcomingCamps.filter(camp => 
+                camp.assignedVles?.some((vle: any) => vle.id === userProfile.id && vle.status === 'pending')
+            );
+        }, [upcomingCamps, userProfile]);
+    
+        const myConfirmedCamps = useMemo(() => {
+            if (!userProfile) return [];
+            return upcomingCamps.filter(camp => 
+                camp.assignedVles?.some((vle: any) => vle.id === userProfile.id && vle.status === 'accepted')
+            );
+        }, [upcomingCamps, userProfile]);
+
+        return (
          <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold tracking-tight">Your Camps</h1>
@@ -753,9 +759,7 @@ export default function CampManagementPage() {
                             <PlusCircle className="mr-2 h-4 w-4" /> Suggest a Camp
                         </Button>
                     </DialogTrigger>
-                        <DialogContent
-                        className="sm:max-w-lg"
-                    >
+                    <DialogContent className="sm:max-w-lg">
                         <SuggestCampDialog onFinished={() => setIsSuggestFormOpen(false)} services={services} />
                     </DialogContent>
                 </Dialog>
@@ -835,7 +839,7 @@ export default function CampManagementPage() {
                 </TabsContent>
              </Tabs>
          </div>
-    );
+    )};
 
     const CustomerView = () => (
          <div className="space-y-6">
@@ -944,5 +948,3 @@ export default function CampManagementPage() {
     }
     return <CustomerView />;
 }
-
-    
