@@ -1,7 +1,8 @@
+
 'use server';
 
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where } from "firebase/firestore";
-import { db } from "./lib/firebase";
+import { db } from "@/lib/firebase";
 
 
 // --- NOTIFICATION HELPERS ---
