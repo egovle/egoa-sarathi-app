@@ -1583,7 +1583,7 @@ const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.R
 };
 
 
-const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData, onApprovePayout }: { allTasks: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void, onResetData: () => Promise<void>, onApprovePayout: (task: any) => Promise<void> }) => {
+const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData, onApprovePayout, onVleAvailabilityChange }: { allTasks: any[], allUsers: any[], paymentRequests: any[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: any) => void, onResetData: () => Promise<void>, onApprovePayout: (task: any) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) => {
     const vlesForManagement = allUsers.filter(u => u.role === 'vle' && !u.isAdmin);
     const customersForManagement = allUsers.filter(u => u.role === 'customer');
     
@@ -1861,7 +1861,11 @@ const AdminDashboard = ({ allTasks, allUsers, paymentRequests, onComplaintRespon
                             <TableCell><Badge variant={vle.status === 'Approved' ? 'default' : 'secondary'}>{vle.status}</Badge></TableCell>
                             <TableCell>
                                 {vle.status === 'Approved' ? (
-                                     <Badge variant={vle.available ? 'outline' : 'destructive'} className={cn(vle.available && 'border-green-500 text-green-600')}>{vle.available ? 'Available' : 'Unavailable'}</Badge>
+                                     <Switch
+                                        checked={vle.available}
+                                        onCheckedChange={(checked) => onVleAvailabilityChange(vle.id, checked)}
+                                        aria-label="Toggle VLE Availability"
+                                     />
                                 ) : 'N/A'}
                             </TableCell>
                             <TableCell className="text-right">
@@ -2333,7 +2337,7 @@ export default function DashboardPage() {
     const handleVleAvailabilityChange = async (vleId: string, available: boolean) => {
         const vleRef = doc(db, "vles", vleId);
         await updateDoc(vleRef, { available: available });
-        toast({ title: 'Availability Updated', description: `You are now ${available ? 'available' : 'unavailable'} for tasks.`});
+        toast({ title: 'Availability Updated', description: `This VLE is now ${available ? 'available' : 'unavailable'} for tasks.`});
     }
 
     const handleAssignVle = async (taskId: string, vleId: string, vleName: string) => {
@@ -2651,7 +2655,7 @@ export default function DashboardPage() {
 
         switch (primaryRole) {
             case 'admin':
-                return <AdminDashboard allTasks={allTasks} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} />;
+                return <AdminDashboard allTasks={allTasks} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} onVleAvailabilityChange={handleVleAvailabilityChange} />;
             case 'vle':
                 return <VLEDashboard assignedTasks={assignedTasks} myLeads={myLeads} userId={user!.uid} userProfile={realtimeProfile} services={services} onTaskCreated={handleCreateTask} onVleAvailabilityChange={handleVleAvailabilityChange} onTaskAccept={handleTaskAccept} onTaskReject={handleTaskReject} />;
             case 'customer':

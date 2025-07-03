@@ -55,7 +55,6 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
     }, [vles, vleSearch]);
 
     const minDate = useMemo(() => {
-        // All new camps/suggestions must be at least 7 days in the future.
         const d = new Date();
         d.setDate(d.getDate() + 7);
         return d;
@@ -134,7 +133,7 @@ const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: any; su
     };
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} id="camp-form">
             <DialogHeader>
                 <DialogTitle>{camp ? 'Edit Camp' : (suggestion ? 'Approve & Finalize Camp' : 'Create New Camp')}</DialogTitle>
             </DialogHeader>
@@ -391,6 +390,12 @@ export default function CampManagementPage() {
     const [selectedCamp, setSelectedCamp] = useState<any | null>(null);
     const [selectedSuggestion, setSelectedSuggestion] = useState<any | null>(null);
 
+    // --- NEW STATE FOR DERIVED LISTS ---
+    const [upcomingCamps, setUpcomingCamps] = useState<any[]>([]);
+    const [pastCamps, setPastCamps] = useState<any[]>([]);
+    const [myInvitations, setMyInvitations] = useState<any[]>([]);
+    const [myConfirmedCamps, setMyConfirmedCamps] = useState<any[]>([]);
+
     // Effect for authorization
     useEffect(() => {
         if (!authLoading && !user) {
@@ -398,117 +403,85 @@ export default function CampManagementPage() {
         }
     }, [user, authLoading, router]);
 
-    // Effect for fetching camps data
+    // Effect for fetching base data (camps, suggestions, VLEs, services)
     useEffect(() => {
         setLoadingData(true);
         const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
-
         const unsubCamps = onSnapshot(campsQuery, (snapshot) => {
              setAllCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-             setLoadingData(false);
+             if (!userProfile?.isAdmin) setLoadingData(false); // VLEs don't wait for other data
         }, (error) => {
             console.error("Error fetching camps: ", error);
             setLoadingData(false);
         });
         
-        return () => { unsubCamps() };
-
-    }, []);
-    
-    // Effect for fetching camp suggestions & VLEs (Admins/Govt only)
-    useEffect(() => {
-        if (!userProfile || (userProfile.role !== 'government' && !userProfile.isAdmin)) return;
-
-        if (userProfile.isAdmin) {
-            const suggestionsQuery = query(collection(db, 'campSuggestions'), orderBy('date', 'asc'));
-            const unsubSuggestions = onSnapshot(suggestionsQuery, (snapshot) => {
-                setCampSuggestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            }, (error) => console.error("Error fetching camp suggestions:", error));
-    
-            // FIX: The query that requires an index. Remove orderBy and sort on the client.
-            const vlesQuery = query(collection(db, 'vles'), where('isAdmin', '==', false));
-            const unsubVles = onSnapshot(vlesQuery, (snapshot) => {
-                const fetchedVles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Sort client-side
-                fetchedVles.sort((a, b) => a.name.localeCompare(b.name));
-                setVles(fetchedVles);
-            }, (error) => console.error("Error fetching VLEs:", error));
-    
-            return () => {
-                unsubSuggestions();
-                unsubVles();
-            };
-        } else if (userProfile.role === 'government') {
-            const vlesQuery = query(collection(db, 'vles'), where('isAdmin', '==', false));
-             const unsubVles = onSnapshot(vlesQuery, (snapshot) => {
-                setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            }, (error) => console.error("Error fetching VLEs:", error));
-            return () => unsubVles();
-        }
-
-    }, [userProfile]);
-
-    // Effect to fetch services for the suggestion dialog
-     useEffect(() => {
         const servicesQuery = query(collection(db, "services"), orderBy("name"));
         const unsubServices = onSnapshot(servicesQuery, (snapshot) => {
-            const fetchedServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setServices(fetchedServices);
+            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, (error) => console.error("Error fetching services:", error));
 
-        return () => unsubServices();
-    }, []);
-    
-    // --- Data Derivations ---
-    const { upcomingCamps, pastCamps } = useMemo(() => {
+        let unsubSuggestions: () => void = () => {};
+        let unsubVles: () => void = () => {};
+
+        if (userProfile && (userProfile.isAdmin || userProfile.role === 'government')) {
+             if (userProfile.isAdmin) {
+                const suggestionsQuery = query(collection(db, 'campSuggestions'), orderBy('date', 'asc'));
+                unsubSuggestions = onSnapshot(suggestionsQuery, (snapshot) => {
+                    setCampSuggestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                }, (error) => console.error("Error fetching camp suggestions:", error));
+            }
+            
+            const vlesQuery = query(collection(db, 'vles'), where('isAdmin', '==', false));
+            unsubVles = onSnapshot(vlesQuery, (snapshot) => {
+                const fetchedVles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                fetchedVles.sort((a, b) => a.name.localeCompare(b.name));
+                setVles(fetchedVles);
+                setLoadingData(false);
+            }, (error) => {
+                console.error("Error fetching VLEs:", error)
+                setLoadingData(false);
+            });
+        }
+        
+        return () => { unsubCamps(); unsubServices(); unsubSuggestions(); unsubVles(); };
+    }, [userProfile]);
+
+    // --- NEW EFFECT FOR CALCULATING DERIVED LISTS ---
+    useEffect(() => {
+        if (!allCamps) return;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Normalize today to the start of the day
+
         const upcoming: any[] = [];
         const past: any[] = [];
-        
-        // Use a string comparison for dates to avoid timezone issues.
-        // Format today's date as YYYY-MM-DD
-        const today = new Date();
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-        for (const c of allCamps) {
-            if (!c.date || typeof c.date !== 'string' || c.date.length < 10) continue;
-            
-            // Get just the date part of the ISO string: 'YYYY-MM-DD'
-            const campDateStr = c.date.substring(0, 10);
-            
-            if (campDateStr < todayStr) {
-                past.push(c);
+        for (const camp of allCamps) {
+            if (!camp.date) continue;
+            const campDate = new Date(camp.date);
+            campDate.setHours(0, 0, 0, 0); // Normalize camp date
+
+            if (campDate >= today) {
+                upcoming.push(camp);
             } else {
-                upcoming.push(c);
+                past.push(camp);
             }
         }
-        return { upcomingCamps: upcoming, pastCamps: past };
-    }, [allCamps]);
-    
-    const myInvitations = useMemo(() => {
-        if (!userProfile || userProfile.role !== 'vle') return [];
-
-        return upcomingCamps.filter(camp => {
-            if (!Array.isArray(camp.assignedVles)) {
-                return false;
-            }
-            return camp.assignedVles.some(vle => 
-                vle.id === userProfile.id && vle.status === 'pending'
-            );
-        });
-    }, [upcomingCamps, userProfile]);
-
-    const myConfirmedCamps = useMemo(() => {
-        if (!userProfile || userProfile.role !== 'vle') return [];
+        setUpcomingCamps(upcoming);
+        setPastCamps(past);
         
-        return upcomingCamps.filter(camp => {
-            if (!Array.isArray(camp.assignedVles)) {
-                return false;
-            }
-            return camp.assignedVles.some(vle => 
-                vle.id === userProfile.id && vle.status === 'accepted'
+        if (userProfile && userProfile.role === 'vle') {
+            const invitations = upcoming.filter(camp => 
+                camp.assignedVles?.some((vle: any) => vle.id === userProfile.id && vle.status === 'pending')
             );
-        });
-    }, [upcomingCamps, userProfile]);
+            const confirmed = upcoming.filter(camp => 
+                camp.assignedVles?.some((vle: any) => vle.id === userProfile.id && vle.status === 'accepted')
+            );
+            setMyInvitations(invitations);
+            setMyConfirmedCamps(confirmed);
+        }
+
+    }, [allCamps, userProfile]);
 
     // --- Handlers ---
     const handleEdit = (camp: any) => {
