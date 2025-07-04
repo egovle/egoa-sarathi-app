@@ -855,7 +855,13 @@ export default function TaskDetailPage() {
                                     }
                                 </p>
                             </div>
-                             {task.status !== 'Pending Price Approval' && <div><Label>Service Fee</Label><p>₹{task.totalPaid?.toFixed(2)}</p></div>}
+                            <div>
+                                <Label>Total Service Fee</Label>
+                                {task.status === 'Pending Price Approval' 
+                                    ? <p className="text-muted-foreground">To be determined</p>
+                                    : <p>₹{task.totalPaid?.toFixed(2)}</p>
+                                }
+                            </div>
                             {task.acknowledgementNumber && (
                                 <div className="sm:col-span-2"><Label>Acknowledgement #</Label><p>{task.acknowledgementNumber}</p></div>
                             )}

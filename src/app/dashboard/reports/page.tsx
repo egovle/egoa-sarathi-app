@@ -262,11 +262,10 @@ eGoa Sarathi Admin Team
 };
 
 const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEProfile }) => {
-    const assignedTasks = useMemo(() => tasks.filter(t => t.assignedVleId === userProfile.id), [tasks, userProfile.id]);
     
     const stats = useMemo(() => {
-        const completedTasks = assignedTasks.filter(t => t.status === 'Completed' || t.status === 'Paid Out');
-        const pending = assignedTasks.length - completedTasks.length;
+        const completedTasks = tasks.filter(t => t.status === 'Completed' || t.status === 'Paid Out');
+        const pending = tasks.length - completedTasks.length;
         
         const totalCommission = completedTasks.reduce((sum, task) => {
             const serviceProfit = (task.totalPaid || 0) - (task.governmentFeeApplicable || 0);
@@ -275,12 +274,12 @@ const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEPro
         }, 0);
         
         return {
-            total: assignedTasks.length,
+            total: tasks.length,
             completed: completedTasks.length,
             pending,
             totalCommission,
         };
-    }, [assignedTasks]);
+    }, [tasks]);
 
     return (
         <div className="space-y-6">
@@ -339,7 +338,7 @@ const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEPro
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {assignedTasks.map(task => (
+                            {tasks.map(task => (
                                 <TableRow key={task.id}>
                                     <TableCell>{task.id.slice(-6).toUpperCase()}</TableCell>
                                     <TableCell>{task.service}</TableCell>
