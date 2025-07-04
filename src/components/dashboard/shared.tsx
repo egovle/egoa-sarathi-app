@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
@@ -114,7 +113,7 @@ export const ComplaintResponseDialog = ({ trigger, complaint, taskId, customerId
 };
 
 
-export const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: React.ReactNode, taskId: string, onComplaintSubmit: (taskId: string, complaint: any) => void }) => {
+export const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: React.ReactNode, taskId: string, onComplaintSubmit: (taskId: string, complaint: any, files: File[]) => void }) => {
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
     const [complaintText, setComplaintText] = useState('');
@@ -128,10 +127,9 @@ export const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigge
             text: complaintText,
             status: 'Open',
             response: null,
-            documents: selectedFiles.map(f => ({ name: f.name, url: '' })), // Placeholder for storage URL
             date: new Date().toISOString(),
         };
-        onComplaintSubmit(taskId, newComplaint);
+        onComplaintSubmit(taskId, newComplaint, selectedFiles);
         toast({ title: 'Complaint Submitted', description: 'Your complaint has been registered. We will look into it shortly.' });
         setOpen(false);
     };

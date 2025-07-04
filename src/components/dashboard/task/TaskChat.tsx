@@ -1,0 +1,123 @@
+'use client';
+
+import { useEffect, useState, type FormEvent, useRef } from 'react';
+import { collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { createNotification } from '@/app/actions';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Loader2, MessageSquare, Send } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { formatDistanceToNow } from 'date-fns';
+
+export const TaskChat = ({ taskId, task, user, userProfile }: { taskId: string, task: any, user: any, userProfile: any }) => {
+    const [messages, setMessages] = useState<any[]>([]);
+    const [newMessage, setNewMessage] = useState('');
+    const [isSending, setIsSending] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
+    useEffect(() => {
+        const messagesRef = collection(db, `taskChats/${taskId}/messages`);
+        const q = query(messagesRef, orderBy('timestamp', 'asc'));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const newMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setMessages(newMessages);
+        });
+
+        return () => unsubscribe();
+    }, [taskId]);
+
+    const handleSendMessage = async (e: FormEvent) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !user) return;
+        setIsSending(true);
+
+        const messageData = {
+            text: newMessage.trim(),
+            senderId: user.uid,
+            senderName: userProfile.name,
+            senderRole: userProfile.isAdmin ? 'Admin' : userProfile.role,
+            timestamp: serverTimestamp(),
+        };
+
+        try {
+            await addDoc(collection(db, `taskChats/${taskId}/messages`), messageData);
+            setNewMessage('');
+            
+            const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true));
+            const adminSnapshot = await getDocs(adminsQuery);
+            const adminIds = adminSnapshot.docs.map(doc => doc.id);
+            
+            const participantIds = new Set([task.creatorId, task.assignedVleId, ...adminIds].filter(id => id && id !== user.uid));
+
+            for (const id of participantIds) {
+                await createNotification(
+                    id,
+                    `New message in Task #${taskId.slice(-6).toUpperCase()}`,
+                    `${userProfile.name}: "${newMessage.trim()}"`,
+                    `/dashboard/task/${taskId}`
+                );
+            }
+        } catch (error) {
+            console.error("Error sending message:", error);
+            toast({ title: "Error", description: "Could not send message.", variant: "destructive" });
+        } finally {
+            setIsSending(false);
+        }
+    };
+    
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5" />Task Chat</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="h-64 overflow-y-auto space-y-4 pr-2 flex flex-col">
+                    {messages.length > 0 ? (
+                        messages.map(msg => (
+                            <div key={msg.id} className={cn("flex flex-col", msg.senderId === user.uid ? "items-end" : "items-start")}>
+                                <div className={cn("p-2 rounded-lg max-w-xs md:max-w-md", msg.senderId === user.uid ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                                    <p className="font-bold text-xs">{msg.senderName}</p>
+                                    <p className="text-sm break-words">{msg.text}</p>
+                                    {msg.timestamp && (
+                                        <p className="text-xs opacity-70 mt-1 text-right">
+                                            {formatDistanceToNow(msg.timestamp.toDate(), { addSuffix: true })}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+                            No messages yet. Start the conversation!
+                        </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
+            </CardContent>
+            <CardFooter>
+                <form onSubmit={handleSendMessage} className="flex w-full items-center gap-2">
+                    <Textarea
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        placeholder="Type a message..."
+                        rows={1}
+                        className="flex-1 resize-none"
+                        disabled={isSending}
+                    />
+                    <Button type="submit" size="icon" disabled={isSending || !newMessage.trim()}>
+                        {isSending ? <Loader2 className="animate-spin" /> : <Send />}
+                    </Button>
+                </form>
+            </CardFooter>
+        </Card>
+    );
+};

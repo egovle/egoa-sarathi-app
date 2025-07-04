@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -154,9 +153,21 @@ export default function DashboardPage() {
     }
 
 
-    const handleComplaintSubmit = async (taskId: string, complaint: any) => {
+    const handleComplaintSubmit = async (taskId: string, complaint: any, filesToUpload: File[]) => {
         const taskRef = doc(db, "tasks", taskId);
-        await updateDoc(taskRef, { complaint: complaint, status: 'Complaint Raised' });
+        
+        const uploadedDocuments: { name: string, url: string }[] = [];
+        if (filesToUpload.length > 0) {
+            for (const file of filesToUpload) {
+                const storageRef = ref(storage, `tasks/${taskId}/complaints/${Date.now()}_${file.name}`);
+                await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(storageRef);
+                uploadedDocuments.push({ name: file.name, url: downloadURL });
+            }
+        }
+        const complaintWithDocs = { ...complaint, documents: uploadedDocuments };
+
+        await updateDoc(taskRef, { complaint: complaintWithDocs, status: 'Complaint Raised' });
         const taskSnap = await getDoc(taskRef);
         const taskData = taskSnap.data();
         await createNotificationForAdmins(
