@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
@@ -535,6 +536,9 @@ export const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorI
                     <Label htmlFor="email">Email</Label>
                     <Input id="email" name="email" type="email" defaultValue={creatorProfile?.email} />
                 </div>
+
+                <Separator className="my-2" />
+                
                 <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                         <Label>Service Category</Label>
@@ -587,28 +591,31 @@ export const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorI
                 </div>
 
                {selectedService && creatorProfile && (
-                 <Card className="bg-muted/50 p-4 mt-2">
-                    <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Current Wallet Balance</span>
-                        <span>₹{creatorProfile.walletBalance?.toFixed(2) || '0.00'}</span>
-                    </div>
-                    {!selectedService.isVariable && (
-                      <>
-                        <div className="flex justify-between text-sm text-destructive">
-                            <span className="text-muted-foreground">Service Fee</span>
-                            <span>- ₹{serviceFee.toFixed(2)}</span>
+                <>
+                    <Separator className="my-2" />
+                    <Card className="bg-muted/50 p-4 mt-2">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Current Wallet Balance</span>
+                            <span>₹{creatorProfile.walletBalance?.toFixed(2) || '0.00'}</span>
                         </div>
-                        <Separator className="my-2" />
-                        <div className={`flex justify-between font-semibold ${remainingBalance < 0 ? 'text-destructive' : ''}`}>
-                            <span>Remaining Balance</span>
-                            <span>₹{remainingBalance.toFixed(2)}</span>
-                        </div>
-                      </>
-                    )}
-                    {selectedService.isVariable && (
-                        <p className="text-xs text-center text-muted-foreground pt-2">An admin will set the final price for this service after reviewing your request.</p>
-                    )}
-                 </Card>
+                        {!selectedService.isVariable && (
+                        <>
+                            <div className="flex justify-between text-sm text-destructive">
+                                <span className="text-muted-foreground">Service Fee</span>
+                                <span>- ₹{serviceFee.toFixed(2)}</span>
+                            </div>
+                            <Separator className="my-2" />
+                            <div className={`flex justify-between font-semibold ${remainingBalance < 0 ? 'text-destructive' : ''}`}>
+                                <span>Remaining Balance</span>
+                                <span>₹{remainingBalance.toFixed(2)}</span>
+                            </div>
+                        </>
+                        )}
+                        {selectedService.isVariable && (
+                            <p className="text-xs text-center text-muted-foreground pt-2">An admin will set the final price for this service after reviewing your request.</p>
+                        )}
+                    </Card>
+                 </>
               )}
             </div>
             <DialogFooter className='pt-4 border-t'>
@@ -683,114 +690,6 @@ export const AddBalanceRequestDialog = ({ trigger, onBalanceRequest }: { trigger
                     </div>
                     <DialogFooter>
                         <Button type="submit">Submit Request</Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-};
-
-
-export const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger: React.ReactNode, taskId: string, availableVles: any[], onAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
-    const { toast } = useToast();
-    const [open, setOpen] = useState(false);
-    const [selectedVleId, setSelectedVleId] = useState('');
-
-    const handleAssign = async () => {
-        if (!selectedVleId) {
-            toast({ title: 'Select a VLE', description: 'Please select a VLE to assign the task.', variant: 'destructive' });
-            return;
-        }
-        const vle = availableVles.find(v => v.id === selectedVleId);
-        
-        try {
-            await onAssign(taskId, selectedVleId, vle.name);
-            toast({ title: 'Task Assigned', description: `Task ${taskId.slice(-6).toUpperCase()} has been assigned.`});
-            setOpen(false);
-        } catch (error) {
-            console.error("Assignment failed, dialog will remain open.");
-        }
-    }
-
-    const handleOpenChange = (isOpen: boolean) => {
-        if (!isOpen) {
-            setSelectedVleId('');
-        }
-        setOpen(isOpen);
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>{trigger}</DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Assign Task {taskId.slice(-6).toUpperCase()}</DialogTitle>
-                    <DialogDescription>Select an available VLE to assign this task to.</DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                    <Select onValueChange={setSelectedVleId} value={selectedVleId}>
-                        <SelectTrigger><SelectValue placeholder="Select an available VLE" /></SelectTrigger>
-                        <SelectContent>
-                            {availableVles.map(vle => (
-                                <SelectItem key={vle.id} value={vle.id}>{vle.name} - {vle.location}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <DialogFooter>
-                    <Button onClick={handleAssign}>Assign VLE</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
-export const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.ReactNode, vleName: string, onAddBalance: (vleId: string, amount: number) => void }) => {
-    const { toast } = useToast();
-    const [open, setOpen] = useState(false);
-    const [amount, setAmount] = useState('');
-
-    const handleSubmit = (e: FormEvent) => {
-        e.preventDefault();
-        const amountToAdd = parseFloat(amount);
-        if (isNaN(amountToAdd) || amountToAdd <= 0) {
-            toast({ title: 'Invalid Amount', description: 'Please enter a valid positive number.', variant: 'destructive' });
-            return;
-        }
-        onAddBalance(vleName, amountToAdd);
-        toast({ title: 'Balance Added', description: `₹${amountToAdd.toFixed(2)} has been added to ${vleName}'s wallet.` });
-        setOpen(false);
-    };
-
-    const handleOpenChange = (isOpen: boolean) => {
-        if (!isOpen) {
-            setAmount('');
-        }
-        setOpen(isOpen);
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>{trigger}</DialogTrigger>
-            <DialogContent>
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader>
-                        <DialogTitle>Add Balance to {vleName}'s Wallet</DialogTitle>
-                        <DialogDescription>Enter the amount you wish to add. This will be added to the VLE's current balance.</DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4 grid gap-4">
-                        <Label htmlFor="amount">Amount to Add (₹)</Label>
-                        <Input
-                            id="amount"
-                            type="number"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            placeholder="e.g., 500"
-                            required
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button type="submit">Add Balance</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
