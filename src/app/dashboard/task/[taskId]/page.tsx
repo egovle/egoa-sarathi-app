@@ -7,7 +7,7 @@ import { doc, onSnapshot, updateDoc, arrayUnion, addDoc, collection, runTransact
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
-import { createNotification, createNotificationForAdmins, processPayout } from '@/app/actions';
+import { createNotification, createNotificationForAdmins, processPayout, payForVariablePriceTask } from '@/app/actions';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -705,67 +705,21 @@ export default function TaskDetailPage() {
     const handlePayment = async () => {
         if (!userProfile || !user || !task) {
             toast({ title: 'Error', description: 'User profile not loaded. Please try again.', variant: 'destructive' });
-            setIsPaying(false);
             return;
         }
         setIsPaying(true);
-
-        const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true), limit(1));
-        const adminSnapshot = await getDocs(adminsQuery);
-        if (adminSnapshot.empty) {
-            toast({ title: "System Error", description: "No admin account configured to receive payments.", variant: "destructive"});
-            setIsPaying(false);
-            return;
-        }
-        const adminRef = adminSnapshot.docs[0].ref;
-
+    
         try {
-            await runTransaction(db, async (transaction) => {
-                const customerCollection = userProfile.role === 'vle' ? 'vles' : 'users';
-                const customerRef = doc(db, customerCollection, user.uid);
-                const taskRef = doc(db, 'tasks', taskId as string);
-
-                const customerDoc = await transaction.get(customerRef);
-                const adminDoc = await transaction.get(adminRef);
-
-                if (!customerDoc.exists()) throw new Error("User profile not found.");
-                if (!adminDoc.exists()) throw new Error("Admin profile not found.");
-
-                const customerBalance = customerDoc.data().walletBalance || 0;
-                if (customerBalance < task.totalPaid) throw new Error("Insufficient wallet balance.");
-                
-                const adminBalance = adminDoc.data().walletBalance || 0;
-
-                const newCustomerBalance = customerBalance - task.totalPaid;
-                const newAdminBalance = adminBalance + task.totalPaid;
-
-                transaction.update(customerRef, { walletBalance: newCustomerBalance });
-                transaction.update(adminRef, { walletBalance: newAdminBalance });
-
-                const historyEntry = {
-                    timestamp: new Date().toISOString(),
-                    actorId: user.uid,
-                    actorRole: userProfile.role === 'vle' ? 'VLE' : 'Customer',
-                    action: 'Payment Completed',
-                    details: `Paid ₹${task.totalPaid.toFixed(2)}.`,
-                };
-                transaction.update(taskRef, {
-                    status: 'Unassigned',
-                    history: arrayUnion(historyEntry)
-                });
-            });
-
-            toast({ title: 'Payment Successful!', description: `₹${task.totalPaid.toFixed(2)} has been deducted from your wallet.` });
-            
-            await createNotificationForAdmins(
-                'Task Paid & Ready for Assignment',
-                `Task ${task.id.slice(-6).toUpperCase()} is now paid and awaits assignment.`,
-                `/dashboard`
-            );
-
+            const result = await payForVariablePriceTask(task, userProfile);
+    
+            if (result.success) {
+                toast({ title: 'Payment Successful!', description: `₹${task.totalPaid.toFixed(2)} has been deducted from your wallet.` });
+            } else {
+                throw new Error(result.error || "An unknown error occurred during payment.");
+            }
         } catch (error: any) {
             console.error("Payment transaction failed: ", error);
-            toast({ title: 'Payment Failed', description: error.message || "An unknown error occurred.", variant: 'destructive' });
+            toast({ title: 'Payment Failed', description: error.message, variant: 'destructive' });
         } finally {
             setIsPaying(false);
         }

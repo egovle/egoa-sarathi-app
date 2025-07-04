@@ -130,6 +130,15 @@ export default function RegisterPage() {
       else setEmailError('Please enter a valid email address.');
       return;
     }
+    
+    if (postOffices.length > 1 && !city) {
+        toast({
+            title: 'City Required',
+            description: 'Please select your city from the dropdown.',
+            variant: 'destructive',
+        });
+        return;
+    }
 
     if (mobile.length !== 10) {
         toast({

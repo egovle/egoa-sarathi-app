@@ -176,9 +176,11 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
 
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold tracking-tight">Camp Management</h1>
-                <Button onClick={() => { setSelectedCamp(null); setSelectedSuggestion(null); setIsFormOpen(true); }}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Create New Camp
-                </Button>
+                <DialogTrigger asChild>
+                    <Button onClick={() => { setSelectedCamp(null); setSelectedSuggestion(null); setIsFormOpen(true); }}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Create New Camp
+                    </Button>
+                </DialogTrigger>
             </div>
             
             <Tabs defaultValue='upcoming' className="w-full">

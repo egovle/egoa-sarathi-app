@@ -1,9 +1,9 @@
 
 'use server';
 
-import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where } from "firebase/firestore";
+import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Task } from "@/lib/types";
+import type { Task, UserProfile } from "@/lib/types";
 
 // --- NOTIFICATION HELPERS ---
 export async function createNotification(userId: string, title: string, description: string, link?: string) {
@@ -36,6 +36,114 @@ export async function createNotificationForAdmins(title: string, description: st
     } catch (error) {
         console.error("Error creating notifications for admins:", error);
     }
+}
+
+
+// --- CENTRALIZED PAYMENT & TASK LOGIC ---
+
+export async function createFixedPriceTask(
+    taskId: string,
+    taskData: Omit<Task, 'id'>, 
+    userProfile: UserProfile
+) {
+    const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true));
+    const adminSnapshot = await getDocs(adminsQuery);
+    if (adminSnapshot.empty) {
+        throw new Error("No admin account configured to receive payments.");
+    }
+    const adminRef = adminSnapshot.docs[0].ref;
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            const creatorCollection = userProfile.role === 'vle' ? 'vles' : 'users';
+            const creatorRef = doc(db, creatorCollection, userProfile.id);
+            const creatorDoc = await transaction.get(creatorRef);
+            const adminDoc = await transaction.get(adminRef);
+
+            if (!creatorDoc.exists()) throw new Error("Could not find your user profile to process payment.");
+            if (!adminDoc.exists()) throw new Error("Could not find the admin profile to process payment.");
+            
+            const creatorBalance = creatorDoc.data().walletBalance || 0;
+            if (creatorBalance < taskData.totalPaid) throw new Error("Insufficient wallet balance.");
+            
+            const adminBalance = adminDoc.data().walletBalance || 0;
+
+            const newCreatorBalance = creatorBalance - taskData.totalPaid;
+            const newAdminBalance = adminBalance + taskData.totalPaid;
+
+            transaction.update(creatorRef, { walletBalance: newCreatorBalance });
+            transaction.update(adminRef, { walletBalance: newAdminBalance });
+
+            const taskWithStatus = { ...taskData, status: 'Unassigned' };
+            transaction.set(doc(db, "tasks", taskId), taskWithStatus);
+        });
+
+        await createNotificationForAdmins(
+            'New Task Ready for Assignment',
+            `A new task '${taskData.service}' by ${taskData.customer} is paid and ready for assignment.`,
+            `/dashboard`
+        );
+        return { success: true };
+    } catch (error: any) {
+        console.error("Fixed-price task creation failed:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+export async function payForVariablePriceTask(task: Task, userProfile: UserProfile) {
+     const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true));
+     const adminSnapshot = await getDocs(adminsQuery);
+     if (adminSnapshot.empty) {
+         throw new Error("No admin account configured to receive payments.");
+     }
+     const adminRef = adminSnapshot.docs[0].ref;
+
+     try {
+         await runTransaction(db, async (transaction) => {
+             const customerCollection = userProfile.role === 'vle' ? 'vles' : 'users';
+             const customerRef = doc(db, customerCollection, userProfile.id);
+             const taskRef = doc(db, 'tasks', task.id);
+
+             const customerDoc = await transaction.get(customerRef);
+             const adminDoc = await transaction.get(adminRef);
+
+             if (!customerDoc.exists()) throw new Error("User profile not found.");
+             if (!adminDoc.exists()) throw new Error("Admin profile not found.");
+
+             const customerBalance = customerDoc.data().walletBalance || 0;
+             if (customerBalance < task.totalPaid) throw new Error("Insufficient wallet balance.");
+             
+             const adminBalance = adminDoc.data().walletBalance || 0;
+
+             const newCustomerBalance = customerBalance - task.totalPaid;
+             const newAdminBalance = adminBalance + task.totalPaid;
+
+             transaction.update(customerRef, { walletBalance: newCustomerBalance });
+             transaction.update(adminRef, { walletBalance: newAdminBalance });
+
+             const historyEntry = {
+                 timestamp: new Date().toISOString(),
+                 actorId: userProfile.id,
+                 actorRole: userProfile.role === 'vle' ? 'VLE' : 'Customer',
+                 action: 'Payment Completed',
+                 details: `Paid ₹${task.totalPaid.toFixed(2)}.`,
+             };
+             transaction.update(taskRef, {
+                 status: 'Unassigned',
+                 history: arrayUnion(historyEntry)
+             });
+         });
+
+         await createNotificationForAdmins(
+             'Task Paid & Ready for Assignment',
+             `Task ${task.id.slice(-6).toUpperCase()} is now paid and awaits assignment.`,
+             `/dashboard`
+         );
+        return { success: true };
+     } catch (error: any) {
+         console.error("Payment transaction failed: ", error);
+         return { success: false, error: error.message };
+     }
 }
 
 

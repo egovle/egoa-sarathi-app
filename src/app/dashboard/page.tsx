@@ -8,7 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createNotification, createNotificationForAdmins, processPayout } from '@/app/actions';
+import { createNotification, createNotificationForAdmins, processPayout, createFixedPriceTask } from '@/app/actions';
 import { services as seedServices } from '@/lib/seed';
 import { Loader2 } from 'lucide-react';
 
@@ -140,47 +140,15 @@ export default function DashboardPage() {
                 `/dashboard/task/${taskId}`
             );
         } else {
-            const rate = taskWithDocs.totalPaid;
-            const adminsQuery = query(collection(db, "vles"), where("isAdmin", "==", true), limit(1));
-            const adminSnapshot = await getDocs(adminsQuery);
-            if (adminSnapshot.empty) {
-                throw new Error("No admin account configured to receive payments.");
+            const result = await createFixedPriceTask(taskId, taskWithDocs, userProfile);
+            if (result.success) {
+                toast({
+                    title: 'Task Created & Paid!',
+                    description: `₹${taskWithDocs.totalPaid.toFixed(2)} has been deducted from your wallet.`,
+                });
+            } else {
+                 throw new Error(result.error || "An unknown error occurred during task creation.");
             }
-            const adminRef = adminSnapshot.docs[0].ref;
-            
-            await runTransaction(db, async (transaction) => {
-                const creatorCollection = userProfile.role === 'vle' ? 'vles' : 'users';
-                const creatorRef = doc(db, creatorCollection, user.uid);
-                const creatorDoc = await transaction.get(creatorRef);
-                const adminDoc = await transaction.get(adminRef);
-
-                if (!creatorDoc.exists()) throw new Error("Could not find your user profile to process payment.");
-                if (!adminDoc.exists()) throw new Error("Could not find the admin profile to process payment.");
-                
-                const creatorBalance = creatorDoc.data().walletBalance || 0;
-                if (creatorBalance < rate) throw new Error("Insufficient wallet balance.");
-                
-                const adminBalance = adminDoc.data().walletBalance || 0;
-
-                const newCreatorBalance = creatorBalance - rate;
-                const newAdminBalance = adminBalance + rate;
-
-                transaction.update(creatorRef, { walletBalance: newCreatorBalance });
-                transaction.update(adminRef, { walletBalance: newAdminBalance });
-
-                const taskWithStatus = { ...taskWithDocs, status: 'Unassigned' };
-                transaction.set(doc(db, "tasks", taskId), taskWithStatus);
-            });
-
-            toast({
-                title: 'Task Created & Paid!',
-                description: `₹${rate.toFixed(2)} has been deducted from your wallet.`,
-            });
-            await createNotificationForAdmins(
-                'New Task Ready for Assignment',
-                `A new task '${newTaskData.service}' by ${newTaskData.customer} is paid and ready for assignment.`,
-                `/dashboard`
-            );
         }
     }
 

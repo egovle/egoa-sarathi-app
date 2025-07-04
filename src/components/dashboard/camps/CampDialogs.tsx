@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { Camp, CampSuggestion, VLEProfile, Service } from '@/lib/types';
+import type { Camp, CampSuggestion, VLEProfile, Service, GovernmentProfile } from '@/lib/types';
 
 
 export const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: Camp | null; suggestion?: CampSuggestion | null; vles: VLEProfile[]; onFinished: () => void; }) => {

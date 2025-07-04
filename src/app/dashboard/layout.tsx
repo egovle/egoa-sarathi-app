@@ -85,6 +85,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { user, userProfile } = useAuth();
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -122,6 +123,10 @@ export default function DashboardLayout({
   };
 
   const getPageTitle = (path: string) => {
+    const isProfileTab = searchParams.get('tab') === 'profile';
+    if (isProfileTab) {
+        return 'My Profile';
+    }
     if (path.startsWith('/dashboard/task/')) {
         return 'Task Details';
     }
