@@ -4,3 +4,20 @@ import { twMerge } from "tailwind-merge"
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+export const fileValidationConfig = {
+    allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
+    maxSize: 1 * 1024 * 1024, // 1 MB
+};
+
+export const validateFiles = (files: File[]): { isValid: boolean, message?: string } => {
+    for (const file of files) {
+        if (!fileValidationConfig.allowedTypes.includes(file.type)) {
+            return { isValid: false, message: `Invalid file type: ${file.name}. Only PNG, JPG, JPEG, and PDF are allowed.` };
+        }
+        if (file.size > fileValidationConfig.maxSize) {
+            return { isValid: false, message: `File is too large: ${file.name}. Maximum size is 1MB.` };
+        }
+    }
+    return { isValid: true };
+};

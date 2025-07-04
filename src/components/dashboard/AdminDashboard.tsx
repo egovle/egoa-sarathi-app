@@ -24,14 +24,12 @@ const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01s-.521.074-.792.372c-.272.296-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
 );
 
-export default function AdminDashboard({ allTasks, allUsers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData, onApprovePayout, onVleAvailabilityChange }: { allTasks: Task[], allUsers: (VLEProfile | CustomerProfile)[], paymentRequests: PaymentRequest[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: PaymentRequest) => void, onResetData: () => Promise<void>, onApprovePayout: (task: Task) => Promise<{success: boolean}>, onVleAvailabilityChange: (vleId: string, available: boolean) => void }) {
-    const vlesForManagement = allUsers.filter(u => u.role === 'vle') as VLEProfile[];
-    const customersForManagement = allUsers.filter(u => u.role === 'customer') as CustomerProfile[];
+export default function AdminDashboard({ allTasks, vles, customers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData, onApprovePayout, onVleAvailabilityChange, processingVleId }: { allTasks: Task[], vles: VLEProfile[], customers: CustomerProfile[], paymentRequests: PaymentRequest[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: PaymentRequest) => void, onResetData: () => Promise<void>, onApprovePayout: (task: Task) => Promise<{success: boolean}>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, processingVleId: string | null }) {
     
     const [processingBalanceRequestId, setProcessingBalanceRequestId] = useState<string | null>(null);
     const [processingPayoutTaskId, setProcessingPayoutTaskId] = useState<string | null>(null);
 
-    const pendingVles = vlesForManagement.filter(v => v.status === 'Pending');
+    const pendingVles = vles.filter(v => v.status === 'Pending');
     const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
     const payoutTasks = useMemo(() => allTasks.filter(t => t.status === 'Completed'), [allTasks]);
@@ -49,16 +47,16 @@ export default function AdminDashboard({ allTasks, allUsers, paymentRequests, on
     const [taskSearch, setTaskSearch] = useState('');
     
     const filteredVles = useMemo(() => {
-        if (!vleSearch) return vlesForManagement;
+        if (!vleSearch) return vles;
         const query = vleSearch.toLowerCase();
-        return vlesForManagement.filter(vle => 
+        return vles.filter(vle => 
             vle.name.toLowerCase().includes(query) ||
             vle.location.toLowerCase().includes(query)
         );
-    }, [vlesForManagement, vleSearch]);
+    }, [vles, vleSearch]);
 
     const filteredCustomers = useMemo(() => {
-        if (!customerSearch) return customersForManagement;
+        if (!customerSearch) return customers;
         const query = customerSearch.toLowerCase();
         
         const tasksByCustomer: {[key: string]: string[]} = {};
@@ -67,13 +65,13 @@ export default function AdminDashboard({ allTasks, allUsers, paymentRequests, on
             tasksByCustomer[task.creatorId].push(task.id);
         });
 
-        return customersForManagement.filter(user => 
+        return customers.filter(user => 
             user.name.toLowerCase().includes(query) ||
             user.email.toLowerCase().includes(query) ||
             user.mobile.includes(query) ||
             (tasksByCustomer[user.id] || []).some(taskId => taskId.toLowerCase().includes(query))
         );
-    }, [customersForManagement, allTasks, customerSearch]);
+    }, [customers, allTasks, customerSearch]);
 
     const filteredTasks = useMemo(() => {
         if (!taskSearch) return allTasks;
@@ -132,8 +130,8 @@ export default function AdminDashboard({ allTasks, allUsers, paymentRequests, on
             <TabsContent value="overview" className="mt-4 space-y-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <StatCard title="Total Tasks" value={allTasks.length.toString()} icon={Briefcase} description="All tasks in the system" />
-                    <StatCard title="Total VLEs" value={vlesForManagement.length.toString()} icon={Users} description="Registered VLEs" />
-                    <StatCard title="Total Customers" value={customersForManagement.length.toString()} icon={Users2} description="Registered customers" />
+                    <StatCard title="Total VLEs" value={vles.length.toString()} icon={Users} description="Registered VLEs" />
+                    <StatCard title="Total Customers" value={customers.length.toString()} icon={Users2} description="Registered customers" />
                     <StatCard title="Open Complaints" value={openComplaintsCount.toString()} icon={AlertTriangle} description="Awaiting admin response" />
                     <StatCard title="Pending Payouts" value={payoutTaskCount.toString()} icon={Wallet} description="Tasks needing payout approval" />
                 </div>
@@ -149,7 +147,7 @@ export default function AdminDashboard({ allTasks, allUsers, paymentRequests, on
                                             <TableRow key={vle.id}>
                                                 <TableCell>{vle.name}</TableCell>
                                                 <TableCell>{vle.location}</TableCell>
-                                                <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)}><UserPlus className="mr-2 h-4 w-4" /> Approve</Button></TableCell>
+                                                <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)} disabled={processingVleId === vle.id}>{processingVleId === vle.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Approve</Button></TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -232,7 +230,7 @@ export default function AdminDashboard({ allTasks, allUsers, paymentRequests, on
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                {vle.status === 'Pending' && <DropdownMenuItem onClick={() => onVleApprove(vle.id)}><UserPlus className="mr-2 h-4 w-4" />Approve VLE</DropdownMenuItem>}
+                                                {vle.status === 'Pending' && <DropdownMenuItem onClick={() => onVleApprove(vle.id)} disabled={processingVleId === vle.id}>{processingVleId === vle.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}Approve VLE</DropdownMenuItem>}
                                                 {vle.status === 'Approved' && <AddBalanceDialog trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Wallet className="mr-2 h-4 w-4"/>Add Balance</DropdownMenuItem>} vleName={vle.name} onAddBalance={(amount) => onUpdateVleBalance(vle.id, amount)} />}
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem asChild><a href={`mailto:${vle.email}`}><Mail className="mr-2 h-4 w-4"/>Email VLE</a></DropdownMenuItem>
@@ -269,7 +267,7 @@ export default function AdminDashboard({ allTasks, allUsers, paymentRequests, on
                             <TableHeader><TableRow><TableHead>Task ID</TableHead><TableHead>Customer</TableHead><TableHead>Service</TableHead><TableHead>Status</TableHead><TableHead>Assigned VLE</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {filteredTasks.map(task => {
-                                    const availableVles = vlesForManagement.filter(vle => vle.status === 'Approved' && vle.available && vle.id !== task.creatorId);
+                                    const availableVles = vles.filter(vle => vle.status === 'Approved' && vle.available && vle.id !== task.creatorId);
                                     return (
                                         <TableRow key={task.id}>
                                             <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>

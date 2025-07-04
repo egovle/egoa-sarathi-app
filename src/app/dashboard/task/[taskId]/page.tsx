@@ -22,27 +22,9 @@ import { Badge } from '@/components/ui/badge';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { cn } from '@/lib/utils';
+import { cn, validateFiles } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-
-// --- FILE VALIDATION ---
-const fileValidationConfig = {
-    allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
-    maxSize: 1 * 1024 * 1024, // 1 MB
-};
-
-const validateFiles = (files: File[]): { isValid: boolean, message?: string } => {
-    for (const file of files) {
-        if (!fileValidationConfig.allowedTypes.includes(file.type)) {
-            return { isValid: false, message: `Invalid file type: ${file.name}. Only PNG, JPG, JPEG, and PDF are allowed.` };
-        }
-        if (file.size > fileValidationConfig.maxSize) {
-            return { isValid: false, message: `File is too large: ${file.name}. Maximum size is 1MB.` };
-        }
-    }
-    return { isValid: true };
-};
-
+import { VLE_COMMISSION_RATE } from '@/lib/config';
 
 // --- TASK DETAIL PAGE DIALOGS ---
 
@@ -812,7 +794,7 @@ export default function TaskDetailPage() {
     const getEarningsDetails = () => {
         const governmentFee = task.governmentFeeApplicable || 0;
         const serviceProfit = (task.totalPaid || 0) - governmentFee;
-        const vleCommission = serviceProfit * 0.8;
+        const vleCommission = serviceProfit * VLE_COMMISSION_RATE;
         return { governmentFee, vleCommission };
     };
 

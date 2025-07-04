@@ -17,6 +17,7 @@ import type { ChartConfig } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import type { Task, VLEProfile, UserProfile } from '@/lib/types';
+import { ADMIN_COMMISSION_RATE, VLE_COMMISSION_RATE } from '@/lib/config';
 
 
 const AdminReports = ({ tasks, vles }: { tasks: Task[], vles: VLEProfile[] }) => {
@@ -36,7 +37,7 @@ const AdminReports = ({ tasks, vles }: { tasks: Task[], vles: VLEProfile[] }) =>
             const completedTasks = assignedTasks.filter(t => t.status === 'Completed' || t.status === 'Paid Out');
             const totalCommission = completedTasks.reduce((sum, task) => {
                 const profit = (task.totalPaid || 0) - (task.governmentFeeApplicable || 0);
-                const commission = profit * 0.8;
+                const commission = profit * VLE_COMMISSION_RATE;
                 return sum + commission;
             }, 0);
             return {
@@ -53,7 +54,7 @@ const AdminReports = ({ tasks, vles }: { tasks: Task[], vles: VLEProfile[] }) =>
         tasks.filter(t => t.status === 'Paid Out' || t.status === 'Completed').forEach(task => {
             const month = format(new Date(task.date), 'yyyy-MM');
             const profit = (task.totalPaid || 0) - (task.governmentFeeApplicable || 0);
-            const adminRevenue = profit * 0.2;
+            const adminRevenue = profit * ADMIN_COMMISSION_RATE;
             data[month] = (data[month] || 0) + adminRevenue;
         });
         return Object.entries(data)
@@ -269,7 +270,7 @@ const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEPro
         
         const totalCommission = completedTasks.reduce((sum, task) => {
             const serviceProfit = (task.totalPaid || 0) - (task.governmentFeeApplicable || 0);
-            const commission = serviceProfit * 0.8;
+            const commission = serviceProfit * VLE_COMMISSION_RATE;
             return sum + commission;
         }, 0);
         

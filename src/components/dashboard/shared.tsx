@@ -12,28 +12,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { cn } from '@/lib/utils';
+import { cn, validateFiles } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 
 // --- HELPER COMPONENTS ---
-
-const fileValidationConfig = {
-    allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
-    maxSize: 1 * 1024 * 1024, // 1 MB
-};
-
-const validateFiles = (files: File[]): { isValid: boolean, message?: string } => {
-    for (const file of files) {
-        if (!fileValidationConfig.allowedTypes.includes(file.type)) {
-            return { isValid: false, message: `Invalid file type: ${file.name}. Only PNG, JPG, JPEG, and PDF are allowed.` };
-        }
-        if (file.size > fileValidationConfig.maxSize) {
-            return { isValid: false, message: `File is too large: ${file.name}. Maximum size is 1MB.` };
-        }
-    }
-    return { isValid: true };
-};
 
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 

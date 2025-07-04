@@ -30,8 +30,9 @@ export default function DashboardPage() {
     const [allTasks, setAllTasks] = useState<Task[]>([]);
     const [allUsers, setAllUsers] = useState<(VLEProfile | CustomerProfile)[]>([]);
     const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
-    
     const [services, setServices] = useState<Service[]>([]);
+    
+    const [processingVleId, setProcessingVleId] = useState<string | null>(null);
     
     const activeTab = useMemo(() => {
         const tabFromUrl = searchParams.get('tab');
@@ -187,14 +188,22 @@ export default function DashboardPage() {
     }
     
     const handleVleApprove = async (vleId: string) => {
+        setProcessingVleId(vleId);
         const vleRef = doc(db, "vles", vleId);
-        await updateDoc(vleRef, { status: 'Approved' });
-        await createNotification(
-            vleId,
-            'Account Approved',
-            'Congratulations! Your VLE account has been approved by an admin.'
-        );
-        toast({ title: 'VLE Approved', description: 'The VLE has been approved and can now take tasks.'});
+        try {
+            await updateDoc(vleRef, { status: 'Approved' });
+            await createNotification(
+                vleId,
+                'Account Approved',
+                'Congratulations! Your VLE account has been approved by an admin.'
+            );
+            toast({ title: 'VLE Approved', description: 'The VLE has been approved and can now take tasks.'});
+        } catch (error) {
+            console.error("Error approving VLE:", error);
+            toast({ title: "Error", description: "Could not approve the VLE.", variant: "destructive" });
+        } finally {
+            setProcessingVleId(null);
+        }
     }
 
     const handleVleAvailabilityChange = async (vleId: string, available: boolean) => {
@@ -446,6 +455,19 @@ export default function DashboardPage() {
         return { success: result.success };
     };
 
+    const { vles, customers } = useMemo(() => {
+        const vles: VLEProfile[] = [];
+        const customers: CustomerProfile[] = [];
+        allUsers.forEach(user => {
+            if (user.role === 'vle') {
+                vles.push(user as VLEProfile);
+            } else if (user.role === 'customer') {
+                customers.push(user as CustomerProfile);
+            }
+        });
+        return { vles, customers };
+    }, [allUsers]);
+
     if (loading || !user || !userProfile) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
@@ -461,7 +483,7 @@ export default function DashboardPage() {
 
         switch (userProfile.role) {
             case 'admin':
-                return <AdminDashboard allTasks={allTasks} allUsers={allUsers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} onVleAvailabilityChange={handleVleAvailabilityChange} />;
+                return <AdminDashboard allTasks={allTasks} vles={vles} customers={customers} paymentRequests={paymentRequests} onComplaintResponse={handleComplaintResponse} onVleApprove={handleVleApprove} onVleAssign={handleAssignVle} onUpdateVleBalance={handleUpdateVleBalance} onApproveBalanceRequest={handleApproveBalanceRequest} onResetData={handleResetData} onApprovePayout={handleApprovePayout} onVleAvailabilityChange={handleVleAvailabilityChange} processingVleId={processingVleId} />;
             case 'vle':
                 const assignedTasks = allTasks.filter(t => t.assignedVleId === user.uid);
                 const myLeads = allTasks.filter(t => t.creatorId === user.uid);

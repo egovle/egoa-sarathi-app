@@ -4,6 +4,7 @@
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { Task, UserProfile } from "@/lib/types";
+import { ADMIN_COMMISSION_RATE, VLE_COMMISSION_RATE } from "@/lib/config";
 
 // --- NOTIFICATION HELPERS ---
 export async function createNotification(userId: string, title: string, description: string, link?: string) {
@@ -174,8 +175,8 @@ export async function processPayout(task: Task, adminUserId: string) {
             const governmentFee = parseFloat(task.governmentFeeApplicable?.toString() || '0');
 
             const serviceProfit = totalPaid - governmentFee;
-            const vleCommission = serviceProfit * 0.8;
-            const adminCommission = serviceProfit * 0.2;
+            const vleCommission = serviceProfit * VLE_COMMISSION_RATE;
+            const adminCommission = serviceProfit * ADMIN_COMMISSION_RATE;
             
             const amountToVle = governmentFee + vleCommission;
 
