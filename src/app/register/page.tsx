@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -292,9 +291,7 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2 text-left">
                     <Label htmlFor="city">City</Label>
-                     {isLocationManual ? (
-                        <Input id="city" name="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Enter your city" required />
-                     ) : postOffices.length > 1 ? (
+                     {postOffices.length > 1 ? (
                         <Select onValueChange={setCity} value={city} required>
                             <SelectTrigger id="city"><SelectValue placeholder="Select your city" /></SelectTrigger>
                             <SelectContent>
@@ -304,16 +301,12 @@ export default function RegisterPage() {
                             </SelectContent>
                         </Select>
                     ) : (
-                        <Input id="city" name="city" value={city} placeholder="Auto-populated" readOnly required className="bg-muted/50 cursor-not-allowed" />
+                        <Input id="city" name="city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Auto-populated" required />
                     )}
                 </div>
                 <div className="grid gap-2 text-left">
                     <Label htmlFor="district">District</Label>
-                     {isLocationManual ? (
-                        <Input id="district" name="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Enter your district" required />
-                     ) : (
-                        <Input id="district" name="district" value={district} placeholder="Auto-populated" readOnly required className="bg-muted/50 cursor-not-allowed" />
-                     )}
+                    <Input id="district" name="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Auto-populated" required />
                 </div>
             </div>
             <div className="grid gap-2 text-left">

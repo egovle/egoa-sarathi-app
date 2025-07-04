@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type FormEvent, useRef } from 'react';
-import { collection, onSnapshot, addDoc, query, where, orderBy, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, query, orderBy, serverTimestamp, getDocs, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { createNotification } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +56,7 @@ export const TaskChat = ({ taskId, task, user, userProfile }: { taskId: string, 
             const adminSnapshot = await getDocs(adminsQuery);
             const adminIds = adminSnapshot.docs.map(doc => doc.id);
             
+            // Send notifications only to active participants who are not the sender
             const participantIds = new Set([task.creatorId, task.assignedVleId, ...adminIds].filter(id => id && id !== user.uid));
 
             for (const id of participantIds) {

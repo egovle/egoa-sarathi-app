@@ -1,9 +1,9 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +13,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Wallet, PlusCircle, Edit, Loader2, Banknote, AtSign, Trash } from 'lucide-react';
 import { AddBalanceRequestDialog } from './shared';
+import { createNotificationForAdmins } from '@/app/actions';
 import type { UserProfile, Service, VLEProfile, BankAccount } from '@/lib/types';
 
 
-export default function ProfileView({ userId, profileData, onBalanceRequest, services }: { userId: string, profileData: UserProfile, onBalanceRequest: (amount: number) => void, services: Service[]}) {
+export default function ProfileView({ userId, profileData, services }: { userId: string, profileData: UserProfile, services: Service[]}) {
     const { toast } = useToast();
+    const { user, userProfile } = useAuth();
     
     // Profile Edit State
     const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -45,7 +47,7 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
     useEffect(() => {
         setBankAccounts(profileData.bankAccounts || []);
         if (profileData.role === 'vle') {
-            setOfferedServices(profileData.offeredServices || []);
+            setOfferedServices((profileData as VLEProfile).offeredServices || []);
         }
         setProfileFormState({
             name: profileData.name || '',
@@ -53,6 +55,23 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
             location: profileData.location || '',
         });
     }, [userId, profileData]);
+
+    const handleBalanceRequest = async (amount: number) => {
+        if (!user || !userProfile) return;
+        
+        await addDoc(collection(db, "paymentRequests"), {
+            userId: user.uid,
+            userName: userProfile.name,
+            userRole: userProfile.role || 'customer',
+            amount,
+            status: 'pending',
+            date: new Date().toISOString()
+        });
+        
+        toast({ title: 'Request Submitted', description: 'Your request to add balance has been sent to an admin for verification.' });
+        
+        await createNotificationForAdmins('New Balance Request', `${userProfile.name} has requested to add ₹${amount.toFixed(2)} to their wallet.`);
+    };
 
     const handleProfileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
@@ -73,8 +92,7 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
         }
         
         let collectionName = 'users';
-        if (userRole === 'vle') collectionName = 'vles';
-        if (userRole === 'admin') collectionName = 'vles';
+        if (userRole === 'vle' || userRole === 'admin') collectionName = 'vles';
         if (userRole === 'government') collectionName = 'government';
 
         const docRef = doc(db, collectionName, userId);
@@ -222,7 +240,7 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
                     {userRole !== 'admin' && (
                         <AddBalanceRequestDialog 
                             trigger={<Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4"/>Add Balance</Button>}
-                            onBalanceRequest={onBalanceRequest}
+                            onBalanceRequest={handleBalanceRequest}
                         />
                     )}
                 </CardHeader>
@@ -336,4 +354,4 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
             )}
         </div>
     </div>
-)};
+)];

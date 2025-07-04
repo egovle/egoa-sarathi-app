@@ -1,11 +1,16 @@
-
 'use client';
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { FilePlus, Search, ToggleRight, CheckCircle2, XCircle } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { db, storage } from '@/lib/firebase';
+import { collection, doc, addDoc, updateDoc, setDoc, arrayUnion, runTransaction } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { createNotificationForAdmins, createFixedPriceTask } from '@/app/actions';
 
+import { FilePlus, Search, ToggleRight, CheckCircle2, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,18 +20,139 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { TaskCreatorDialog } from './shared';
+import { VLE_COMMISSION_RATE } from '@/lib/config';
 import type { Task, Service, UserProfile, VLEProfile } from '@/lib/types';
 
 
 const getCommissionDetails = (task: Task) => {
     const governmentFee = task.governmentFeeApplicable || 0;
     const serviceProfit = (task.totalPaid || 0) - governmentFee;
-    const vleCommission = serviceProfit * 0.8;
+    const vleCommission = serviceProfit * VLE_COMMISSION_RATE;
     return { governmentFee, vleCommission };
 };
 
-export default function VleDashboard({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange, onTaskAccept, onTaskReject }: { assignedTasks: Task[], myLeads: Task[], userId: string, userProfile: VLEProfile, services: Service[], onTaskCreated: (task: any, service: Service, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, onTaskAccept: (taskId: string) => void, onTaskReject: (taskId: string) => void }) {
+export default function VleDashboard({ assignedTasks, myLeads, services }: { assignedTasks: Task[], myLeads: Task[], services: Service[] }) {
+    const { toast } = useToast();
+    const { user, userProfile } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
+    
+    // Logic handlers moved from parent page.tsx
+    const onVleAvailabilityChange = async (vleId: string, available: boolean) => {
+        const vleRef = doc(db, "vles", vleId);
+        await updateDoc(vleRef, { available: available });
+        toast({ title: 'Availability Updated', description: `You are now ${available ? 'available' : 'unavailable'} for tasks.`});
+    }
+
+    const onTaskCreated = async (newTaskData: any, service: Service, filesToUpload: File[]) => {
+        if (!user || !userProfile) {
+            throw new Error("Profile not loaded");
+        }
+    
+        const taskId = doc(collection(db, "tasks")).id;
+        const uploadedDocuments: { name: string, url: string }[] = [];
+    
+        if (filesToUpload.length > 0) {
+            for (const file of filesToUpload) {
+                const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
+                const metadata = { customMetadata: { creatorId: user.uid } };
+                await uploadBytes(storageRef, file, metadata);
+                const downloadURL = await getDownloadURL(storageRef);
+                uploadedDocuments.push({ name: file.name, url: downloadURL });
+            }
+        }
+        
+        const taskWithDocs = { ...newTaskData, documents: uploadedDocuments };
+    
+        if (service.isVariable) {
+            const taskWithStatus = { ...taskWithDocs, status: 'Pending Price Approval' };
+            await setDoc(doc(db, "tasks", taskId), taskWithStatus);
+            toast({
+                title: 'Request Submitted!',
+                description: 'An admin will review the details and notify you of the final cost.'
+            });
+            await createNotificationForAdmins(
+                'New Variable-Rate Task',
+                `A task for '${service.name}' requires a price to be set.`,
+                `/dashboard/task/${taskId}`
+            );
+        } else {
+            const result = await createFixedPriceTask(taskId, taskWithDocs, userProfile);
+            if (result.success) {
+                toast({
+                    title: 'Task Created & Paid!',
+                    description: `₹${taskWithDocs.totalPaid.toFixed(2)} has been deducted from your wallet.`,
+                });
+            } else {
+                 throw new Error(result.error || "An unknown error occurred during task creation.");
+            }
+        }
+    }
+    
+    const onTaskAccept = async (taskId: string) => {
+        if (!user) return;
+        const taskRef = doc(db, "tasks", taskId);
+        
+        try {
+            await runTransaction(db, async (transaction) => {
+                const taskDoc = await transaction.get(taskRef);
+                if (!taskDoc.exists() || taskDoc.data().status !== 'Pending VLE Acceptance') {
+                    throw new Error("Task is no longer available for acceptance.");
+                }
+                
+                const historyEntry = {
+                    timestamp: new Date().toISOString(),
+                    actorId: user.uid,
+                    actorRole: 'VLE',
+                    action: 'Task Accepted',
+                    details: `VLE has accepted the task.`
+                };
+    
+                transaction.update(taskRef, { 
+                    status: 'Assigned',
+                    history: arrayUnion(historyEntry)
+                });
+            });
+    
+            toast({ title: 'Task Accepted', description: 'You can now begin work on this task.' });
+            await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile?.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`);
+            
+        } catch (error: any) {
+            console.error("Task acceptance failed:", error);
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        }
+    }
+
+    const onTaskReject = async (taskId: string) => {
+        if (!user) return;
+        const taskRef = doc(db, "tasks", taskId);
+
+        try {
+            const historyEntry = {
+                timestamp: new Date().toISOString(),
+                actorId: user.uid,
+                actorRole: 'VLE',
+                action: 'Task Rejected',
+                details: `VLE has rejected the task. It has been returned to the assignment queue.`
+            };
+            
+            await updateDoc(taskRef, {
+                status: 'Unassigned',
+                assignedVleId: null,
+                assignedVleName: null,
+                history: arrayUnion(historyEntry)
+            });
+
+            toast({ title: 'Task Rejected', description: 'The task has been returned to the admin.' });
+            await createNotificationForAdmins(
+                'Task Rejected by VLE',
+                `Task ${taskId.slice(-6).toUpperCase()} was rejected and needs to be reassigned.`
+            );
+        } catch (error: any) {
+            console.error("Task rejection failed:", error);
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        }
+    };
+
 
     const invitations = useMemo(() => assignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), [assignedTasks]);
     const activeTasks = useMemo(() => assignedTasks.filter(t => t.status !== 'Pending VLE Acceptance'), [assignedTasks]);
@@ -40,6 +166,8 @@ export default function VleDashboard({ assignedTasks, myLeads, userId, userProfi
         );
     }, [myLeads, searchQuery]);
 
+    if (!user || !userProfile) return null;
+
     return (
     <Tabs defaultValue="invitations" className="w-full">
         <div className="flex items-center">
@@ -49,7 +177,7 @@ export default function VleDashboard({ assignedTasks, myLeads, userId, userProfi
                 <TabsTrigger value="leads">My Generated Leads</TabsTrigger>
             </TabsList>
             <div className="ml-auto flex items-center gap-2">
-                <TaskCreatorDialog services={services} type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={userId} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
+                <TaskCreatorDialog services={services} type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={user.uid} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
             </div>
         </div>
         <TabsContent value="invitations" className="mt-4">
@@ -101,14 +229,14 @@ export default function VleDashboard({ assignedTasks, myLeads, userId, userProfi
                         <ToggleRight className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent className="pt-2">
-                        {userProfile && userProfile.status === 'Approved' ? (
+                        {userProfile && (userProfile as VLEProfile).status === 'Approved' ? (
                             <div className="flex items-center space-x-2 pt-2">
                                 <Switch 
                                     id="availability-mode" 
-                                    checked={userProfile.available} 
-                                    onCheckedChange={(checked) => onVleAvailabilityChange(userId, checked)}
+                                    checked={(userProfile as VLEProfile).available} 
+                                    onCheckedChange={(checked) => onVleAvailabilityChange(user.uid, checked)}
                                 />
-                                <Label htmlFor="availability-mode">{userProfile.available ? 'Available' : 'Unavailable'} for Tasks</Label>
+                                <Label htmlFor="availability-mode">{(userProfile as VLEProfile).available ? 'Available' : 'Unavailable'} for Tasks</Label>
                             </div>
                         ) : (
                             <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>

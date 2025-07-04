@@ -1,12 +1,14 @@
-
 'use client';
 
-import { useState, useMemo, type FormEvent } from 'react';
+import { useState, useMemo, type FormEvent, type ChangeEvent, useRef } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { useSearchParams } from 'next/navigation';
-import { Loader2, PlusCircle, Wallet, UserPlus, MoreHorizontal, Eye, GitFork, ShieldAlert, AlertTriangle, Mail, Phone, Search, Trash2, CircleDollarSign, Briefcase, Users, Users2 } from 'lucide-react';
+import { Loader2, PlusCircle, Wallet, UserPlus, MoreHorizontal, Eye, GitFork, ShieldAlert, AlertTriangle, Mail, Phone, Search, Trash2, CircleDollarSign, Briefcase, Users, Users2, Send, FileUp, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
+import { collection, doc, addDoc, updateDoc, writeBatch, query, arrayUnion, getDoc, runTransaction, getDocs, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { createNotification, processPayout } from '@/app/actions';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,15 +22,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-
-import { ComplaintResponseDialog } from './shared';
+import { Textarea } from '@/components/ui/textarea';
+import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
+import { StatCard } from './shared';
+import { services as seedServices } from '@/lib/seed';
+import { validateFiles } from '@/lib/utils';
 import type { Task, VLEProfile, CustomerProfile, PaymentRequest, Complaint as ComplaintType } from '@/lib/types';
 
-
-const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01s-.521.074-.792.372c-.272.296-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.626.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-);
-
+// Admin-specific dialogs moved here for better encapsulation
 const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger: React.ReactNode, taskId: string, availableVles: any[], onAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
@@ -136,28 +137,314 @@ const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.R
     );
 };
 
+const ComplaintResponseDialog = ({ trigger, complaint, taskId, customerId, onResponseSubmit }: { trigger: React.ReactNode, complaint: any, taskId: string, customerId: string, onResponseSubmit: (taskId: string, customerId: string, response: any) => void }) => {
+    const { toast } = useToast();
+    const [open, setOpen] = useState(false);
+    const [responseText, setResponseText] = useState('');
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-export default function AdminDashboard({ allTasks, vles, customers, paymentRequests, onComplaintResponse, onVleApprove, onVleAssign, onUpdateVleBalance, onApproveBalanceRequest, onResetData, onApprovePayout, onVleAvailabilityChange, processingVleId }: { allTasks: Task[], vles: VLEProfile[], customers: CustomerProfile[], paymentRequests: PaymentRequest[], onComplaintResponse: (taskId: string, customerId: string, response: any) => void, onVleApprove: (vleId: string) => void, onVleAssign: (taskId: string, vleId: string, vleName: string) => Promise<void>, onUpdateVleBalance: (vleId: string, amount: number) => void, onApproveBalanceRequest: (req: PaymentRequest) => void, onResetData: () => Promise<void>, onApprovePayout: (task: Task) => Promise<{success: boolean}>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, processingVleId: string | null }) {
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const response = {
+            text: responseText,
+            documents: selectedFiles.map(f => ({ name: f.name, url: '' })), // Placeholder for storage URL
+            date: new Date().toISOString(),
+        };
+        onResponseSubmit(taskId, customerId, response);
+        toast({ title: 'Response Sent', description: 'The customer has been notified.' });
+        setOpen(false);
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            const validation = validateFiles(files);
+            if (!validation.isValid) {
+                toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+                return;
+            }
+            setSelectedFiles(prev => [...prev, ...files]);
+        }
+    };
+
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            setResponseText('');
+            setSelectedFiles([]);
+        }
+        setOpen(isOpen);
+    }
     
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>{trigger}</DialogTrigger>
+            <DialogContent>
+                <form onSubmit={handleSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>Respond to Complaint</DialogTitle>
+                        <DialogDescription>
+                            Provide a response to the customer's complaint for Task ID: {taskId.slice(-6).toUpperCase()}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 grid gap-4">
+                        <div className="mt-2 text-sm bg-muted/80 p-3 rounded-md"><b>Customer's complaint:</b> "{complaint.text}"</div>
+                        <Textarea id="response" value={responseText} onChange={(e) => setResponseText(e.target.value)} placeholder="Type your response here..." rows={4} required />
+                        <div>
+                             <Label>Attach Documents (Optional)</Label>
+                             <div className="flex items-center gap-2 mt-2">
+                                <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                                    <FileUp className="mr-2 h-4 w-4"/> Choose Files
+                                </Button>
+                             </div>
+                             <Input id="documents" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                            {selectedFiles.length > 0 && (
+                                <div className="text-xs text-muted-foreground space-y-1 mt-2">
+                                    <p className='font-medium'>Selected files:</p>
+                                    {selectedFiles.map((file, i) => <p key={i}>{file.name}</p>)}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit"><Send className="mr-2 h-4 w-4" /> Send Response</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+export default function AdminDashboard({ allTasks, vles, customers, paymentRequests }: { allTasks: Task[], vles: VLEProfile[], customers: CustomerProfile[], paymentRequests: PaymentRequest[] }) {
+    const { toast } = useToast();
+    const { user, userProfile } = useAuth();
+    const [activeTab, setActiveTab] = useState('overview');
+    
+    const [processingVleId, setProcessingVleId] = useState<string | null>(null);
     const [processingBalanceRequestId, setProcessingBalanceRequestId] = useState<string | null>(null);
     const [processingPayoutTaskId, setProcessingPayoutTaskId] = useState<string | null>(null);
+    
+    const [vleSearch, setVleSearch] = useState('');
+    const [customerSearch, setCustomerSearch] = useState('');
+    const [taskSearch, setTaskSearch] = useState('');
+    
+    // Logic handlers moved from parent page.tsx
+    const handleComplaintResponse = async (taskId: string, customerId: string, response: any) => {
+        const taskRef = doc(db, "tasks", taskId);
+        const taskSnap = await getDoc(taskRef);
+        if (taskSnap.exists()) {
+            const taskData = taskSnap.data() as Task;
+            const updatedComplaint = { ...taskData.complaint, response, status: 'Responded' };
+            await updateDoc(taskRef, { complaint: updatedComplaint });
+            await createNotification(
+                customerId,
+                'Response to your Complaint',
+                `An admin has responded to your complaint for task ${taskId.slice(-6).toUpperCase()}.`,
+                `/dashboard/task/${taskId}`
+            );
+        }
+    }
+    
+    const handleVleApprove = async (vleId: string) => {
+        setProcessingVleId(vleId);
+        const vleRef = doc(db, "vles", vleId);
+        try {
+            await updateDoc(vleRef, { status: 'Approved' });
+            await createNotification(
+                vleId,
+                'Account Approved',
+                'Congratulations! Your VLE account has been approved by an admin.'
+            );
+            toast({ title: 'VLE Approved', description: 'The VLE has been approved and can now take tasks.'});
+        } catch (error) {
+            console.error("Error approving VLE:", error);
+            toast({ title: "Error", description: "Could not approve the VLE.", variant: "destructive" });
+        } finally {
+            setProcessingVleId(null);
+        }
+    }
 
+    const handleVleAvailabilityChange = async (vleId: string, available: boolean) => {
+        const vleRef = doc(db, "vles", vleId);
+        await updateDoc(vleRef, { available: available });
+        toast({ title: 'Availability Updated', description: `This VLE is now ${available ? 'available' : 'unavailable'} for tasks.`});
+    }
+
+    const handleAssignVle = async (taskId: string, vleId: string, vleName: string) => {
+        if (!user || !userProfile?.isAdmin) {
+            toast({ title: 'Permission Denied', description: 'Only admins can assign tasks.', variant: 'destructive' });
+            return;
+        }
+
+        const taskRef = doc(db, "tasks", taskId);
+        const historyEntry = {
+            timestamp: new Date().toISOString(),
+            actorId: user.uid,
+            actorRole: 'Admin',
+            action: 'Task Assigned to VLE',
+            details: `Task assigned to VLE ${vleName} for acceptance.`
+        };
+
+        try {
+            await updateDoc(taskRef, { 
+                status: 'Pending VLE Acceptance', 
+                assignedVleId: vleId, 
+                assignedVleName: vleName,
+                history: arrayUnion(historyEntry)
+            });
+
+            await createNotification(
+                vleId,
+                'New Task Invitation',
+                `You have been invited to work on task: ${taskId.slice(-6).toUpperCase()}.`,
+                `/dashboard`
+            );
+        } catch (error: any) {
+            console.error("Task assignment failed:", error);
+            toast({
+                title: 'Assignment Failed',
+                description: error.message || 'Could not assign the task.',
+                variant: 'destructive',
+            });
+            throw error; 
+        }
+    }
+
+     const handleUpdateVleBalance = async (vleId: string, amountToAdd: number) => {
+        const vleRef = doc(db, "vles", vleId);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const vleDoc = await transaction.get(vleRef);
+                if (!vleDoc.exists()) {
+                    throw "Document does not exist!";
+                }
+                const currentBalance = vleDoc.data().walletBalance || 0;
+                const newBalance = currentBalance + amountToAdd;
+                transaction.update(vleRef, { walletBalance: newBalance });
+            });
+
+            await createNotification(
+                vleId,
+                'Wallet Balance Updated',
+                `An admin has added ₹${amountToAdd.toFixed(2)} to your wallet.`
+            );
+        } catch (e) {
+            console.error("Transaction failed: ", e);
+            toast({ title: "Error", description: "Failed to update balance.", variant: "destructive" });
+        }
+    };
+    
+    const handleApproveBalanceRequest = async (req: PaymentRequest) => {
+        setProcessingBalanceRequestId(req.id);
+        const userRef = doc(db, req.userRole === 'vle' ? 'vles' : 'users', req.userId);
+        const reqRef = doc(db, 'paymentRequests', req.id);
+
+        try {
+            await runTransaction(db, async (transaction) => {
+                const userDoc = await transaction.get(userRef);
+                if (!userDoc.exists()) throw new Error("User document not found.");
+
+                const currentBalance = userDoc.data().walletBalance || 0;
+                const newBalance = currentBalance + req.amount;
+                
+                transaction.update(userRef, { walletBalance: newBalance });
+                transaction.update(reqRef, { status: 'approved', approvedBy: user?.uid, approvedAt: new Date().toISOString() });
+            });
+
+            toast({ title: 'Balance Added', description: `Successfully added ₹${req.amount.toFixed(2)} to ${req.userName}'s wallet.` });
+            await createNotification(req.userId, 'Wallet Balance Updated', `An admin has approved your request and added ₹${req.amount.toFixed(2)} to your wallet.`);
+        } catch (error: any) {
+            console.error("Failed to approve balance request:", error);
+            toast({ title: "Approval Failed", description: error.message || "Could not update the user's balance.", variant: 'destructive' });
+        } finally {
+            setProcessingBalanceRequestId(null);
+        }
+    };
+
+    const handleResetData = async () => {
+        toast({ title: 'Resetting Data...', description: 'Please wait, this may take a moment.' });
+        
+        const processInBatches = async (
+            collectionRef: any,
+            operation: 'delete' | 'update',
+            updateData?: object
+        ) => {
+            const BATCH_SIZE = 499;
+            const snapshot = await getDocs(query(collectionRef));
+            if (snapshot.size === 0) return;
+
+            let batch = writeBatch(db);
+            let count = 0;
+
+            for (const doc of snapshot.docs) {
+                if (operation === 'delete') {
+                    batch.delete(doc.ref);
+                } else if (operation === 'update' && updateData) {
+                    batch.update(doc.ref, updateData);
+                }
+                count++;
+                if (count === BATCH_SIZE) {
+                    await batch.commit();
+                    batch = writeBatch(db);
+                    count = 0;
+                }
+            }
+            if (count > 0) {
+                await batch.commit();
+            }
+        };
+
+        try {
+            const collectionsToClear = ['tasks', 'camps', 'notifications', 'paymentRequests', 'services', 'campSuggestions', 'taskChats'];
+            for (const collectionName of collectionsToClear) {
+                await processInBatches(collection(db, collectionName), 'delete');
+            }
+
+            await processInBatches(collection(db, 'users'), 'update', { walletBalance: 0 });
+            await processInBatches(query(collection(db, 'vles'), where('isAdmin', '==', false)), 'update', { walletBalance: 0 });
+
+            let seedBatch = writeBatch(db);
+            seedServices.forEach(service => {
+                const docRef = service.id ? doc(db, "services", service.id) : doc(collection(db, "services"));
+                const { id, ...serviceData } = service;
+                seedBatch.set(docRef, serviceData);
+            });
+            await seedBatch.commit();
+
+            toast({ title: 'Application Reset', description: 'All data has been cleared and default services have been seeded.' });
+        } catch (error: any) {
+            console.error("Error resetting data:", error);
+            toast({ title: 'Reset Failed', description: error.message || 'Could not reset the application data.', variant: 'destructive' });
+        }
+    };
+
+    const handleApprovePayout = async (task: Task) => {
+        if (!user || !userProfile?.isAdmin) {
+            toast({ title: 'Error', description: 'Permission denied.', variant: 'destructive' });
+            return;
+        }
+        
+        setProcessingPayoutTaskId(task.id);
+        const result = await processPayout(task, user.uid);
+
+        if (result.success) {
+            toast({ title: 'Payout Approved!', description: result.message });
+        } else {
+            toast({ title: 'Payout Failed', description: result.error, variant: 'destructive' });
+        }
+        setProcessingPayoutTaskId(null);
+    };
+
+    // Memoized data for rendering
     const pendingVles = vles.filter(v => v.status === 'Pending');
     const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
     const payoutTasks = useMemo(() => allTasks.filter(t => t.status === 'Completed'), [allTasks]);
     
-    const searchParams = useSearchParams();
-    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
-    
     const pendingVleCount = pendingVles.length;
     const unassignedTaskCount = allTasks.filter(t => t.status === 'Unassigned' || t.status === 'Pending Price Approval').length;
     const openComplaintsCount = complaints.filter(c => c.status === 'Open').length;
     const payoutTaskCount = payoutTasks.length;
-
-    const [vleSearch, setVleSearch] = useState('');
-    const [customerSearch, setCustomerSearch] = useState('');
-    const [taskSearch, setTaskSearch] = useState('');
     
     const filteredVles = useMemo(() => {
         if (!vleSearch) return vles;
@@ -197,31 +484,6 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
     }, [allTasks, taskSearch]);
 
 
-    const handleApproveBalance = async (req: PaymentRequest) => {
-        setProcessingBalanceRequestId(req.id);
-        await onApproveBalanceRequest(req);
-        setProcessingBalanceRequestId(null);
-    }
-    
-    const handleApprovePayout = async (task: Task) => {
-        setProcessingPayoutTaskId(task.id);
-        await onApprovePayout(task);
-        setProcessingPayoutTaskId(null);
-    }
-
-    const StatCard = ({ title, value, icon: Icon, description }: {title: string, value: string, icon: React.ElementType, description: string}) => (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{title}</CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">{value}</div>
-                <p className="text-xs text-muted-foreground">{description}</p>
-            </CardContent>
-        </Card>
-    );
-
     const TabTriggerWithBadge = ({ value, label, count }: { value: string, label: string, count: number }) => (
         <TabsTrigger value={value} className="relative">
             {label}
@@ -241,7 +503,7 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
             </TabsList>
 
             <TabsContent value="overview" className="mt-4 space-y-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
                     <StatCard title="Total Tasks" value={allTasks.length.toString()} icon={Briefcase} description="All tasks in the system" />
                     <StatCard title="Total VLEs" value={vles.length.toString()} icon={Users} description="Registered VLEs" />
                     <StatCard title="Total Customers" value={customers.length.toString()} icon={Users2} description="Registered customers" />
@@ -260,7 +522,7 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                                             <TableRow key={vle.id}>
                                                 <TableCell>{vle.name}</TableCell>
                                                 <TableCell>{vle.location}</TableCell>
-                                                <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => onVleApprove(vle.id)} disabled={processingVleId === vle.id}>{processingVleId === vle.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Approve</Button></TableCell>
+                                                <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => handleVleApprove(vle.id)} disabled={processingVleId === vle.id}>{processingVleId === vle.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />} Approve</Button></TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -299,7 +561,7 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                                                 <TableCell>{req.userName}</TableCell>
                                                 <TableCell>₹{req.amount.toFixed(2)}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="outline" size="sm" onClick={() => handleApproveBalance(req)} disabled={processingBalanceRequestId === req.id}>
+                                                    <Button variant="outline" size="sm" onClick={() => handleApproveBalanceRequest(req)} disabled={processingBalanceRequestId === req.id}>
                                                         {processingBalanceRequestId === req.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Approve"}
                                                     </Button>
                                                 </TableCell>
@@ -318,7 +580,7 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                             <AlertDialogTrigger asChild><Button variant="destructive"><Trash2 className="mr-2 h-4 w-4" /> Reset Application Data</Button></AlertDialogTrigger>
                             <AlertDialogContent>
                                 <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete all tasks, camps, notifications, and payment requests. It will also re-seed the services list and reset all user/VLE wallets to zero.</AlertDialogDescription></AlertDialogHeader>
-                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={onResetData} className="bg-destructive hover:bg-destructive/90">Yes, Reset Everything</AlertDialogAction></AlertDialogFooter>
+                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleResetData} className="bg-destructive hover:bg-destructive/90">Yes, Reset Everything</AlertDialogAction></AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
                     </CardContent>
@@ -338,13 +600,13 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                                     <TableCell>{vle.location}</TableCell>
                                     <TableCell>₹{vle.walletBalance?.toFixed(2) || '0.00'}</TableCell>
                                     <TableCell><Badge variant={vle.status === 'Approved' ? 'default' : 'secondary'}>{vle.status}</Badge></TableCell>
-                                    <TableCell>{vle.status === 'Approved' ? (<Switch checked={vle.available} onCheckedChange={(checked) => onVleAvailabilityChange(vle.id, checked)} aria-label="Toggle VLE Availability" />) : 'N/A'}</TableCell>
+                                    <TableCell>{vle.status === 'Approved' ? (<Switch checked={vle.available} onCheckedChange={(checked) => handleVleAvailabilityChange(vle.id, checked)} aria-label="Toggle VLE Availability" />) : 'N/A'}</TableCell>
                                     <TableCell className="text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                {vle.status === 'Pending' && <DropdownMenuItem onClick={() => onVleApprove(vle.id)} disabled={processingVleId === vle.id}>{processingVleId === vle.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}Approve VLE</DropdownMenuItem>}
-                                                {vle.status === 'Approved' && <AddBalanceDialog trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Wallet className="mr-2 h-4 w-4"/>Add Balance</DropdownMenuItem>} vleName={vle.name} onAddBalance={(amount) => onUpdateVleBalance(vle.id, amount)} />}
+                                                {vle.status === 'Pending' && <DropdownMenuItem onClick={() => handleVleApprove(vle.id)} disabled={processingVleId === vle.id}>{processingVleId === vle.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}Approve VLE</DropdownMenuItem>}
+                                                {vle.status === 'Approved' && <AddBalanceDialog trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><Wallet className="mr-2 h-4 w-4"/>Add Balance</DropdownMenuItem>} vleName={vle.name} onAddBalance={(amount) => handleUpdateVleBalance(vle.id, amount)} />}
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem asChild><a href={`mailto:${vle.email}`}><Mail className="mr-2 h-4 w-4"/>Email VLE</a></DropdownMenuItem>
                                                 <DropdownMenuItem asChild><a href={`tel:${vle.mobile}`}><Phone className="mr-2 h-4 w-4"/>Call VLE</a></DropdownMenuItem>
@@ -394,7 +656,7 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`}><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
-                                                        {task.status === 'Unassigned' && <AssignVleDialog trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><GitFork className="mr-2 h-4 w-4"/>Assign VLE</DropdownMenuItem>} taskId={task.id} availableVles={availableVles} onAssign={onVleAssign} />}
+                                                        {task.status === 'Unassigned' && <AssignVleDialog trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}><GitFork className="mr-2 h-4 w-4"/>Assign VLE</DropdownMenuItem>} taskId={task.id} availableVles={availableVles} onAssign={handleAssignVle} />}
                                                         {task.status === 'Completed' && <DropdownMenuItem onClick={() => handleApprovePayout(task)} disabled={processingPayoutTaskId === task.id}>{processingPayoutTaskId === task.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CircleDollarSign className="mr-2 h-4 w-4" />}Approve Payout</DropdownMenuItem>}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -448,7 +710,7 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                                     <TableCell>{c.customer}</TableCell>
                                     <TableCell className="max-w-xs break-words">{c.text}</TableCell>
                                     <TableCell><Badge variant={c.status === 'Open' ? 'destructive' : 'default'}>{c.status}</Badge></TableCell>
-                                    <TableCell className="text-right">{c.status === 'Open' && <ComplaintResponseDialog trigger={<Button size="sm">Respond</Button>} complaint={c} taskId={c.taskId} customerId={c.customerId} onResponseSubmit={onComplaintResponse} />}</TableCell>
+                                    <TableCell className="text-right">{c.status === 'Open' && <ComplaintResponseDialog trigger={<Button size="sm">Respond</Button>} complaint={c} taskId={c.taskId} customerId={c.customerId} onResponseSubmit={handleComplaintResponse} />}</TableCell>
                                 </TableRow>
                                 ))}
                             </TableBody>
