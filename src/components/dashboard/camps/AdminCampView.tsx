@@ -22,7 +22,7 @@ import { CampFormDialog } from './CampDialogs';
 import type { Camp, CampSuggestion, Service, VLEProfile } from '@/lib/types';
 
 
-const AdminCampTable = ({ data, onEdit, onDelete }: { data: Camp[], onEdit: (camp: Camp) => void, onDelete: (camp: Camp) => void }) => (
+const AdminCampTable = ({ data, vles, onEdit, onDelete }: { data: Camp[], vles: VLEProfile[], onEdit: (camp: Camp) => void, onDelete: (camp: Camp) => void }) => (
     <Card>
         <CardContent className="pt-6">
             <Table>
@@ -50,20 +50,24 @@ const AdminCampTable = ({ data, onEdit, onDelete }: { data: Camp[], onEdit: (cam
                             </TableCell>
                             <TableCell>
                                 <div className="flex items-center -space-x-2">
-                                    {camp.assignedVles?.slice(0, 3).map((vle) => (
-                                         <TooltipProvider key={vle.id}>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
-                                                        {vle.name.charAt(0)}
-                                                    </span>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>{vle.name} - <span className="capitalize">{vle.status || 'pending'}</span></p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    ))}
+                                    {camp.assignedVles?.slice(0, 3).map((assignedVle) => {
+                                         const vleProfile = vles.find(v => v.id === assignedVle.vleId);
+                                         if (!vleProfile) return null;
+                                         return (
+                                            <TooltipProvider key={vleProfile.id}>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
+                                                            {vleProfile.name.charAt(0)}
+                                                        </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>{vleProfile.name} - <span className="capitalize">{assignedVle.status || 'pending'}</span></p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                         )
+                                    })}
                                      {camp.assignedVles?.length > 3 && (
                                         <span className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-xs border-2 border-background">
                                             +{camp.assignedVles.length - 3}
@@ -190,7 +194,7 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
                     <TabsTrigger value="past">Past</TabsTrigger>
                 </TabsList>
                 <TabsContent value="upcoming" className="mt-4">
-                    <AdminCampTable data={upcomingCamps} onEdit={handleEdit} onDelete={handleDelete} />
+                    <AdminCampTable data={upcomingCamps} vles={vles} onEdit={handleEdit} onDelete={handleDelete} />
                 </TabsContent>
                 <TabsContent value="suggestions" className="mt-4">
                     <Card>
@@ -230,7 +234,7 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
                     </Card>
                 </TabsContent>
                 <TabsContent value="past" className="mt-4">
-                     <AdminCampTable data={pastCamps} onEdit={handleEdit} onDelete={handleDelete} />
+                     <AdminCampTable data={pastCamps} vles={vles} onEdit={handleEdit} onDelete={handleDelete} />
                 </TabsContent>
             </Tabs>
         </div>

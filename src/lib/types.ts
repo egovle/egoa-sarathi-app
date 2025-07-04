@@ -116,9 +116,7 @@ export interface Task {
 }
 
 export interface CampVLE {
-    id: string;
-    name: string;
-    mobile: string;
+    vleId: string;
     status: 'pending' | 'accepted' | 'rejected';
 }
 
@@ -131,7 +129,6 @@ export interface Camp {
     services: string[];
     otherServices?: string;
     assignedVles: CampVLE[];
-    vleParticipantIds: string[];
 }
 
 export interface CampSuggestion {

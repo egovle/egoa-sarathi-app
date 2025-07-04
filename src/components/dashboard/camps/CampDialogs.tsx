@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { Camp, CampSuggestion, VLEProfile, Service, GovernmentProfile } from '@/lib/types';
+import type { Camp, CampSuggestion, VLEProfile, Service, GovernmentProfile, CampVLE } from '@/lib/types';
 
 
 export const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: Camp | null; suggestion?: CampSuggestion | null; vles: VLEProfile[]; onFinished: () => void; }) => {
@@ -33,7 +33,13 @@ export const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: 
     const [date, setDate] = useState<Date | undefined>(initialData.date ? new Date(initialData.date) : undefined);
     const [loading, setLoading] = useState(false);
     
-    const [assignedVles, setAssignedVles] = useState<any[]>(camp?.assignedVles || []);
+    const initialAssignedVles = useMemo(() => {
+        if (!camp) return [];
+        return vles.filter(vle => camp.assignedVles.some(av => av.vleId === vle.id));
+    }, [camp, vles]);
+
+    const [assignedVles, setAssignedVles] = useState<VLEProfile[]>(initialAssignedVles);
+
     const [isVlePopoverOpen, setIsVlePopoverOpen] = useState(false);
     const [vleSearch, setVleSearch] = useState('');
     const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
@@ -65,18 +71,20 @@ export const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: 
         }
         
         const newlyAssignedVles = assignedVles.filter(
-            vle => !camp?.assignedVles?.some((av:any) => av.id === vle.id)
+            vle => !camp?.assignedVles?.some((av:any) => av.vleId === vle.id)
         );
 
-        const campData = {
+        const campData: Omit<Camp, 'id'> = {
             name,
             location,
             date: date.toISOString(),
             status: 'Upcoming',
             services: initialData.services || [],
             otherServices: initialData.otherServices || '',
-            assignedVles: assignedVles.map(v => ({ id: v.id, name: v.name, mobile: v.mobile, status: 'pending' })),
-            vleParticipantIds: assignedVles.map(v => v.id),
+            assignedVles: assignedVles.map(vle => {
+                const existingVle = camp?.assignedVles.find(av => av.vleId === vle.id);
+                return { vleId: vle.id, status: existingVle?.status || 'pending' };
+            }),
         };
 
         try {
@@ -112,7 +120,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: 
         setLoading(false);
     };
     
-    const toggleVleSelection = (vle: any) => {
+    const toggleVleSelection = (vle: VLEProfile) => {
         setAssignedVles(currentVles => {
             const isSelected = currentVles.some(s => s.id === vle.id);
             if (isSelected) {
@@ -223,7 +231,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: 
                         </Popover>
                         <div className="flex flex-wrap gap-1">
                             {assignedVles.map(vle => {
-                                const status = vle.status || 'pending';
+                                const status = camp?.assignedVles.find(av => av.vleId === vle.id)?.status || 'pending';
                                 const variant = status === 'accepted' ? 'default' : status === 'rejected' ? 'destructive' : 'secondary';
                                 return (
                                     <Badge key={vle.id} variant={variant} className="flex items-center gap-1">

@@ -9,10 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Loader2, PlusCircle, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { SuggestCampDialog } from './CampDialogs';
-import type { Camp, Service, GovernmentProfile } from '@/lib/types';
+import type { Camp, Service, GovernmentProfile, VLEProfile } from '@/lib/types';
 
 
-export default function GovernmentCampView({ allCamps, services, userProfile }: { allCamps: Camp[], services: Service[], userProfile: GovernmentProfile }) {
+export default function GovernmentCampView({ allCamps, services, vles, userProfile }: { allCamps: Camp[], services: Service[], vles: VLEProfile[], userProfile: GovernmentProfile }) {
     const [isSuggestFormOpen, setIsSuggestFormOpen] = useState(false);
     
     const todayStr = new Date().toLocaleDateString('en-CA');
@@ -50,12 +50,16 @@ export default function GovernmentCampView({ allCamps, services, userProfile }: 
                                 <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
                                 <TableCell>
                                     <div className="flex flex-col gap-2">
-                                        {camp.assignedVles?.filter((vle) => vle.status === 'accepted').map((vle) => (
-                                            <div key={vle.id} className="text-sm">
-                                                <p className="font-medium">{vle.name}</p>
-                                                <p className="flex items-center gap-1.5 text-muted-foreground"><Phone className="h-3 w-3" />{vle.mobile}</p>
-                                            </div>
-                                        ))}
+                                        {camp.assignedVles?.filter((vle) => vle.status === 'accepted').map((assignedVle) => {
+                                            const vleProfile = vles.find(v => v.id === assignedVle.vleId);
+                                            if (!vleProfile) return null;
+                                            return (
+                                                <div key={vleProfile.id} className="text-sm">
+                                                    <p className="font-medium">{vleProfile.name}</p>
+                                                    <p className="flex items-center gap-1.5 text-muted-foreground"><Phone className="h-3 w-3" />{vleProfile.mobile}</p>
+                                                </div>
+                                            )
+                                        })}
                                     </div>
                                 </TableCell>
                             </TableRow>

@@ -35,7 +35,7 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
                 }
                 const campData = campDoc.data() as Camp;
                 const assignedVles = campData.assignedVles || [];
-                const vleIndex = assignedVles.findIndex((v) => v.id === userProfile.id);
+                const vleIndex = assignedVles.findIndex((v) => v.vleId === userProfile.id);
 
                 if (vleIndex === -1) {
                     throw "You are not assigned to this camp.";
@@ -69,13 +69,13 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
 
     const myInvitations = allCamps.filter(camp => {
         if (camp.date.substring(0, 10) < todayStr) return false;
-        const myAssignment = camp.assignedVles?.find(vle => vle.id === userProfile.id);
+        const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
         return myAssignment?.status === 'pending';
     });
     
     const myConfirmedCamps = allCamps.filter(camp => {
         if (camp.date.substring(0, 10) < todayStr) return false;
-        const myAssignment = camp.assignedVles?.find(vle => vle.id === userProfile.id);
+        const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
         return myAssignment?.status === 'accepted';
     });
     

@@ -34,7 +34,7 @@ export default function CampManagementPage() {
         const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
         const unsubCamps = onSnapshot(campsQuery, (snapshot) => {
              setAllCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp));
-             if (userProfile && !userProfile.isAdmin) setLoadingData(false);
+             if (userProfile && !userProfile.isAdmin && userProfile.role !== 'government') setLoadingData(false);
         }, (error) => {
             console.error("Error fetching camps: ", error);
             setLoadingData(false);
@@ -83,10 +83,10 @@ export default function CampManagementPage() {
         return <AdminCampView allCamps={allCamps} suggestions={campSuggestions} vles={vles} />;
     }
     if (userProfile.role === 'vle') {
-        return <VleCampView allCamps={allCamps} services={services} userProfile={userProfile} />;
+        return <VleCampView allCamps={allCamps} services={services} userProfile={userProfile as VLEProfile} />;
     }
     if (userProfile.role === 'government') {
-        return <GovernmentCampView allCamps={allCamps} services={services} userProfile={userProfile} />;
+        return <GovernmentCampView allCamps={allCamps} services={services} vles={vles} userProfile={userProfile as GovernmentProfile} />;
     }
     return <CustomerCampView allCamps={allCamps} />;
 }
