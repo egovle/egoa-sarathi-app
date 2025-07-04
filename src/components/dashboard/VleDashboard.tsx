@@ -18,6 +18,13 @@ import { TaskCreatorDialog } from './shared';
 import type { Task, Service, UserProfile, VLEProfile } from '@/lib/types';
 
 
+const getCommissionDetails = (task: Task) => {
+    const governmentFee = task.governmentFeeApplicable || 0;
+    const serviceProfit = (task.totalPaid || 0) - governmentFee;
+    const vleCommission = serviceProfit * 0.8;
+    return { governmentFee, vleCommission };
+};
+
 export default function VleDashboard({ assignedTasks, myLeads, userId, userProfile, services, onTaskCreated, onVleAvailabilityChange, onTaskAccept, onTaskReject }: { assignedTasks: Task[], myLeads: Task[], userId: string, userProfile: VLEProfile, services: Service[], onTaskCreated: (task: any, service: Service, filesToUpload: File[]) => Promise<void>, onVleAvailabilityChange: (vleId: string, available: boolean) => void, onTaskAccept: (taskId: string) => void, onTaskReject: (taskId: string) => void }) {
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -32,13 +39,6 @@ export default function VleDashboard({ assignedTasks, myLeads, userId, userProfi
             task.customer.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [myLeads, searchQuery]);
-
-    const getCommissionDetails = (task: Task) => {
-        const governmentFee = task.governmentFeeApplicable || 0;
-        const serviceProfit = task.totalPaid - governmentFee;
-        const vleCommission = serviceProfit * 0.8;
-        return { governmentFee, vleCommission };
-    };
 
     return (
     <Tabs defaultValue="invitations" className="w-full">

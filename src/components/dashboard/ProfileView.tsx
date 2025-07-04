@@ -16,7 +16,7 @@ import { AddBalanceRequestDialog } from './shared';
 import type { UserProfile, Service, VLEProfile, BankAccount } from '@/lib/types';
 
 
-export default function ProfileView({ userId, profileData, onBalanceRequest, services }: {userType: 'Customer' | 'VLE', userId: string, profileData: UserProfile, onBalanceRequest: (amount: number) => void, services: Service[]}) {
+export default function ProfileView({ userId, profileData, onBalanceRequest, services }: { userId: string, profileData: UserProfile, onBalanceRequest: (amount: number) => void, services: Service[]}) {
     const { toast } = useToast();
     
     // Profile Edit State
@@ -39,6 +39,8 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
     // Offered Services state
     const [offeredServices, setOfferedServices] = useState<string[]>((profileData as VLEProfile).offeredServices || []);
     const [isSavingServices, setIsSavingServices] = useState(false);
+    
+    const userRole = profileData.isAdmin ? 'admin' : profileData.role;
 
     useEffect(() => {
         setBankAccounts(profileData.bankAccounts || []);
@@ -70,7 +72,11 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
             return;
         }
         
-        const collectionName = profileData.role === 'vle' ? 'vles' : 'users';
+        let collectionName = 'users';
+        if (userRole === 'vle') collectionName = 'vles';
+        if (userRole === 'admin') collectionName = 'vles';
+        if (userRole === 'government') collectionName = 'government';
+
         const docRef = doc(db, collectionName, userId);
         try {
             await updateDoc(docRef, {
@@ -126,7 +132,7 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
             toast({ title: "Bank Account Added", description: "Your new bank account has been added."});
         }
         
-        const collectionName = profileData.role === 'vle' ? 'vles' : 'users';
+        const collectionName = userRole === 'vle' ? 'vles' : 'users';
         const docRef = doc(db, collectionName, userId);
         await updateDoc(docRef, { bankAccounts: updatedAccounts });
         setBankAccounts(updatedAccounts);
@@ -142,7 +148,7 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
     const confirmDeleteBank = async () => {
         if (accountToDelete) {
             const updatedAccounts = bankAccounts.filter(acc => acc.id !== accountToDelete);
-            const collectionName = profileData.role === 'vle' ? 'vles' : 'users';
+            const collectionName = userRole === 'vle' ? 'vles' : 'users';
             const docRef = doc(db, collectionName, userId);
             await updateDoc(docRef, { bankAccounts: updatedAccounts });
             setBankAccounts(updatedAccounts);
@@ -205,23 +211,28 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+        
+        {userRole !== 'government' && (
+            <Card>
+                <CardHeader className='flex-row items-center justify-between'>
+                    <CardTitle className="flex items-center gap-2">
+                        <Wallet className="h-5 w-5 text-muted-foreground" />
+                        <span>Wallet Balance</span>
+                    </CardTitle>
+                    {userRole !== 'admin' && (
+                        <AddBalanceRequestDialog 
+                            trigger={<Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4"/>Add Balance</Button>}
+                            onBalanceRequest={onBalanceRequest}
+                        />
+                    )}
+                </CardHeader>
+                <CardContent>
+                    <div className="text-3xl font-bold">₹{profileData.walletBalance?.toFixed(2) || '0.00'}</div>
+                    <p className="text-xs text-muted-foreground">Available balance</p>
+                </CardContent>
+            </Card>
+        )}
 
-        <Card>
-            <CardHeader className='flex-row items-center justify-between'>
-                <CardTitle className="flex items-center gap-2">
-                    <Wallet className="h-5 w-5 text-muted-foreground" />
-                    <span>Wallet Balance</span>
-                </CardTitle>
-                 <AddBalanceRequestDialog 
-                    trigger={<Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4"/>Add Balance</Button>}
-                    onBalanceRequest={onBalanceRequest}
-                />
-            </CardHeader>
-            <CardContent>
-                <div className="text-3xl font-bold">₹{profileData.walletBalance?.toFixed(2) || '0.00'}</div>
-                <p className="text-xs text-muted-foreground">Available balance</p>
-            </CardContent>
-        </Card>
 
         <div className="grid gap-6 lg:grid-cols-2">
             <div className="space-y-6">
@@ -259,7 +270,7 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
                     )}
                 </Card>
 
-                {profileData.role === 'vle' && (
+                {userRole === 'vle' && (
                     <Card>
                         <CardHeader><CardTitle>My Services</CardTitle><CardDescription>Select the services you are qualified to offer.</CardDescription></CardHeader>
                         <CardContent className="space-y-4 max-h-96 overflow-y-auto pr-2">
@@ -282,45 +293,47 @@ export default function ProfileView({ userId, profileData, onBalanceRequest, ser
                 )}
             </div>
             
-            <Card>
-                <CardHeader><div className="flex justify-between items-start"><div><CardTitle>Bank Details</CardTitle><CardDescription>Manage your bank accounts for transactions.</CardDescription></div></div></CardHeader>
-                {isEditingBankAccount ? (
-                     <form onSubmit={handleSaveBank}>
-                        <CardContent className="space-y-4">
-                            <h4 className="text-base font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h4>
-                            <div className="space-y-2 pt-2"><Label htmlFor="bankName">Bank Name</Label><Input id="bankName" placeholder="e.g., State Bank of India" value={bankFormState.bankName} onChange={handleBankInputChange} required /></div>
-                            <div className="space-y-2"><Label htmlFor="accountNumber">Account Number</Label><Input id="accountNumber" placeholder="Enter your account number" value={bankFormState.accountNumber} onChange={handleBankInputChange} required /></div>
-                            <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" placeholder="Enter IFSC Code" value={bankFormState.ifscCode} onChange={handleBankInputChange} required /></div>
-                            <div className="space-y-2"><Label htmlFor="upiId">UPI ID (Optional)</Label><div className="relative"><AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input id="upiId" placeholder="your-name@okbank" className="pl-10" value={bankFormState.upiId} onChange={handleBankInputChange} /></div></div>
-                        </CardContent>
-                        <CardFooter className="justify-end gap-2"><Button type="button" variant="outline" onClick={handleCancelEditBank}>Cancel</Button><Button type="submit">Save Changes</Button></CardFooter>
-                     </form>
-                 ) : (
-                     <>
-                        <CardContent className="space-y-4">
-                            {bankAccounts.length > 0 ? (
-                                <div className="space-y-4">
-                                {bankAccounts.map((account) => (
-                                    <div key={account.id} className="p-4 border rounded-lg relative bg-muted/50">
-                                         <div className="absolute top-2 right-2 flex gap-1">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditBankClick(account)}><Edit className="h-4 w-4" /></Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteBankClick(account.id)}><Trash className="h-4 w-4" /></Button>
+            {(userRole === 'customer' || userRole === 'vle') && (
+                <Card>
+                    <CardHeader><div className="flex justify-between items-start"><div><CardTitle>Bank Details</CardTitle><CardDescription>Manage your bank accounts for transactions.</CardDescription></div></div></CardHeader>
+                    {isEditingBankAccount ? (
+                        <form onSubmit={handleSaveBank}>
+                            <CardContent className="space-y-4">
+                                <h4 className="text-base font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h4>
+                                <div className="space-y-2 pt-2"><Label htmlFor="bankName">Bank Name</Label><Input id="bankName" placeholder="e.g., State Bank of India" value={bankFormState.bankName} onChange={handleBankInputChange} required /></div>
+                                <div className="space-y-2"><Label htmlFor="accountNumber">Account Number</Label><Input id="accountNumber" placeholder="Enter your account number" value={bankFormState.accountNumber} onChange={handleBankInputChange} required /></div>
+                                <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" placeholder="Enter IFSC Code" value={bankFormState.ifscCode} onChange={handleBankInputChange} required /></div>
+                                <div className="space-y-2"><Label htmlFor="upiId">UPI ID (Optional)</Label><div className="relative"><AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input id="upiId" placeholder="your-name@okbank" className="pl-10" value={bankFormState.upiId} onChange={handleBankInputChange} /></div></div>
+                            </CardContent>
+                            <CardFooter className="justify-end gap-2"><Button type="button" variant="outline" onClick={handleCancelEditBank}>Cancel</Button><Button type="submit">Save Changes</Button></CardFooter>
+                        </form>
+                    ) : (
+                        <>
+                            <CardContent className="space-y-4">
+                                {bankAccounts.length > 0 ? (
+                                    <div className="space-y-4">
+                                    {bankAccounts.map((account) => (
+                                        <div key={account.id} className="p-4 border rounded-lg relative bg-muted/50">
+                                            <div className="absolute top-2 right-2 flex gap-1">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditBankClick(account)}><Edit className="h-4 w-4" /></Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteBankClick(account.id)}><Trash className="h-4 w-4" /></Button>
+                                            </div>
+                                            <div className="space-y-2 text-sm">
+                                                <p className="font-semibold">{account.bankName}</p>
+                                                <p className="text-muted-foreground">A/C: {account.accountNumber}</p>
+                                                <p className="text-muted-foreground">IFSC: {account.ifscCode}</p>
+                                                {account.upiId && <p className="text-muted-foreground">UPI: {account.upiId}</p>}
+                                            </div>
                                         </div>
-                                        <div className="space-y-2 text-sm">
-                                            <p className="font-semibold">{account.bankName}</p>
-                                            <p className="text-muted-foreground">A/C: {account.accountNumber}</p>
-                                            <p className="text-muted-foreground">IFSC: {account.ifscCode}</p>
-                                            {account.upiId && <p className="text-muted-foreground">UPI: {account.upiId}</p>}
-                                        </div>
+                                    ))}
                                     </div>
-                                ))}
-                                </div>
-                             ) : <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50"><Banknote className="h-8 w-8 text-muted-foreground mb-2" /><p className="mb-4 text-muted-foreground">No bank account added yet.</p></div>}
-                        </CardContent>
-                        <CardFooter><Button onClick={handleAddBankClick} variant={bankAccounts.length > 0 ? 'default' : 'default'}><PlusCircle className="mr-2 h-4 w-4"/> {bankAccounts.length > 0 ? 'Add Another Account' : 'Add Bank Account'}</Button></CardFooter>
-                     </>
-                 )}
-            </Card>
+                                ) : <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50"><Banknote className="h-8 w-8 text-muted-foreground mb-2" /><p className="mb-4 text-muted-foreground">No bank account added yet.</p></div>}
+                            </CardContent>
+                            <CardFooter><Button onClick={handleAddBankClick} variant={bankAccounts.length > 0 ? 'default' : 'default'}><PlusCircle className="mr-2 h-4 w-4"/> {bankAccounts.length > 0 ? 'Add Another Account' : 'Add Bank Account'}</Button></CardFooter>
+                        </>
+                    )}
+                </Card>
+            )}
         </div>
     </div>
 )};

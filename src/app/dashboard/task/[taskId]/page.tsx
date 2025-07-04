@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Loader2, FileText, History, MessageSquarePlus, CheckCircle, Send, UploadCloud, Camera, FileUp, PenSquare, Wallet, CheckCircle2, XCircle, KeyRound, Phone, CircleDollarSign, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Loader2, FileText, History, MessageSquarePlus, CheckCircle, Send, UploadCloud, Camera, FileUp, PenSquare, Wallet, CheckCircle2, XCircle, KeyRound, Phone, CircleDollarSign, MessageSquare, User, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -965,6 +965,28 @@ export default function TaskDetailPage() {
                            )}
                         </CardContent>
                     </Card>
+
+                     {(isAdmin || isAssignedVle) && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className='flex items-center gap-2'>Customer Details</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 text-sm">
+                                <div className="flex items-center gap-3">
+                                    <User className="h-4 w-4 text-muted-foreground" />
+                                    <span>{task.customer}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Phone className="h-4 w-4 text-muted-foreground" />
+                                    <a href={`tel:${task.customerMobile}`} className="text-primary hover:underline">{task.customerMobile}</a>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Mail className="h-4 w-4 text-muted-foreground" />
+                                    {task.customerEmail ? <a href={`mailto:${task.customerEmail}`} className="text-primary hover:underline break-all">{task.customerEmail}</a> : <span className="text-muted-foreground">Not provided</span>}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {isAssignedVle && (
                         <Card>

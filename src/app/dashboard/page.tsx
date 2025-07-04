@@ -456,7 +456,7 @@ export default function DashboardPage() {
 
     const renderContent = () => {
         if (activeTab === 'profile') {
-            return <ProfileView userType={userProfile.role === 'vle' ? 'VLE' : 'Customer'} userId={user!.uid} profileData={userProfile} onBalanceRequest={handleBalanceRequest} services={services} />
+            return <ProfileView userId={user!.uid} profileData={userProfile} onBalanceRequest={handleBalanceRequest} services={services} />
         }
 
         switch (userProfile.role) {
