@@ -1,10 +1,10 @@
+
 'use client';
 
 import React from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 
@@ -22,7 +22,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = React.useState<User | null>(null);
   const [userProfile, setUserProfile] = React.useState<UserProfile | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const router = useRouter();
 
   React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -54,10 +53,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUserProfile(profileData);
         } else {
             console.error("Authenticated user not found in any known collection. Logging out.");
+            await auth.signOut();
             setUserProfile(null);
             setUser(null);
-            await auth.signOut();
-            router.push('/');
         }
       } else {
         setUser(null);
@@ -67,7 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, []);
 
   const value = {
     user,

@@ -1,19 +1,20 @@
 
 'use client';
 
-import { useState, useMemo, type FormEvent, type ChangeEvent, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Loader2, PlusCircle, Wallet, UserPlus, MoreHorizontal, Eye, GitFork, ShieldAlert, AlertTriangle, Mail, Phone, Search, Trash2, CircleDollarSign, Briefcase, Users, Users2, Send, FileUp, FileText } from 'lucide-react';
+import { Loader2, UserPlus, MoreHorizontal, Eye, GitFork, AlertTriangle, Mail, Phone, Search, Trash2, CircleDollarSign, Briefcase, Users, Users2, Wallet, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { collection, doc, addDoc, updateDoc, writeBatch, query, arrayUnion, getDoc, runTransaction, getDocs, where } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, query, arrayUnion, getDoc, runTransaction, getDocs, where, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { createNotification, processPayout } from '@/app/actions';
+import { resetApplicationData } from '@/app/dashboard/services/actions';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -26,118 +27,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
 import { StatCard } from './shared';
-import { services as seedServices } from '@/lib/seed';
-import { validateFiles } from '@/lib/utils';
 import { ComplaintResponseDialog } from './dialogs/ComplaintResponseDialog';
+import { AssignVleDialog, AddBalanceDialog } from './dialogs/AdminDialogs';
 import type { Task, VLEProfile, CustomerProfile, PaymentRequest, Complaint as ComplaintType } from '@/lib/types';
-
-
-const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger: React.ReactNode, taskId: string, availableVles: any[], onAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
-    const { toast } = useToast();
-    const [open, setOpen] = useState(false);
-    const [selectedVleId, setSelectedVleId] = useState('');
-
-    const handleAssign = async () => {
-        if (!selectedVleId) {
-            toast({ title: 'Select a VLE', description: 'Please select a VLE to assign the task.', variant: 'destructive' });
-            return;
-        }
-        const vle = availableVles.find(v => v.id === selectedVleId);
-        
-        try {
-            await onAssign(taskId, selectedVleId, vle.name);
-            toast({ title: 'Task Assigned', description: `Task ${taskId.slice(-6).toUpperCase()} has been assigned.`});
-            setOpen(false);
-        } catch (error) {
-            console.error("Assignment failed, dialog will remain open.");
-        }
-    }
-
-    const handleOpenChange = (isOpen: boolean) => {
-        if (!isOpen) {
-            setSelectedVleId('');
-        }
-        setOpen(isOpen);
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>{trigger}</DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Assign Task {taskId.slice(-6).toUpperCase()}</DialogTitle>
-                    <DialogDescription>Select an available VLE to assign this task to.</DialogDescription>
-                </DialogHeader>
-                <div className="py-4">
-                    <Select onValueChange={setSelectedVleId} value={selectedVleId}>
-                        <SelectTrigger><SelectValue placeholder="Select an available VLE" /></SelectTrigger>
-                        <SelectContent>
-                            {availableVles.map(vle => (
-                                <SelectItem key={vle.id} value={vle.id}>{vle.name} - {vle.location}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <DialogFooter>
-                    <Button onClick={handleAssign}>Assign VLE</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    )
-}
-
-const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: React.ReactNode, vleName: string, onAddBalance: (amount: number) => void }) => {
-    const { toast } = useToast();
-    const [open, setOpen] = useState(false);
-    const [amount, setAmount] = useState('');
-
-    const handleSubmit = (e: FormEvent) => {
-        e.preventDefault();
-        const amountToAdd = parseFloat(amount);
-        if (isNaN(amountToAdd) || amountToAdd <= 0) {
-            toast({ title: 'Invalid Amount', description: 'Please enter a valid positive number.', variant: 'destructive' });
-            return;
-        }
-        onAddBalance(amountToAdd);
-        toast({ title: 'Balance Added', description: `₹${amountToAdd.toFixed(2)} has been added to ${vleName}'s wallet.` });
-        setOpen(false);
-    };
-
-    const handleOpenChange = (isOpen: boolean) => {
-        if (!isOpen) {
-            setAmount('');
-        }
-        setOpen(isOpen);
-    };
-
-    return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>{trigger}</DialogTrigger>
-            <DialogContent>
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader>
-                        <DialogTitle>Add Balance to {vleName}'s Wallet</DialogTitle>
-                        <DialogDescription>Enter the amount you wish to add. This will be added to the VLE's current balance.</DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4 grid gap-4">
-                        <Label htmlFor="amount">Amount to Add (₹)</Label>
-                        <Input
-                            id="amount"
-                            type="number"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            placeholder="e.g., 500"
-                            required
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button type="submit">Add Balance</Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-};
 
 
 export default function AdminDashboard({ allTasks, vles, customers, paymentRequests }: { allTasks: Task[], vles: VLEProfile[], customers: CustomerProfile[], paymentRequests: PaymentRequest[] }) {
@@ -153,7 +45,6 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
     const [customerSearch, setCustomerSearch] = useState('');
     const [taskSearch, setTaskSearch] = useState('');
     
-    // Logic handlers moved from parent page.tsx
     const handleComplaintResponse = async (taskId: string, customerId: string, response: any) => {
         const taskRef = doc(db, "tasks", taskId);
         const taskSnap = await getDoc(taskRef);
@@ -289,57 +180,13 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
     const handleResetData = async () => {
         toast({ title: 'Resetting Data...', description: 'Please wait, this may take a moment.' });
         
-        const processInBatches = async (
-            collectionRef: any,
-            operation: 'delete' | 'update',
-            updateData?: object
-        ) => {
-            const BATCH_SIZE = 499;
-            const snapshot = await getDocs(query(collectionRef));
-            if (snapshot.size === 0) return;
+        const result = await resetApplicationData();
 
-            let batch = writeBatch(db);
-            let count = 0;
-
-            for (const doc of snapshot.docs) {
-                if (operation === 'delete') {
-                    batch.delete(doc.ref);
-                } else if (operation === 'update' && updateData) {
-                    batch.update(doc.ref, updateData);
-                }
-                count++;
-                if (count === BATCH_SIZE) {
-                    await batch.commit();
-                    batch = writeBatch(db);
-                    count = 0;
-                }
-            }
-            if (count > 0) {
-                await batch.commit();
-            }
-        };
-
-        try {
-            const collectionsToClear = ['tasks', 'camps', 'notifications', 'paymentRequests', 'services', 'campSuggestions', 'taskChats'];
-            for (const collectionName of collectionsToClear) {
-                await processInBatches(collection(db, collectionName), 'delete');
-            }
-
-            await processInBatches(collection(db, 'users'), 'update', { walletBalance: 0 });
-            await processInBatches(query(collection(db, 'vles'), where('isAdmin', '==', false)), 'update', { walletBalance: 0 });
-
-            let seedBatch = writeBatch(db);
-            seedServices.forEach(service => {
-                const docRef = service.id ? doc(db, "services", service.id) : doc(collection(db, "services"));
-                const { id, ...serviceData } = service;
-                seedBatch.set(docRef, serviceData);
-            });
-            await seedBatch.commit();
-
+        if (result.success) {
             toast({ title: 'Application Reset', description: 'All data has been cleared and default services have been seeded.' });
-        } catch (error: any) {
-            console.error("Error resetting data:", error);
-            toast({ title: 'Reset Failed', description: error.message || 'Could not reset the application data.', variant: 'destructive' });
+        } else {
+            console.error("Error resetting data:", result.error);
+            toast({ title: 'Reset Failed', description: result.error || 'Could not reset the application data.', variant: 'destructive' });
         }
     };
 
@@ -360,7 +207,6 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
         setProcessingPayoutTaskId(null);
     };
 
-    // Memoized data for rendering
     const pendingVles = vles.filter(v => v.status === 'Pending');
     const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
@@ -499,7 +345,7 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                     </Card>
                 </div>
                 <Card className="mt-6 border-destructive/50">
-                    <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5"/>Danger Zone</CardTitle><CardDescription>These actions are permanent and cannot be undone.</CardDescription></CardHeader>
+                    <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5"/>Danger Zone</CardTitle><CardDescription>This action is permanent and cannot be undone.</CardDescription></CardHeader>
                     <CardContent>
                          <AlertDialog>
                             <AlertDialogTrigger asChild><Button variant="destructive"><Trash2 className="mr-2 h-4 w-4" /> Reset Application Data</Button></AlertDialogTrigger>
@@ -535,7 +381,7 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem asChild><a href={`mailto:${vle.email}`}><Mail className="mr-2 h-4 w-4"/>Email VLE</a></DropdownMenuItem>
                                                 <DropdownMenuItem asChild><a href={`tel:${vle.mobile}`}><Phone className="mr-2 h-4 w-4"/>Call VLE</a></DropdownMenuItem>
-                                                <DropdownMenuItem asChild><a href={`https://wa.me/91${vle.mobile}`} target="_blank" rel="noopener noreferrer"><WhatsAppIcon className="mr-2 h-5 w-5 fill-green-600"/>WhatsApp</a></DropdownMenuItem>
+                                                <DropdownMenuItem asChild><a href={`https://wa.me/91${vle.mobile}`} target="_blank" rel="noopener noreferrer"><WhatsAppIcon className="mr-2 h-5 w-5"/>WhatsApp</a></DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>
                                     </TableCell>
@@ -646,5 +492,3 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
         </Tabs>
     )
 }
-
-    

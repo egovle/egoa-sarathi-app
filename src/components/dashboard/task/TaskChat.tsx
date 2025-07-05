@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, type FormEvent, useRef } from 'react';
@@ -88,7 +89,7 @@ export const TaskChat = ({ taskId, task, user, userProfile }: { taskId: string, 
                         messages.map(msg => (
                             <div key={msg.id} className={cn("flex flex-col", msg.senderId === user.uid ? "items-end" : "items-start")}>
                                 <div className={cn("p-2 rounded-lg max-w-xs md:max-w-md", msg.senderId === user.uid ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                                    <p className="font-bold text-xs">{msg.senderName}</p>
+                                    <p className="font-bold text-xs capitalize">{msg.senderName} ({msg.senderRole})</p>
                                     <p className="text-sm break-words">{msg.text}</p>
                                     {msg.timestamp && (
                                         <p className="text-xs opacity-70 mt-1 text-right">

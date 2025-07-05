@@ -4,10 +4,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, getDocs, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { services as seedServices } from '@/lib/seed';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
@@ -19,7 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Service } from '@/lib/types';
-import { deleteService } from './actions';
+import { deleteService, seedDatabase } from './actions';
 import { ServiceFormDialog } from './ServiceFormDialog';
 
 export default function ServiceManagementPage() {
@@ -109,27 +108,16 @@ export default function ServiceManagementPage() {
     const handleSeedClick = async () => {
         setIsSeeding(true);
         setIsSeedAlertOpen(false);
-        try {
-            const servicesCollectionRef = collection(db, 'services');
-            const existingServicesSnapshot = await getDocs(query(servicesCollectionRef));
-    
-            const batch = writeBatch(db);
-            existingServicesSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+        
+        const result = await seedDatabase();
 
-            seedServices.forEach(service => {
-                const { id, ...serviceData } = service;
-                const docRef = id ? doc(db, "services", id) : doc(collection(db, "services"));
-                batch.set(docRef, serviceData);
-            });
-            await batch.commit();
-
+        if (result.success) {
             toast({ title: "Database Seeded", description: "Common services have been added." });
-        } catch (error) {
-            console.error("Error seeding database:", error);
+        } else {
+            console.error("Error seeding database:", result.error);
             toast({ title: "Error", description: "Could not seed the database. Check console for details.", variant: "destructive" });
-        } finally {
-            setIsSeeding(false);
         }
+        setIsSeeding(false);
     };
 
 
@@ -242,10 +230,10 @@ export default function ServiceManagementPage() {
                                             {service.isVariable && <Badge variant="outline" className="ml-2">Variable</Badge>}
                                         </TableCell>
                                         <TableCell>
-                                             {service.customerRate > 0 ? `₹${service.customerRate}` : <span className="text-muted-foreground">-</span>}
+                                             {service.isVariable ? 'N/A' : (service.customerRate > 0 ? `₹${service.customerRate}` : <span className="text-muted-foreground">-</span>)}
                                         </TableCell>
                                          <TableCell>
-                                             {service.vleRate > 0 ? `₹${service.vleRate}` : <span className="text-muted-foreground">-</span>}
+                                             {service.isVariable ? 'N/A' : (service.vleRate > 0 ? `₹${service.vleRate}` : <span className="text-muted-foreground">-</span>)}
                                         </TableCell>
                                          <TableCell>
                                              {service.governmentFee > 0 ? `₹${service.governmentFee}` : <span className="text-muted-foreground">-</span>}

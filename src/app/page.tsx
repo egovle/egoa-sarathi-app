@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -45,7 +46,7 @@ export default function LoginPage() {
       console.error('Login failed:', error);
       toast({
         title: 'Login Failed',
-        description: error.message || 'Please check your credentials and try again.',
+        description: 'Invalid email or password. Please try again.',
         variant: 'destructive',
       });
     } finally {

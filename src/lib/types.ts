@@ -118,6 +118,7 @@ export interface Task {
 export interface CampVLE {
     vleId: string;
     status: 'pending' | 'accepted' | 'rejected';
+    approvedBy?: string; // Admin who assigned this VLE
 }
 
 export interface Camp {
@@ -126,6 +127,7 @@ export interface Camp {
     location: string;
     date: string; // ISO String
     status: 'Upcoming' | 'Completed' | 'Cancelled';
+    type: 'created' | 'suggested'; // Distinguishes admin-created from VLE-suggested
     services: string[];
     otherServices?: string;
     assignedVles: CampVLE[];

@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useState, type FormEvent, useEffect } from 'react';
+import { useState, type FormEvent, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, ShieldCheck, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -24,6 +25,15 @@ type PostOffice = {
 };
 
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const getPasswordStrength = (password: string) => {
+    let strength = 0;
+    if (password.length >= 8) strength++;
+    if (password.match(/[a-z]/)) strength++;
+    if (password.match(/[A-Z]/)) strength++;
+    if (password.match(/[0-9]/)) strength++;
+    if (password.match(/[^a-zA-Z0-9]/)) strength++;
+    return strength;
+};
 
 export default function RegisterPage() {
   const { toast } = useToast();
@@ -56,23 +66,14 @@ export default function RegisterPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (pincode.length !== 6) {
-      setCity('');
-      setDistrict('');
-      setPostOffices([]);
-      setIsLocationManual(false);
-      return;
-    }
-
-      const fetchLocation = async () => {
+    const fetchLocation = useCallback(async (searchPincode: string) => {
         setIsPincodeLoading(true);
         setIsLocationManual(false);
         setCity('');
         setDistrict('');
         setPostOffices([]);
         try {
-          const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+          const response = await fetch(`https://api.postalpincode.in/pincode/${searchPincode}`);
           const data = await response.json();
           if (data && data[0] && data[0].Status === 'Success') {
             const fetchedPostOffices: PostOffice[] = data[0].PostOffice;
@@ -88,7 +89,7 @@ export default function RegisterPage() {
             setIsLocationManual(true);
             toast({
               title: 'Invalid Pincode',
-              description: 'Could not find a location for this pincode. Please enter manually.',
+              description: 'Could not find a location. Please enter manually.',
               variant: 'destructive',
             });
           }
@@ -105,10 +106,26 @@ export default function RegisterPage() {
         } finally {
           setIsPincodeLoading(false);
         }
-      };
-      fetchLocation();
-    
-  }, [pincode, toast]);
+    }, [toast]);
+
+    useEffect(() => {
+        if (pincode.length !== 6) {
+          setCity('');
+          setDistrict('');
+          setPostOffices([]);
+          setIsLocationManual(false);
+          return;
+        }
+
+        const handler = setTimeout(() => {
+            fetchLocation(pincode);
+        }, 500); // 500ms debounce delay
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [pincode, fetchLocation]);
+
 
   const handleEmailBlur = () => {
     if (email) {
@@ -120,6 +137,7 @@ export default function RegisterPage() {
     }
   };
 
+  const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
 
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -197,6 +215,20 @@ export default function RegisterPage() {
     }
   };
 
+  const strengthColor = useMemo(() => {
+    if (passwordStrength < 3) return 'bg-destructive';
+    if (passwordStrength < 4) return 'bg-yellow-500';
+    return 'bg-green-500';
+  }, [passwordStrength]);
+
+  const strengthLabel = useMemo(() => {
+    if (!password) return '';
+    if (passwordStrength < 3) return 'Weak';
+    if (passwordStrength < 4) return 'Medium';
+    return 'Strong';
+  }, [password, passwordStrength]);
+
+
   return (
     <div className="flex items-center justify-center min-h-screen bg-background text-foreground p-4">
        <Card className="mx-auto max-w-sm w-full">
@@ -253,7 +285,7 @@ export default function RegisterPage() {
               {emailError && <p className="text-sm text-destructive mt-1">{emailError}</p>}
             </div>
              <div className="grid gap-2 text-left">
-              <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
                     <Input 
                         id="password" 
@@ -276,6 +308,14 @@ export default function RegisterPage() {
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </Button>
                 </div>
+                {password && (
+                    <div className="flex items-center gap-2 text-xs mt-1">
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                             <div className={cn("h-full transition-all", strengthColor)} style={{ width: `${passwordStrength * 20}%`}}></div>
+                        </div>
+                        <span className="w-12 text-right">{strengthLabel}</span>
+                    </div>
+                )}
             </div>
             <div className="grid gap-2 text-left">
               <Label htmlFor="mobile">Mobile Number</Label>

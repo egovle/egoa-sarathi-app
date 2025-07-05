@@ -19,10 +19,10 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { Camp, CampSuggestion, VLEProfile, Service, GovernmentProfile, CampVLE } from '@/lib/types';
+import type { Camp, CampSuggestion, VLEProfile, Service, GovernmentProfile, CampVLE, UserProfile } from '@/lib/types';
 
 
-export const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: Camp | null; suggestion?: CampSuggestion | null; vles: VLEProfile[]; onFinished: () => void; }) => {
+export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinished }: { camp?: Camp | null; suggestion?: CampSuggestion | null; vles: VLEProfile[]; adminProfile: UserProfile | null; onFinished: () => void; }) => {
     const { toast } = useToast();
     const initialData = camp || suggestion || {};
     
@@ -79,11 +79,13 @@ export const CampFormDialog = ({ camp, suggestion, vles, onFinished }: { camp?: 
             location,
             date: date.toISOString(),
             status: 'Upcoming',
+            type: camp ? camp.type : (suggestion ? 'suggested' : 'created'),
             services: initialData.services || [],
             otherServices: initialData.otherServices || '',
             assignedVles: assignedVles.map(vle => {
                 const existingVle = camp?.assignedVles.find(av => av.vleId === vle.id);
-                return { vleId: vle.id, status: existingVle?.status || 'pending' };
+                if (existingVle) return existingVle;
+                return { vleId: vle.id, status: 'pending', approvedBy: adminProfile?.id };
             }),
         };
 

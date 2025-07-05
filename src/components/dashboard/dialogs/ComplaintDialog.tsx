@@ -19,6 +19,7 @@ export const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigge
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
+    const [inputKey, setInputKey] = useState(Date.now());
     
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
@@ -58,6 +59,8 @@ export const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigge
             setComplaintText('');
             setSelectedFiles([]);
             setIsCameraOpen(false);
+        } else {
+            setInputKey(Date.now()); // Reset the file input when dialog opens
         }
         setOpen(isOpen);
     }
@@ -84,7 +87,7 @@ export const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigge
                                         <Camera className="mr-2 h-4 w-4" /> Use Camera
                                     </Button>
                                 </div>
-                                <Input id="documents" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
+                                <Input key={inputKey} id="documents" type="file" multiple onChange={handleFileChange} ref={fileInputRef} className="hidden" />
                                 {selectedFiles.length > 0 && (
                                     <div className="text-xs text-muted-foreground space-y-1 mt-2">
                                         <p className='font-medium'>Selected files:</p>
@@ -103,5 +106,3 @@ export const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigge
         </>
     );
 };
-
-    
