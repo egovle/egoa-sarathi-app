@@ -119,12 +119,17 @@ export default function TaskDetailPage() {
                 action: 'Additional Documents Uploaded',
                 details: `${newDocuments.length} new document(s) uploaded.`,
             };
-            
-            await updateDoc(taskRef, {
-                status: 'Assigned', 
+
+            const updateData: any = {
                 documents: arrayUnion(...newDocuments),
                 history: arrayUnion(historyEntry),
-            });
+            };
+
+            if (task.status === 'Awaiting Documents') {
+                updateData.status = 'Assigned';
+            }
+            
+            await updateDoc(taskRef, updateData);
     
             if (task.assignedVleId) {
                  await createNotification(
@@ -535,6 +540,3 @@ export default function TaskDetailPage() {
             </div>
         </div>
     );
-}
-
-    

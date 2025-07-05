@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, type FormEvent, useRef } from 'react';
@@ -16,11 +17,13 @@ export const TaskChat = ({ taskId, task, user, userProfile }: { taskId: string, 
     const [messages, setMessages] = useState<any[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isSending, setIsSending] = useState(false);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
 
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+        }
     }, [messages]);
 
     useEffect(() => {
@@ -81,7 +84,7 @@ export const TaskChat = ({ taskId, task, user, userProfile }: { taskId: string, 
                 <CardTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5" />Task Chat</CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="h-64 overflow-y-auto space-y-4 pr-2 flex flex-col">
+                <div ref={scrollContainerRef} className="h-64 overflow-y-auto space-y-4 pr-2 flex flex-col">
                     {messages.length > 0 ? (
                         messages.map(msg => (
                             <div key={msg.id} className={cn("flex flex-col", msg.senderId === user.uid ? "items-end" : "items-start")}>
@@ -101,7 +104,6 @@ export const TaskChat = ({ taskId, task, user, userProfile }: { taskId: string, 
                             No messages yet. Start the conversation!
                         </div>
                     )}
-                    <div ref={messagesEndRef} />
                 </div>
             </CardContent>
             <CardFooter>

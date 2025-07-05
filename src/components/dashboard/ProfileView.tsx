@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
@@ -12,9 +13,78 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Wallet, PlusCircle, Edit, Loader2, Banknote, AtSign, Trash } from 'lucide-react';
-import { AddBalanceRequestDialog } from './shared';
+
 import { createNotificationForAdmins } from '@/app/actions';
 import type { UserProfile, Service, VLEProfile, BankAccount } from '@/lib/types';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
+
+
+const AddBalanceRequestDialog = ({ trigger, onBalanceRequest }: { trigger: React.ReactNode, onBalanceRequest: (amount: number) => void }) => {
+    const { toast } = useToast();
+    const [open, setOpen] = useState(false);
+    const [amount, setAmount] = useState('');
+
+    const handleSubmit = (e: FormEvent) => {
+        e.preventDefault();
+        const amountToAdd = parseFloat(amount);
+        if (isNaN(amountToAdd) || amountToAdd <= 0) {
+            toast({ title: 'Invalid Amount', description: 'Please enter a valid positive number.', variant: 'destructive' });
+            return;
+        }
+        onBalanceRequest(amountToAdd);
+        setOpen(false);
+    };
+
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            setAmount('');
+        }
+        setOpen(isOpen);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>{trigger}</DialogTrigger>
+            <DialogContent>
+                <form onSubmit={handleSubmit}>
+                    <DialogHeader>
+                        <DialogTitle>Add Balance to Wallet</DialogTitle>
+                        <DialogDescription>
+                            Please transfer funds to the details below and then create a request here. An admin will verify and credit your wallet.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 grid gap-6">
+                        <Card className="bg-muted/50">
+                            <CardHeader className='p-4'>
+                                <CardTitle className="text-base">Payment Details</CardTitle>
+                            </CardHeader>
+                            <CardContent className='p-4 pt-0 text-sm space-y-2'>
+                                <p><b>UPI ID:</b> admin-upi@ybl</p>
+                                <p><b>Bank:</b> HDFC Bank</p>
+                                <p><b>Account:</b> 1234567890</p>
+                            </CardContent>
+                        </Card>
+                        <div className="grid gap-2">
+                            <Label htmlFor="amount">Amount Transferred (₹)</Label>
+                            <Input
+                                id="amount"
+                                type="number"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                placeholder="e.g., 500"
+                                required
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit">Submit Request</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+};
 
 
 export default function ProfileView({ userId, profileData, services }: { userId: string, profileData: UserProfile, services: Service[]}) {
@@ -354,4 +424,3 @@ export default function ProfileView({ userId, profileData, services }: { userId:
             )}
         </div>
     </div>
-)];
