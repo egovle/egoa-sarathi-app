@@ -135,7 +135,6 @@ export interface Camp {
 
 export interface CampSuggestion {
     id: string;
-    name: string;
     location: string;
     date: string; // ISO String
     suggestedBy: {

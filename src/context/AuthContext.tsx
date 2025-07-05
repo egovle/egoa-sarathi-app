@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUserProfile(profileData);
         } else {
             console.error("Authenticated user not found in any known collection. Logging out.");
-            await auth.signOut();
+            // Do not redirect here, let the page handle it.
             setUserProfile(null);
             setUser(null);
         }

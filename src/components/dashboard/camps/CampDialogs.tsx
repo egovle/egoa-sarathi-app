@@ -291,8 +291,7 @@ export const SuggestCampDialog = ({ onFinished, services, userProfile }: { onFin
             return;
         }
 
-        const suggestionData = {
-            name: `Suggested by ${userProfile.name}`,
+        const suggestionData: Omit<CampSuggestion, 'id'> = {
             location,
             date: date.toISOString(),
             suggestedBy: {
