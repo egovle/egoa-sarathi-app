@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -65,26 +66,40 @@ export default function DashboardPage() {
             unsubscribers.push(unsubUsers);
             
             unsubscribers.push(onSnapshot(query(collection(db, "paymentRequests"), where("status", "==", "pending")), (s) => setPaymentRequests(s.docs.map(d => ({ id: d.id, ...d.data() }) as PaymentRequest))));
+        
         } else if (userProfile.role === 'vle') {
+            let assignedTasks: Task[] = [];
+            let myLeads: Task[] = [];
+
+            const combineAndSetTasks = () => {
+                const allTaskIds = new Set<string>();
+                const combinedTasks: Task[] = [];
+
+                [...assignedTasks, ...myLeads].forEach(task => {
+                    if (!allTaskIds.has(task.id)) {
+                        allTaskIds.add(task.id);
+                        combinedTasks.push(task);
+                    }
+                });
+                
+                combinedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setAllTasks(combinedTasks);
+            };
+            
             const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
-            unsubscribers.push(onSnapshot(assignedTasksQuery, (snapshot) => {
-                const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-                fetched.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setAllTasks(fetched);
-            }));
+            const unsubAssigned = onSnapshot(assignedTasksQuery, (snapshot) => {
+                assignedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
+                combineAndSetTasks();
+            });
 
             const myLeadsQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
-             unsubscribers.push(onSnapshot(myLeadsQuery, (snapshot) => {
-                const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...d.data() }) as Task);
-                // Combine with assigned tasks for a full view
-                setAllTasks(prev => {
-                    const existingIds = new Set(prev.map(p => p.id));
-                    const newLeads = fetched.filter(f => !existingIds.has(f.id));
-                    const updatedTasks = [...prev, ...newLeads];
-                    updatedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                    return updatedTasks;
-                });
-            }));
+            const unsubLeads = onSnapshot(myLeadsQuery, (snapshot) => {
+                myLeads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
+                combineAndSetTasks();
+            });
+
+            unsubscribers.push(unsubAssigned, unsubLeads);
+        
         } else if (userProfile.role === 'customer') {
             const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
             unsubscribers.push(onSnapshot(tasksQuery, (snapshot) => {

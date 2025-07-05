@@ -8,27 +8,53 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Send, FileUp } from 'lucide-react';
+import { Send, FileUp, Loader2, FileText } from 'lucide-react';
 import { validateFiles } from '@/lib/utils';
+import { storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useAuth } from '@/context/AuthContext';
 
 
 export const ComplaintResponseDialog = ({ trigger, complaint, taskId, customerId, onResponseSubmit }: { trigger: React.ReactNode, complaint: any, taskId: string, customerId: string, onResponseSubmit: (taskId: string, customerId: string, response: any) => void }) => {
+    const { user } = useAuth();
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
     const [responseText, setResponseText] = useState('');
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleSubmit = (e: FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        const response = {
-            text: responseText,
-            documents: selectedFiles.map(f => ({ name: f.name, url: '' })), // Placeholder for storage URL
-            date: new Date().toISOString(),
-        };
-        onResponseSubmit(taskId, customerId, response);
-        toast({ title: 'Response Sent', description: 'The customer has been notified.' });
-        setOpen(false);
+        setIsSubmitting(true);
+        
+        try {
+            const uploadedDocuments: { name: string; url: string }[] = [];
+            if (selectedFiles.length > 0) {
+                for (const file of selectedFiles) {
+                    const storageRef = ref(storage, `tasks/${taskId}/complaint_responses/${Date.now()}_${file.name}`);
+                    const metadata = { customMetadata: { uploaderId: user?.uid } };
+                    await uploadBytes(storageRef, file, metadata);
+                    const downloadURL = await getDownloadURL(storageRef);
+                    uploadedDocuments.push({ name: file.name, url: downloadURL });
+                }
+            }
+
+            const response = {
+                text: responseText,
+                documents: uploadedDocuments,
+                date: new Date().toISOString(),
+            };
+            
+            onResponseSubmit(taskId, customerId, response);
+            toast({ title: 'Response Sent', description: 'The customer has been notified.' });
+            setOpen(false);
+        } catch (error) {
+            console.error("Error submitting response:", error);
+            toast({ title: "Error", description: "Could not submit your response.", variant: "destructive" });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -76,18 +102,24 @@ export const ComplaintResponseDialog = ({ trigger, complaint, taskId, customerId
                             {selectedFiles.length > 0 && (
                                 <div className="text-xs text-muted-foreground space-y-1 mt-2">
                                     <p className='font-medium'>Selected files:</p>
-                                    {selectedFiles.map((file, i) => <p key={i}>{file.name}</p>)}
+                                    {selectedFiles.map((file, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <FileText className="h-3 w-3" />
+                                            <span>{file.name}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button type="submit"><Send className="mr-2 h-4 w-4" /> Send Response</Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                           {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                           <Send className="mr-2 h-4 w-4" /> Send Response
+                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
     );
 };
-
-    

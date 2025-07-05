@@ -98,5 +98,3 @@ export const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: bo
         </Dialog>
     );
 };
-
-    

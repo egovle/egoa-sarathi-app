@@ -12,14 +12,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Wallet, PlusCircle, Edit, Loader2, Banknote, AtSign, Trash } from 'lucide-react';
+import { Wallet, PlusCircle, Edit, Loader2, Banknote, AtSign, Trash, MoreHorizontal } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AddBalanceRequestDialog } from './dialogs/AddBalanceRequestDialog';
 
 import { createNotificationForAdmins } from '@/app/actions';
 import type { UserProfile, Service, VLEProfile, BankAccount } from '@/lib/types';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Separator } from '@/components/ui/separator';
-
 
 
 export default function ProfileView({ userId, profileData, services }: { userId: string, profileData: UserProfile, services: Service[]}) {
@@ -200,6 +198,15 @@ export default function ProfileView({ userId, profileData, services }: { userId:
     }
 
     const handleSaveOfferedServices = async () => {
+        if (offeredServices.length === 0) {
+            toast({
+                title: "At least one service required",
+                description: "As a VLE, you must offer at least one service.",
+                variant: "destructive",
+            });
+            return;
+        }
+
         setIsSavingServices(true);
         const docRef = doc(db, "vles", userId);
         try {
@@ -333,7 +340,7 @@ export default function ProfileView({ userId, profileData, services }: { userId:
                                 </div>
                             ))}
                         </CardContent>
-                        <CardFooter><Button onClick={handleSaveOfferedServices} disabled={isSavingServices}>{isSavingServices && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save My Services</Button></CardFooter>
+                        <CardFooter><Button onClick={handleSaveOfferedServices} disabled={isSavingServices || offeredServices.length === 0}>{isSavingServices && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save My Services</Button></CardFooter>
                     </Card>
                 )}
             </div>
@@ -359,11 +366,26 @@ export default function ProfileView({ userId, profileData, services }: { userId:
                                     <div className="space-y-4">
                                     {bankAccounts.map((account) => (
                                         <div key={account.id} className="p-4 border rounded-lg relative bg-muted/50">
-                                            <div className="absolute top-2 right-2 flex gap-1">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditBankClick(account)}><Edit className="h-4 w-4" /></Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteBankClick(account.id)}><Trash className="h-4 w-4" /></Button>
+                                            <div className="absolute top-1 right-1">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => handleEditBankClick(account)}>
+                                                            <Edit className="mr-2 h-4 w-4" />
+                                                            <span>Edit</span>
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleDeleteBankClick(account.id)} className="text-destructive focus:text-destructive">
+                                                            <Trash className="mr-2 h-4 w-4" />
+                                                            <span>Delete</span>
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
                                             </div>
-                                            <div className="space-y-2 text-sm">
+                                            <div className="space-y-2 text-sm pr-10">
                                                 <p className="font-semibold">{account.bankName}</p>
                                                 <p className="text-muted-foreground">A/C: {account.accountNumber}</p>
                                                 <p className="text-muted-foreground">IFSC: {account.ifscCode}</p>

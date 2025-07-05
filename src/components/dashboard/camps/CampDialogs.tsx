@@ -45,8 +45,9 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
     const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
 
     const filteredVles = useMemo(() => {
-        if (!vleSearch) return vles;
-        return vles.filter(vle => 
+        const baseList = vles.filter(vle => vle.status === 'Approved' && vle.available);
+        if (!vleSearch) return baseList;
+        return baseList.filter(vle => 
             vle.name.toLowerCase().includes(vleSearch.toLowerCase()) ||
             vle.location.toLowerCase().includes(vleSearch.toLowerCase())
         );
@@ -226,7 +227,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
                                             )
                                         })
                                     ) : (
-                                        <p className="p-4 text-center text-sm text-muted-foreground">No VLEs found.</p>
+                                        <p className="p-4 text-center text-sm text-muted-foreground">No available VLEs found.</p>
                                     )}
                                 </div>
                             </PopoverContent>

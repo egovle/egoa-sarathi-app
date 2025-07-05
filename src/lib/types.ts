@@ -44,7 +44,7 @@ export interface BankAccount {
 }
 
 export interface Service {
-    id: string;
+    id:string;
     name: string;
     customerRate: number;
     vleRate: number;
@@ -73,6 +73,7 @@ export interface Complaint {
     response: {
         text: string;
         date: string;
+        documents?: Document[];
     } | null;
     documents?: Document[];
     date: string;
