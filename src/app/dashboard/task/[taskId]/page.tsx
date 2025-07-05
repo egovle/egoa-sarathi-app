@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, useRef, type ChangeEvent } from 'react';
@@ -125,6 +124,7 @@ export default function TaskDetailPage() {
                 history: arrayUnion(historyEntry),
             };
 
+            // Only change status if it was previously 'Awaiting Documents'
             if (task.status === 'Awaiting Documents') {
                 updateData.status = 'Assigned';
             }

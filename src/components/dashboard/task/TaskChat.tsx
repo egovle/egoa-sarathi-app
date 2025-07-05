@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState, type FormEvent, useRef } from 'react';
@@ -115,6 +114,12 @@ export const TaskChat = ({ taskId, task, user, userProfile }: { taskId: string, 
                         rows={1}
                         className="flex-1 resize-none"
                         disabled={isSending}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSendMessage(e);
+                            }
+                        }}
                     />
                     <Button type="submit" size="icon" disabled={isSending || !newMessage.trim()}>
                         {isSending ? <Loader2 className="animate-spin" /> : <Send />}
