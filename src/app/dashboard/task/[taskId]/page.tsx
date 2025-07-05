@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useRef, type ChangeEvent } from 'react';
@@ -496,7 +497,7 @@ export default function TaskDetailPage() {
                             </CardContent>
                             <CardFooter>
                                 <Button onClick={handleUpload} disabled={isUploading || selectedFiles.length === 0}>
-                                    {isUploading ? <Loader2 className="animate-spin" /> : <UploadCloud />}
+                                    {isUploading ? <Loader2 className="animate-spin" /> : <FileUp />}
                                     Upload Documents
                                 </Button>
                             </CardFooter>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useRef, type ChangeEvent } from 'react';
@@ -8,7 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { db, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, doc, addDoc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
-import { createNotificationForAdmins, createFixedPriceTask } from '@/app/actions';
+import { createNotificationForAdmins } from '@/app/actions';
 import { cn, validateFiles } from '@/lib/utils';
 
 
@@ -283,51 +284,6 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
     const [searchQuery, setSearchQuery] = useState('');
 
     // Logic handlers moved from parent page.tsx
-    const handleCreateTask = async (newTaskData: any, service: Service, filesToUpload: File[]) => {
-        if (!user || !userProfile) {
-            throw new Error("Profile not loaded");
-        }
-    
-        const taskId = doc(collection(db, "tasks")).id;
-        const uploadedDocuments: { name: string, url: string }[] = [];
-    
-        if (filesToUpload.length > 0) {
-            for (const file of filesToUpload) {
-                const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-                const metadata = { customMetadata: { creatorId: user.uid } };
-                await uploadBytes(storageRef, file, metadata);
-                const downloadURL = await getDownloadURL(storageRef);
-                uploadedDocuments.push({ name: file.name, url: downloadURL });
-            }
-        }
-        
-        const taskWithDocs = { ...newTaskData, documents: uploadedDocuments };
-    
-        if (service.isVariable) {
-            const taskWithStatus = { ...taskWithDocs, status: 'Pending Price Approval' };
-            await setDoc(doc(db, "tasks", taskId), taskWithStatus);
-            toast({
-                title: 'Request Submitted!',
-                description: 'An admin will review the details and notify you of the final cost.'
-            });
-            await createNotificationForAdmins(
-                'New Variable-Rate Task',
-                `A task for '${service.name}' requires a price to be set.`,
-                `/dashboard/task/${taskId}`
-            );
-        } else {
-            const result = await createFixedPriceTask(taskId, taskWithDocs, userProfile);
-            if (result.success) {
-                toast({
-                    title: 'Task Created & Paid!',
-                    description: `₹${taskWithDocs.totalPaid.toFixed(2)} has been deducted from your wallet.`,
-                });
-            } else {
-                 throw new Error(result.error || "An unknown error occurred during task creation.");
-            }
-        }
-    }
-
     const handleComplaintSubmit = async (taskId: string, complaint: any, filesToUpload: File[]) => {
         const taskRef = doc(db, "tasks", taskId);
         
@@ -376,7 +332,7 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
                 <TabsTrigger value="tasks">My Bookings</TabsTrigger>
                 <TabsTrigger value="complaints">My Complaints</TabsTrigger>
             </TabsList>
-             <TaskCreatorDialog services={services} creatorId={user.uid} creatorProfile={userProfile} type="Customer Request" onTaskCreated={handleCreateTask} buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />Create New Booking</Button>} />
+             <TaskCreatorDialog services={services} creatorId={user.uid} creatorProfile={userProfile} type="Customer Request" buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />Create New Booking</Button>} />
           </div>
             <TabsContent value="tasks" className="mt-4 space-y-6">
                 <Card>

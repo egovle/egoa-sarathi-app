@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
-import type { Camp, CampSuggestion, Service, VLEProfile, UserProfile } from '@/lib/types';
+import type { Camp, CampSuggestion, Service, VLEProfile, UserProfile, GovernmentProfile } from '@/lib/types';
 import AdminCampView from '@/components/dashboard/camps/AdminCampView';
 import VleCampView from '@/components/dashboard/camps/VleCampView';
 import CustomerCampView from '@/components/dashboard/camps/CustomerCampView';

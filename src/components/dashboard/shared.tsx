@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
@@ -12,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { validateFiles } from '@/lib/utils';
 import { Briefcase, Users, Users2, AlertTriangle } from 'lucide-react';
+import { createTask } from '@/app/actions';
 
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -28,7 +30,7 @@ export const StatCard = ({ title, value, icon: Icon, description }: {title: stri
     </Card>
 );
 
-export const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, onTaskCreated: (task: any, service: any, filesToUpload: File[]) => Promise<void>, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
+export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
@@ -77,7 +79,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorI
     }
   };
 
-  const handleDialogSubmit = async (e: FormEvent) => {
+  const handleDialogSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
     
@@ -114,45 +116,31 @@ export const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorI
     }
     
     try {
-        const isVleLead = creatorProfile.role === 'vle';
-        const totalPaid = isVleLead ? selectedService.vleRate : selectedService.customerRate;
+        const formData = new FormData();
+        formData.append('name', form.name.value);
+        formData.append('mobile', mobile);
+        formData.append('address', form.address.value);
+        formData.append('email', email);
+        formData.append('type', type);
+        formData.append('creatorId', creatorId);
+        formData.append('creatorProfile', JSON.stringify(creatorProfile));
+        formData.append('selectedService', JSON.stringify(selectedService));
+        selectedFiles.forEach(file => formData.append('files', file));
         
-        const newTaskData = {
-            customer: form.name.value,
-            customerAddress: form.address.value,
-            customerMobile: mobile,
-            customerEmail: email,
-            service: selectedService.name,
-            serviceId: selectedService.id,
-            date: new Date().toISOString(),
-            totalPaid: totalPaid,
-            governmentFeeApplicable: selectedService.governmentFee || 0,
-            customerRate: selectedService.customerRate,
-            vleRate: selectedService.vleRate,
-            history: [{
-                timestamp: new Date().toISOString(),
-                actorId: creatorId,
-                actorRole: type === 'VLE Lead' ? 'VLE' : 'Customer',
-                action: 'Task Created',
-                details: `Task created for service: ${selectedService.name}.`
-            }],
-            acknowledgementNumber: null,
-            complaint: null,
-            feedback: null,
-            type: type,
-            assignedVleId: null,
-            assignedVleName: null,
-            creatorId: creatorId,
-            finalCertificate: null,
-        };
+        const result = await createTask(formData);
 
-        await onTaskCreated(newTaskData, selectedService, selectedFiles);
-        setDialogOpen(false); 
+        if (result.success) {
+            toast({ title: 'Success!', description: result.message });
+            setDialogOpen(false); 
+        } else {
+            throw new Error(result.error || 'An unknown error occurred.');
+        }
+
     } catch (error: any) {
         console.error("Error creating task:", error);
         toast({
             title: 'Task Creation Failed',
-            description: error.message || 'There was an error creating your task. Please check your balance and try again.',
+            description: error.message,
             variant: 'destructive',
         });
     } finally {
@@ -256,6 +244,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, onTaskCreated, type, creatorI
                         <Label htmlFor="documents">Attach Documents</Label>
                         <Input
                             id="documents"
+                            name="files"
                             type="file"
                             multiple
                             onChange={handleFileChange}

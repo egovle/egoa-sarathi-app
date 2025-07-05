@@ -29,27 +29,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true);
       if (user) {
-        let profileDoc;
-        let profileData;
+        
+        const userDocRef = doc(db, 'users', user.uid);
+        const vleDocRef = doc(db, 'vles', user.uid);
+        const govDocRef = doc(db, 'government', user.uid);
+        
+        const [userSnap, vleSnap, govSnap] = await Promise.all([
+            getDoc(userDocRef),
+            getDoc(vleDocRef),
+            getDoc(govDocRef)
+        ]);
+        
+        let profileData: UserProfile | null = null;
 
-        profileDoc = await getDoc(doc(db, 'users', user.uid));
-        if (profileDoc.exists()) {
-          profileData = { id: profileDoc.id, ...profileDoc.data() };
-        } else {
-          profileDoc = await getDoc(doc(db, 'vles', user.uid));
-           if (profileDoc.exists()) {
-              profileData = { id: profileDoc.id, ...profileDoc.data() };
-           } else {
-              profileDoc = await getDoc(doc(db, 'government', user.uid));
-              if(profileDoc.exists()){
-                profileData = { id: profileDoc.id, ...profileDoc.data() };
-              }
-           }
+        if (userSnap.exists()) {
+          profileData = { id: userSnap.id, ...userSnap.data() } as UserProfile;
+        } else if (vleSnap.exists()) {
+          profileData = { id: vleSnap.id, ...vleSnap.data() } as UserProfile;
+        } else if (govSnap.exists()) {
+          profileData = { id: govSnap.id, ...govSnap.data() } as UserProfile;
         }
-
+        
         if (profileData) {
           setUser(user);
-          setUserProfile(profileData as UserProfile);
+          setUserProfile(profileData);
         } else {
             console.error("Authenticated user not found in any known collection. Logging out.");
             setUserProfile(null);

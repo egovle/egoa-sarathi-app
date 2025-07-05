@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -8,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
 import { collection, doc, addDoc, updateDoc, setDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { createNotificationForAdmins, createFixedPriceTask } from '@/app/actions';
+import { createNotificationForAdmins } from '@/app/actions';
 
 import { FilePlus, Search, ToggleRight, CheckCircle2, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -41,51 +42,6 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
         const vleRef = doc(db, "vles", vleId);
         await updateDoc(vleRef, { available: available });
         toast({ title: 'Availability Updated', description: `You are now ${available ? 'available' : 'unavailable'} for tasks.`});
-    }
-
-    const onTaskCreated = async (newTaskData: any, service: Service, filesToUpload: File[]) => {
-        if (!user || !userProfile) {
-            throw new Error("Profile not loaded");
-        }
-    
-        const taskId = doc(collection(db, "tasks")).id;
-        const uploadedDocuments: { name: string, url: string }[] = [];
-    
-        if (filesToUpload.length > 0) {
-            for (const file of filesToUpload) {
-                const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-                const metadata = { customMetadata: { creatorId: user.uid } };
-                await uploadBytes(storageRef, file, metadata);
-                const downloadURL = await getDownloadURL(storageRef);
-                uploadedDocuments.push({ name: file.name, url: downloadURL });
-            }
-        }
-        
-        const taskWithDocs = { ...newTaskData, documents: uploadedDocuments };
-    
-        if (service.isVariable) {
-            const taskWithStatus = { ...taskWithDocs, status: 'Pending Price Approval' };
-            await setDoc(doc(db, "tasks", taskId), taskWithStatus);
-            toast({
-                title: 'Request Submitted!',
-                description: 'An admin will review the details and notify you of the final cost.'
-            });
-            await createNotificationForAdmins(
-                'New Variable-Rate Task',
-                `A task for '${service.name}' requires a price to be set.`,
-                `/dashboard/task/${taskId}`
-            );
-        } else {
-            const result = await createFixedPriceTask(taskId, taskWithDocs, userProfile);
-            if (result.success) {
-                toast({
-                    title: 'Task Created & Paid!',
-                    description: `₹${taskWithDocs.totalPaid.toFixed(2)} has been deducted from your wallet.`,
-                });
-            } else {
-                 throw new Error(result.error || "An unknown error occurred during task creation.");
-            }
-        }
     }
     
     const onTaskAccept = async (taskId: string) => {
@@ -177,7 +133,7 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
                 <TabsTrigger value="leads">My Generated Leads</TabsTrigger>
             </TabsList>
             <div className="ml-auto flex items-center gap-2">
-                <TaskCreatorDialog services={services} type="VLE Lead" onTaskCreated={onTaskCreated} creatorId={user.uid} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
+                <TaskCreatorDialog services={services} type="VLE Lead" creatorId={user.uid} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
             </div>
         </div>
         <TabsContent value="invitations" className="mt-4">

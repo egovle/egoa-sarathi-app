@@ -2,8 +2,9 @@
 'use server';
 
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import type { Task, UserProfile } from "@/lib/types";
+import { db, storage } from "@/lib/firebase";
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import type { Task, UserProfile, Service } from "@/lib/types";
 import { ADMIN_COMMISSION_RATE, VLE_COMMISSION_RATE } from "@/lib/config";
 
 // --- NOTIFICATION HELPERS ---
@@ -36,6 +37,90 @@ export async function createNotificationForAdmins(title: string, description: st
         await Promise.all(notificationPromises);
     } catch (error) {
         console.error("Error creating notifications for admins:", error);
+    }
+}
+
+
+// --- CENTRALIZED TASK CREATION ---
+export async function createTask(formData: FormData) {
+    try {
+        const creatorId = formData.get('creatorId') as string;
+        const creatorProfile = JSON.parse(formData.get('creatorProfile') as string) as UserProfile;
+        const service = JSON.parse(formData.get('selectedService') as string) as Service;
+        const type = formData.get('type') as 'Customer Request' | 'VLE Lead';
+        const files = formData.getAll('files') as File[];
+
+        if (!creatorId || !creatorProfile || !service) {
+            throw new Error("Missing critical user or service data.");
+        }
+        
+        const taskId = doc(collection(db, "tasks")).id;
+        const uploadedDocuments: { name: string, url: string }[] = [];
+
+        if (files.length > 0) {
+            for (const file of files) {
+                const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
+                const metadata = { customMetadata: { creatorId: creatorId } };
+                await uploadBytes(storageRef, file, metadata);
+                const downloadURL = await getDownloadURL(storageRef);
+                uploadedDocuments.push({ name: file.name, url: downloadURL });
+            }
+        }
+        
+        const isVleLead = creatorProfile.role === 'vle';
+        const totalPaid = isVleLead ? service.vleRate : service.customerRate;
+
+        const taskData: Omit<Task, 'id'> = {
+            customer: formData.get('name') as string,
+            customerAddress: formData.get('address') as string,
+            customerMobile: formData.get('mobile') as string,
+            customerEmail: formData.get('email') as string,
+            service: service.name,
+            serviceId: service.id,
+            date: new Date().toISOString(),
+            status: 'Unassigned', // Will be updated below
+            totalPaid: totalPaid,
+            governmentFeeApplicable: service.governmentFee || 0,
+            customerRate: service.customerRate,
+            vleRate: service.vleRate,
+            history: [{
+                timestamp: new Date().toISOString(),
+                actorId: creatorId,
+                actorRole: type === 'VLE Lead' ? 'VLE' : 'Customer',
+                action: 'Task Created',
+                details: `Task created for service: ${service.name}.`
+            }],
+            acknowledgementNumber: null,
+            complaint: null,
+            feedback: null,
+            type: type,
+            assignedVleId: null,
+            assignedVleName: null,
+            creatorId: creatorId,
+            documents: uploadedDocuments,
+            finalCertificate: null,
+        };
+
+        if (service.isVariable) {
+            const taskWithStatus = { ...taskData, status: 'Pending Price Approval' as const };
+            await setDoc(doc(db, "tasks", taskId), taskWithStatus);
+            await createNotificationForAdmins(
+                'New Variable-Rate Task',
+                `A task for '${service.name}' requires a price to be set.`,
+                `/dashboard/task/${taskId}`
+            );
+            return { success: true, message: 'Request Submitted! An admin will review the details and notify you of the final cost.' };
+        } else {
+            const result = await createFixedPriceTask(taskId, taskData, creatorProfile);
+            if (result.success) {
+                return { success: true, message: `Task Created & Paid! ₹${taskData.totalPaid.toFixed(2)} has been deducted from your wallet.` };
+            } else {
+                throw new Error(result.error || "An unknown error occurred during task creation.");
+            }
+        }
+    } catch (error: any) {
+        console.error("Task creation failed in server action:", error);
+        return { success: false, error: error.message };
     }
 }
 
@@ -75,7 +160,7 @@ export async function createFixedPriceTask(
             transaction.update(creatorRef, { walletBalance: newCreatorBalance });
             transaction.update(adminRef, { walletBalance: newAdminBalance });
 
-            const taskWithStatus = { ...taskData, status: 'Unassigned' };
+            const taskWithStatus = { ...taskData, status: 'Unassigned' as const };
             transaction.set(doc(db, "tasks", taskId), taskWithStatus);
         });
 
