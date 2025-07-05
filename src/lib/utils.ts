@@ -1,5 +1,8 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { type Task } from "@/lib/types";
+import { VLE_COMMISSION_RATE } from "@/lib/config";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -21,3 +24,12 @@ export const validateFiles = (files: File[]): { isValid: boolean, message?: stri
     }
     return { isValid: true };
 };
+
+export const calculateVleEarnings = (task: Task) => {
+    const governmentFee = task.governmentFeeApplicable || 0;
+    const serviceProfit = (task.totalPaid || 0) - governmentFee;
+    const vleCommission = serviceProfit * VLE_COMMISSION_RATE;
+    return { governmentFee, vleCommission };
+};
+
+    

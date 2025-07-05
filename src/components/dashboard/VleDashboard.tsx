@@ -6,9 +6,8 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { db, storage } from '@/lib/firebase';
-import { collection, doc, addDoc, updateDoc, setDoc, arrayUnion, runTransaction } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db } from '@/lib/firebase';
+import { doc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import { createNotificationForAdmins } from '@/app/actions';
 
 import { FilePlus, Search, ToggleRight, CheckCircle2, XCircle } from 'lucide-react';
@@ -21,16 +20,9 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { TaskCreatorDialog } from './shared';
-import { VLE_COMMISSION_RATE } from '@/lib/config';
+import { calculateVleEarnings } from '@/lib/utils';
 import type { Task, Service, UserProfile, VLEProfile } from '@/lib/types';
 
-
-const getCommissionDetails = (task: Task) => {
-    const governmentFee = task.governmentFeeApplicable || 0;
-    const serviceProfit = (task.totalPaid || 0) - governmentFee;
-    const vleCommission = serviceProfit * VLE_COMMISSION_RATE;
-    return { governmentFee, vleCommission };
-};
 
 export default function VleDashboard({ assignedTasks, myLeads, services }: { assignedTasks: Task[], myLeads: Task[], services: Service[] }) {
     const { toast } = useToast();
@@ -154,7 +146,7 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
                        </TableHeader>
                        <TableBody>
                            {invitations.length > 0 ? invitations.map(task => {
-                               const { governmentFee, vleCommission } = getCommissionDetails(task);
+                               const { governmentFee, vleCommission } = calculateVleEarnings(task);
                                return (
                                    <TableRow key={task.id}>
                                        <TableCell className="font-medium">{task.service}</TableCell>
@@ -287,3 +279,5 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
         </TabsContent>
     </Tabs>
 )};
+
+    

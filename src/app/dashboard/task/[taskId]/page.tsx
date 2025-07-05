@@ -18,9 +18,8 @@ import { Loader2, FileText, History, CheckCircle, Wallet, Phone, CircleDollarSig
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { cn, validateFiles } from '@/lib/utils';
+import { cn, validateFiles, calculateVleEarnings } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-import { VLE_COMMISSION_RATE } from '@/lib/config';
 import { TaskChat } from '@/components/dashboard/task/TaskChat';
 import { RequestOtpDialog, SetPriceDialog, RequestInfoDialog, SubmitAcknowledgementDialog, UploadCertificateDialog } from '@/components/dashboard/task/TaskDialogs';
 
@@ -256,12 +255,7 @@ export default function TaskDetailPage() {
 
     const displayStatus = task.status === 'Paid Out' && isTaskCreator ? 'Completed' : task.status;
     
-    const getEarningsDetails = () => {
-        const governmentFee = task.governmentFeeApplicable || 0;
-        const serviceProfit = (task.totalPaid || 0) - governmentFee;
-        const vleCommission = serviceProfit * VLE_COMMISSION_RATE;
-        return { governmentFee, vleCommission };
-    };
+    const earnings = calculateVleEarnings(task);
 
     return (
         <div className="w-full space-y-6">
@@ -443,16 +437,16 @@ export default function TaskDetailPage() {
                              <CardContent className="text-sm space-y-2">
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Govt. Fee (if any)</span>
-                                    <span>+ ₹{getEarningsDetails().governmentFee.toFixed(2)}</span>
+                                    <span>+ ₹{earnings.governmentFee.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Your Commission (80%)</span>
-                                    <span>+ ₹{getEarningsDetails().vleCommission.toFixed(2)}</span>
+                                    <span>+ ₹{earnings.vleCommission.toFixed(2)}</span>
                                 </div>
                                 <Separator className="my-2"/>
                                  <div className="flex justify-between font-bold">
                                     <span>Total Payout</span>
-                                    <span>₹{(getEarningsDetails().governmentFee + getEarningsDetails().vleCommission).toFixed(2)}</span>
+                                    <span>₹{(earnings.governmentFee + earnings.vleCommission).toFixed(2)}</span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -542,3 +536,5 @@ export default function TaskDetailPage() {
         </div>
     );
 }
+
+    
