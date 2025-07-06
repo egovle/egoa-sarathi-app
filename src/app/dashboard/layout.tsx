@@ -18,10 +18,11 @@ import {
   ListPlus,
   BarChart,
   Tent,
-  ArrowLeft
+  ArrowLeft,
+  X
 } from "lucide-react"
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where, doc, writeBatch, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, writeBatch, getDocs, deleteDoc } from "firebase/firestore";
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -77,13 +78,12 @@ export default function DashboardLayout({
 
     const q = query(
       collection(db, "notifications"),
-      where("userId", "==", user.uid)
+      where("userId", "==", user.uid),
+      orderBy("date", "desc")
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort on the client to avoid needing a composite index
-      notifs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setNotifications(notifs);
     });
 
@@ -155,6 +155,18 @@ export default function DashboardLayout({
         toast({ title: 'Error', description: 'Could not clear notifications.', variant: 'destructive' });
       } finally {
         setIsClearAlertOpen(false);
+      }
+    };
+
+    const handleClearSingleNotification = async (notifId: string) => {
+      if (!user) return;
+      const notifRef = doc(db, "notifications", notifId);
+      try {
+        await deleteDoc(notifRef);
+        toast({ title: 'Notification cleared.' });
+      } catch (error) {
+        console.error("Error clearing notification:", error);
+        toast({ title: 'Error', description: 'Could not clear the notification.', variant: 'destructive' });
       }
     };
 
@@ -318,12 +330,25 @@ export default function DashboardLayout({
                     <div className="space-y-1 p-2 max-h-80 overflow-y-auto">
                         {notifications.length > 0 ? (
                           notifications.map((notif) => (
-                            <div key={notif.id} className={`p-3 rounded-md transition-colors hover:bg-muted ${!notif.read ? 'bg-primary/10' : 'bg-transparent'}`}>
-                                <Link href={notif.link || '/dashboard'} className="block">
+                            <div key={notif.id} className={cn("group relative p-3 rounded-md transition-colors hover:bg-muted", !notif.read && 'bg-primary/10')}>
+                                <Link href={notif.link || '/dashboard'} className="block pr-6">
                                   <p className="font-semibold text-sm">{notif.title}</p>
                                   <p className="text-sm text-muted-foreground">{notif.description}</p>
                                   <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(notif.date), { addSuffix: true })}</p>
                                 </Link>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleClearSingleNotification(notif.id);
+                                    }}
+                                >
+                                    <X className="h-4 w-4" />
+                                    <span className="sr-only">Clear notification</span>
+                                </Button>
                             </div>
                           ))
                         ) : (
