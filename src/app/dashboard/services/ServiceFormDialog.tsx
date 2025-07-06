@@ -11,10 +11,14 @@ import { Loader2, PlusCircle, Trash } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import type { Service, DocumentGroup, DocumentOption } from '@/lib/types';
+import type { Service, DocumentGroup, DocumentOption, AllowedFileTypes } from '@/lib/types';
 import { addService, updateService } from './actions';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
+
+const fileTypes: AllowedFileTypes[] = ['pdf', 'png', 'jpg'];
 
 export const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: Service | null, parentServices: Service[], onFinished: () => void }) => {
     const { toast } = useToast();
@@ -25,17 +29,20 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
     const [parentId, setParentId] = useState(service?.parentId || 'none');
     const [isVariable, setIsVariable] = useState(service?.isVariable || false);
     const [loading, setLoading] = useState(false);
+    
     const [documentGroups, setDocumentGroups] = useState<DocumentGroup[]>(service?.documentGroups || []);
     
     const isSubCategory = parentId !== 'none';
 
-    const handleGroupChange = (index: number, field: keyof DocumentGroup, value: string | number) => {
+    const handleGroupChange = (index: number, field: keyof DocumentGroup, value: any) => {
         const newGroups = [...documentGroups];
         const currentGroup = { ...newGroups[index] };
         if (field === 'key') {
             currentGroup.key = (value as string).toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
-        } else if(field === 'minRequired') {
-            currentGroup.minRequired = Number(value);
+        } else if(field === 'type') {
+            currentGroup.type = value;
+            // Reset options when type changes
+            currentGroup.options = [{ key: '', label: '', type: value === 'documents' ? 'document' : 'text', allowedFileTypes: ['pdf', 'png', 'jpg'] }];
         } else {
              (currentGroup as any)[field] = value;
         }
@@ -44,23 +51,23 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
     };
 
     const addGroup = () => {
-        setDocumentGroups([...documentGroups, { key: '', label: '', minRequired: 1, options: [{ key: '', label: '' }] }]);
+        setDocumentGroups([...documentGroups, { key: '', label: '', isOptional: false, type: 'documents', options: [{ key: '', label: '', type: 'document', allowedFileTypes: ['pdf', 'png', 'jpg'] }] }]);
     };
     
     const removeGroup = (index: number) => {
         setDocumentGroups(documentGroups.filter((_, i) => i !== index));
     };
     
-    const handleOptionChange = (groupIndex: number, optionIndex: number, field: 'key' | 'label', value: string) => {
+    const handleOptionChange = (groupIndex: number, optionIndex: number, field: keyof DocumentOption, value: any) => {
         const newGroups = [...documentGroups];
         const group = { ...newGroups[groupIndex] };
         const newOptions = [...group.options];
         const currentOption = { ...newOptions[optionIndex] };
 
         if (field === 'key') {
-            currentOption.key = value.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+            currentOption.key = (value as string).toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
         } else {
-            currentOption.label = value;
+            (currentOption as any)[field] = value;
         }
         newOptions[optionIndex] = currentOption;
         group.options = newOptions;
@@ -68,10 +75,25 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
         setDocumentGroups(newGroups);
     };
 
+    const handleFileTypeChange = (groupIndex: number, optionIndex: number, fileType: AllowedFileTypes) => {
+         const newGroups = [...documentGroups];
+        const group = newGroups[groupIndex];
+        const option = group.options[optionIndex];
+        const currentTypes = option.allowedFileTypes || [];
+        
+        if(currentTypes.includes(fileType)) {
+            option.allowedFileTypes = currentTypes.filter(t => t !== fileType);
+        } else {
+            option.allowedFileTypes = [...currentTypes, fileType];
+        }
+        setDocumentGroups(newGroups);
+    }
+
     const addOption = (groupIndex: number) => {
         const newGroups = [...documentGroups];
         const group = { ...newGroups[groupIndex] };
-        group.options.push({ key: '', label: '' });
+        const newType = group.type === 'documents' ? 'document' : 'text';
+        group.options.push({ key: '', label: '', type: newType, allowedFileTypes: ['pdf', 'png', 'jpg'] });
         newGroups[groupIndex] = group;
         setDocumentGroups(newGroups);
     };
@@ -91,19 +113,8 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
 
         const filteredGroups = documentGroups.map(group => ({
             ...group,
-            minRequired: Number(group.minRequired) || 0,
             options: group.options.filter(opt => opt.key.trim() && opt.label.trim())
         })).filter(group => group.key.trim() && group.label.trim() && group.options.length > 0);
-
-        if (filteredGroups.some(g => g.options.length < g.minRequired)) {
-             toast({
-                title: 'Invalid Document Requirements',
-                description: "A group's minimum required documents cannot be greater than the number of options available.",
-                variant: 'destructive',
-            });
-            setLoading(false);
-            return;
-        }
         
         const serviceData: Omit<Service, 'id'> = {
             name,
@@ -208,13 +219,13 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
                     <Separator className="my-2" />
 
                     <div className="grid grid-cols-4 items-start gap-4 pt-2">
-                        <Label className="text-right pt-2">Required Documents</Label>
+                        <Label className="text-right pt-2">Form Fields</Label>
                         <div className="col-span-3 space-y-4">
                             {documentGroups.map((group, groupIndex) => (
                                 <Card key={groupIndex} className="p-4 bg-muted/50">
                                     <CardContent className="p-0 space-y-4">
                                         <div className="flex justify-between items-center">
-                                            <h4 className="font-semibold">Document Group {groupIndex + 1}</h4>
+                                            <h4 className="font-semibold">Group {groupIndex + 1}</h4>
                                             <Button type="button" variant="ghost" size="icon" onClick={() => removeGroup(groupIndex)}>
                                                 <Trash className="h-4 w-4 text-destructive" />
                                             </Button>
@@ -223,26 +234,55 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
                                             <div className="space-y-1"><Label>Group Label</Label><Input placeholder="e.g. Identity Proof" value={group.label} onChange={e => handleGroupChange(groupIndex, 'label', e.target.value)} required /></div>
                                             <div className="space-y-1"><Label>Group Key</Label><Input placeholder="e.g. identity_proof" value={group.key} onChange={e => handleGroupChange(groupIndex, 'key', e.target.value)} required /></div>
                                         </div>
-                                        <div className="space-y-1"><Label>Minimum Required</Label><Input type="number" placeholder="e.g. 1" value={group.minRequired} onChange={e => handleGroupChange(groupIndex, 'minRequired', e.target.value)} required min={0} /></div>
+                                        <div className="flex items-center space-x-2">
+                                            <Switch id={`optional-${groupIndex}`} checked={group.isOptional} onCheckedChange={checked => handleGroupChange(groupIndex, 'isOptional', checked)} />
+                                            <Label htmlFor={`optional-${groupIndex}`}>Group is optional</Label>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Group Type</Label>
+                                            <RadioGroup value={group.type} onValueChange={value => handleGroupChange(groupIndex, 'type', value)} className="flex gap-4">
+                                                <div className="flex items-center space-x-2"><RadioGroupItem value="documents" id={`type-docs-${groupIndex}`} /><Label htmlFor={`type-docs-${groupIndex}`}>Document Uploads</Label></div>
+                                                <div className="flex items-center space-x-2"><RadioGroupItem value="text" id={`type-text-${groupIndex}`} /><Label htmlFor={`type-text-${groupIndex}`}>Text Inputs</Label></div>
+                                            </RadioGroup>
+                                        </div>
                                         
                                         <Separator />
 
                                         <div className="space-y-2">
-                                            <Label className="font-medium">Options in this group</Label>
+                                            <Label className="font-medium">Fields in this group</Label>
                                             {group.options.map((option, optionIndex) => (
-                                                <div key={optionIndex} className="flex items-end gap-2">
-                                                    <div className="flex-1 space-y-1"><Label className="text-xs">Option Label</Label><Input placeholder="e.g. Aadhaar Card" value={option.label} onChange={e => handleOptionChange(groupIndex, optionIndex, 'label', e.target.value)} required /></div>
-                                                    <div className="flex-1 space-y-1"><Label className="text-xs">Option Key</Label><Input placeholder="e.g. aadhar_card" value={option.key} onChange={e => handleOptionChange(groupIndex, optionIndex, 'key', e.target.value)} required /></div>
+                                                <div key={optionIndex} className="flex items-end gap-2 p-2 border rounded-md">
+                                                    <div className="flex-1 space-y-3">
+                                                        <div className="grid grid-cols-2 gap-2">
+                                                            <div className="space-y-1"><Label className="text-xs">Field Label</Label><Input placeholder="e.g. Aadhaar Card" value={option.label} onChange={e => handleOptionChange(groupIndex, optionIndex, 'label', e.target.value)} required /></div>
+                                                            <div className="space-y-1"><Label className="text-xs">Field Key</Label><Input placeholder="e.g. aadhar_card" value={option.key} onChange={e => handleOptionChange(groupIndex, optionIndex, 'key', e.target.value)} required /></div>
+                                                        </div>
+                                                        {group.type === 'documents' ? (
+                                                            <div>
+                                                                <Label className="text-xs">Allowed File Types</Label>
+                                                                <div className="flex gap-4 pt-2">
+                                                                    {fileTypes.map(type => (
+                                                                        <div key={type} className="flex items-center space-x-2">
+                                                                            <Checkbox id={`${groupIndex}-${optionIndex}-${type}`} checked={option.allowedFileTypes?.includes(type)} onCheckedChange={() => handleFileTypeChange(groupIndex, optionIndex, type)} />
+                                                                            <Label htmlFor={`${groupIndex}-${optionIndex}-${type}`} className="text-xs font-normal uppercase">{type}</Label>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-1"><Label className="text-xs">Placeholder</Label><Input placeholder="e.g. Enter father's full name" value={option.placeholder || ''} onChange={e => handleOptionChange(groupIndex, optionIndex, 'placeholder', e.target.value)} /></div>
+                                                        )}
+                                                    </div>
                                                     <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(groupIndex, optionIndex)}><Trash className="h-4 w-4" /></Button>
                                                 </div>
                                             ))}
-                                            <Button type="button" size="sm" variant="link" onClick={() => addOption(groupIndex)}><PlusCircle className="mr-2 h-4 w-4" /> Add Option</Button>
+                                            <Button type="button" size="sm" variant="link" onClick={() => addOption(groupIndex)}><PlusCircle className="mr-2 h-4 w-4" /> Add Field</Button>
                                         </div>
                                     </CardContent>
                                 </Card>
                             ))}
                             <Button type="button" variant="outline" size="sm" onClick={addGroup}>
-                                <PlusCircle className="mr-2 h-4 w-4" /> Add Document Group
+                                <PlusCircle className="mr-2 h-4 w-4" /> Add Field Group
                             </Button>
                         </div>
                     </div>

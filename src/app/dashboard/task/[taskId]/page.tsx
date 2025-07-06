@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, FileText, History, CheckCircle, Wallet, Phone, CircleDollarSign, User, Mail, FileUp, Info } from 'lucide-react';
+import { Loader2, FileText, History, CheckCircle, Wallet, Phone, CircleDollarSign, User, Mail, FileUp, Info, ListChecks } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -287,6 +287,7 @@ export default function TaskDetailPage() {
     const displayStatus = task.status === 'Paid Out' && isTaskCreator ? 'Completed' : task.status;
     
     const earnings = calculateVleEarnings(task);
+    const formDataEntries = Object.entries(task.formData || {});
 
     return (
         <div className="w-full space-y-6">
@@ -516,6 +517,24 @@ export default function TaskDetailPage() {
                                     Upload Documents
                                 </Button>
                             </CardFooter>
+                        </Card>
+                    )}
+                     {formDataEntries.length > 0 && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5" />Submitted Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {formDataEntries.map(([key, value]) => {
+                                    const formattedKey = key.split(':').pop()?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                    return (
+                                        <div key={key}>
+                                            <Label className="text-muted-foreground">{formattedKey}</Label>
+                                            <p className="text-sm font-medium">{value as string}</p>
+                                        </div>
+                                    )
+                                })}
+                            </CardContent>
                         </Card>
                     )}
 

@@ -36,15 +36,21 @@ export type UserProfile = CustomerProfile | VLEProfile | AdminProfile | Governme
 
 // --- New Document Structures ---
 
+export type AllowedFileTypes = 'pdf' | 'png' | 'jpg';
+
 export interface DocumentOption {
     key: string;
     label: string;
+    type: 'document' | 'text';
+    allowedFileTypes?: AllowedFileTypes[];
+    placeholder?: string;
 }
 
 export interface DocumentGroup {
     key: string;
     label: string;
-    minRequired: number; // e.g., 1 for "Any one of the following"
+    isOptional: boolean;
+    type: 'documents' | 'text';
     options: DocumentOption[];
 }
 
@@ -57,7 +63,7 @@ export interface Service {
     customerRate: number;
     vleRate: number;
     governmentFee: number;
-    documentGroups: DocumentGroup[]; // Updated from 'documents'
+    documentGroups: DocumentGroup[];
     parentId: string | null;
     isVariable: boolean;
 }
@@ -122,6 +128,7 @@ export interface Task {
     creatorId: string;
     documents?: TaskDocument[]; // Updated to TaskDocument
     finalCertificate: Document | null;
+    formData?: { [key: string]: string };
 }
 
 export interface CampVLE {

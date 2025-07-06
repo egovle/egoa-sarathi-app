@@ -68,10 +68,10 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
       setUploadedFiles({});
   }, [selectedCategory])
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, groupKey: string, optionKey: string) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, groupKey: string, optionKey: string, allowedFileTypes?: string[]) => {
     if (e.target.files && e.target.files[0]) {
         const file = e.target.files[0];
-        const validation = validateFiles([file]);
+        const validation = validateFiles([file], allowedFileTypes);
         if (!validation.isValid) {
             toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
             if(e.target) e.target.value = ''; // Reset file input
@@ -86,8 +86,10 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
     setIsSubmitting(true);
     
     const form = e.target as HTMLFormElement;
-    const mobile = form.mobile.value;
-    const email = form.email.value;
+    const formData = new FormData(form);
+
+    const mobile = formData.get('mobile') as string;
+    const email = formData.get('email') as string;
 
     if (mobile.length !== 10) {
         toast({ title: 'Invalid Mobile Number', description: 'Please enter a valid 10-digit mobile number.', variant: 'destructive' });
@@ -111,32 +113,39 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
         return;
     }
 
-    let isAllDocsUploaded = true;
     if(selectedService?.documentGroups) {
         for (const group of selectedService.documentGroups) {
-            const uploadedInGroup = Object.keys(uploadedFiles).filter(key => key.startsWith(`${group.key}:`)).length;
-            if (uploadedInGroup < group.minRequired) {
-                isAllDocsUploaded = false;
-                toast({
-                    title: `Documents Required for "${group.label}"`,
-                    description: `Please upload at least ${group.minRequired} document(s) for this group.`,
-                    variant: 'destructive',
-                });
-                break;
+            if (group.isOptional) continue;
+            
+            if (group.type === 'documents') {
+                const uploadedInGroup = Object.keys(uploadedFiles).filter(key => key.startsWith(`${group.key}:`)).length;
+                if (uploadedInGroup < 1) { // Simplified from minRequired to just checking if at least one is uploaded for mandatory doc groups
+                     toast({
+                        title: `Document Required for "${group.label}"`,
+                        description: `Please upload at least one document for this mandatory group.`,
+                        variant: 'destructive',
+                    });
+                    setIsSubmitting(false);
+                    return;
+                }
+            } else if (group.type === 'text') {
+                 for (const option of group.options) {
+                    const fieldKey = `text_${group.key}:${option.key}`;
+                    if (!formData.get(fieldKey)) {
+                         toast({
+                            title: `Field Required in "${group.label}"`,
+                            description: `The field "${option.label}" is required.`,
+                            variant: 'destructive',
+                        });
+                        setIsSubmitting(false);
+                        return;
+                    }
+                 }
             }
         }
     }
-    if (!isAllDocsUploaded) {
-        setIsSubmitting(false);
-        return;
-    }
     
     try {
-        const formData = new FormData();
-        formData.append('name', form.name.value);
-        formData.append('mobile', mobile);
-        formData.append('address', form.address.value);
-        formData.append('email', email);
         formData.append('type', type);
         formData.append('creatorId', creatorId);
         formData.append('creatorProfile', JSON.stringify(creatorProfile));
@@ -264,40 +273,58 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                 <>
                   <Separator className="my-2" />
                   <div className="space-y-4">
-                      <p className="text-sm font-medium text-muted-foreground">Document Upload</p>
+                      <p className="text-sm font-medium text-muted-foreground">Required Information</p>
                       <div className="space-y-4">
                         {selectedService.documentGroups.map(group => (
                           <Card key={group.key} className="p-4 bg-muted/50">
                               <CardHeader className="p-0 pb-2">
-                                <CardTitle className="text-base">{group.label}</CardTitle>
-                                {group.minRequired > 0 && <p className="text-xs text-muted-foreground">Please upload at least {group.minRequired} of the following:</p>}
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    {group.label}
+                                    {group.isOptional && <Badge variant="outline">Optional</Badge>}
+                                </CardTitle>
+                                {group.type === 'documents' && !group.isOptional && <p className="text-xs text-muted-foreground">Please upload at least one of the following:</p>}
                               </CardHeader>
                               <CardContent className="p-0 space-y-2">
                                 {group.options.map(option => {
                                   const fileKey = `${group.key}:${option.key}`;
                                   const uploadedFile = uploadedFiles[fileKey];
-                                  return (
-                                      <div key={option.key} className="flex items-center justify-between gap-2 text-sm p-2 border-b last:border-b-0">
-                                          <Label htmlFor={fileKey} className="flex-1">{option.label}</Label>
-                                          {uploadedFile ? (
-                                              <div className="flex items-center gap-2 text-green-600 font-medium">
-                                                <FileText className="h-4 w-4" />
-                                                <span className="truncate max-w-xs">{uploadedFile.name}</span>
-                                              </div>
-                                          ) : (
-                                            <Button type="button" size="sm" variant="outline" onClick={() => fileInputRefs.current[fileKey]?.click()}>
-                                                <FileUp className="h-4 w-4 mr-2"/>Upload
-                                            </Button>
-                                          )}
-                                          <Input 
-                                              id={fileKey}
-                                              type="file"
-                                              className="hidden"
-                                              ref={el => fileInputRefs.current[fileKey] = el}
-                                              onChange={(e) => handleFileChange(e, group.key, option.key)}
-                                          />
-                                      </div>
-                                  )
+                                  if (group.type === 'documents') {
+                                      return (
+                                          <div key={option.key} className="flex items-center justify-between gap-2 text-sm p-2 border-b last:border-b-0">
+                                              <Label htmlFor={fileKey} className="flex-1">{option.label}</Label>
+                                              {uploadedFile ? (
+                                                  <div className="flex items-center gap-2 text-green-600 font-medium">
+                                                    <FileText className="h-4 w-4" />
+                                                    <span className="truncate max-w-xs">{uploadedFile.name}</span>
+                                                  </div>
+                                              ) : (
+                                                <Button type="button" size="sm" variant="outline" onClick={() => fileInputRefs.current[fileKey]?.click()}>
+                                                    <FileUp className="h-4 w-4 mr-2"/>Upload
+                                                </Button>
+                                              )}
+                                              <Input 
+                                                  id={fileKey}
+                                                  type="file"
+                                                  className="hidden"
+                                                  ref={el => fileInputRefs.current[fileKey] = el}
+                                                  onChange={(e) => handleFileChange(e, group.key, option.key, option.allowedFileTypes)}
+                                                  accept={option.allowedFileTypes?.map(t => `.${t}`).join(',')}
+                                              />
+                                          </div>
+                                      )
+                                  } else { // group.type === 'text'
+                                      return (
+                                          <div key={option.key} className="space-y-2 p-2">
+                                              <Label htmlFor={`text_${group.key}:${option.key}`}>{option.label}</Label>
+                                              <Input 
+                                                id={`text_${group.key}:${option.key}`}
+                                                name={`text_${group.key}:${option.key}`}
+                                                placeholder={option.placeholder || ''}
+                                                required={!group.isOptional}
+                                              />
+                                          </div>
+                                      )
+                                  }
                                 })}
                               </CardContent>
                           </Card>

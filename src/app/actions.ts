@@ -56,6 +56,7 @@ export async function createTask(formData: FormData) {
         const taskId = doc(collection(db, "tasks")).id;
         const uploadedDocuments: TaskDocument[] = [];
         const fileUploadPromises: Promise<any>[] = [];
+        const customFormData: { [key: string]: string } = {};
 
         for (const [key, value] of formData.entries()) {
             if (key.startsWith('file_') && value instanceof File) {
@@ -84,6 +85,9 @@ export async function createTask(formData: FormData) {
                     });
                 });
                 fileUploadPromises.push(uploadPromise);
+            } else if (key.startsWith('text_')) {
+                 const keys = key.replace('text_', '');
+                 customFormData[keys] = value as string;
             }
         }
         
@@ -120,6 +124,7 @@ export async function createTask(formData: FormData) {
             assignedVleName: null,
             creatorId: creatorId,
             documents: uploadedDocuments,
+            formData: customFormData,
             finalCertificate: null,
         };
 

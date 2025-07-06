@@ -9,14 +9,21 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const fileValidationConfig = {
+    // Stricter default, can be overridden
     allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
     maxSize: 1 * 1024 * 1024, // 1 MB
 };
 
-export const validateFiles = (files: File[]): { isValid: boolean, message?: string } => {
+export const validateFiles = (files: File[], allowedTypes?: string[]): { isValid: boolean, message?: string } => {
+    const validTypes = allowedTypes && allowedTypes.length > 0 
+        ? allowedTypes.map(t => `image/${t.replace('jpg', 'jpeg')}`).concat(allowedTypes.map(t => `application/${t}`))
+        : fileValidationConfig.allowedTypes;
+    
+    const friendlyTypeList = (allowedTypes && allowedTypes.length > 0 ? allowedTypes : ['PNG', 'JPG', 'PDF']).join(', ').toUpperCase();
+
     for (const file of files) {
-        if (!fileValidationConfig.allowedTypes.includes(file.type)) {
-            return { isValid: false, message: `Invalid file type: ${file.name}. Only PNG, JPG, JPEG, and PDF are allowed.` };
+        if (!validTypes.includes(file.type)) {
+            return { isValid: false, message: `Invalid file type: ${file.name}. Only ${friendlyTypeList} are allowed.` };
         }
         if (file.size > fileValidationConfig.maxSize) {
             return { isValid: false, message: `File is too large: ${file.name}. Maximum size is 1MB.` };
