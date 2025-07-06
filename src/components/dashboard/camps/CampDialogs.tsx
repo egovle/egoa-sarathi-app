@@ -33,12 +33,13 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
     const [date, setDate] = useState<Date | undefined>(initialData.date ? new Date(initialData.date) : undefined);
     const [loading, setLoading] = useState(false);
     
-    const initialAssignedVles = useMemo(() => {
-        if (!camp) return [];
-        return vles.filter(vle => camp.assignedVles.some(av => av.vleId === vle.id));
+    const [assignedVles, setAssignedVles] = useState<VLEProfile[]>([]);
+
+    useEffect(() => {
+        const initialAssignedVles = camp ? vles.filter(vle => camp.assignedVles.some(av => av.vleId === vle.id)) : [];
+        setAssignedVles(initialAssignedVles);
     }, [camp, vles]);
 
-    const [assignedVles, setAssignedVles] = useState<VLEProfile[]>(initialAssignedVles);
 
     const [isVlePopoverOpen, setIsVlePopoverOpen] = useState(false);
     const [vleSearch, setVleSearch] = useState('');
