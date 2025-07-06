@@ -1,7 +1,7 @@
 
 'use server';
 
-import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch, getDocs, query, where, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { services as seedServices } from '@/lib/seed';
 import type { Service } from '@/lib/types';
