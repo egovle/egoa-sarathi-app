@@ -37,7 +37,8 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({}); // key: "groupKey:optionKey"
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const parentServices = useMemo(() => services.filter(s => !s.parentId), [services]);
   const subServices = useMemo(() => {
@@ -64,18 +65,19 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
 
   useEffect(() => {
       setSelectedSubCategory('');
-      setSelectedFiles([]);
+      setUploadedFiles({});
   }, [selectedCategory])
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-        const files = Array.from(e.target.files);
-        const validation = validateFiles(files);
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, groupKey: string, optionKey: string) => {
+    if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        const validation = validateFiles([file]);
         if (!validation.isValid) {
             toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+            if(e.target) e.target.value = ''; // Reset file input
             return;
         }
-        setSelectedFiles(prev => [...prev, ...files]);
+        setUploadedFiles(prev => ({ ...prev, [`${groupKey}:${optionKey}`]: file }));
     }
   };
 
@@ -103,14 +105,28 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
         return;
     }
     
-    if (selectedFiles.length === 0) {
-        toast({ title: "Documents Required", description: "Please upload at least one document for the selected service.", variant: 'destructive' });
+    if (!selectedService || (!selectedService.isVariable && (!selectedService.customerRate || selectedService.customerRate <= 0))) {
+        toast({ title: 'Specific Service Required', description: 'This appears to be a category. Please select a specific sub-service to proceed.', variant: 'destructive' });
         setIsSubmitting(false);
         return;
     }
 
-    if (!selectedService || (!selectedService.isVariable && (!selectedService.customerRate || selectedService.customerRate <= 0))) {
-        toast({ title: 'Specific Service Required', description: 'This appears to be a category. Please select a specific sub-service to proceed.', variant: 'destructive' });
+    let isAllDocsUploaded = true;
+    if(selectedService?.documentGroups) {
+        for (const group of selectedService.documentGroups) {
+            const uploadedInGroup = Object.keys(uploadedFiles).filter(key => key.startsWith(`${group.key}:`)).length;
+            if (uploadedInGroup < group.minRequired) {
+                isAllDocsUploaded = false;
+                toast({
+                    title: `Documents Required for "${group.label}"`,
+                    description: `Please upload at least ${group.minRequired} document(s) for this group.`,
+                    variant: 'destructive',
+                });
+                break;
+            }
+        }
+    }
+    if (!isAllDocsUploaded) {
         setIsSubmitting(false);
         return;
     }
@@ -125,7 +141,10 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
         formData.append('creatorId', creatorId);
         formData.append('creatorProfile', JSON.stringify(creatorProfile));
         formData.append('selectedService', JSON.stringify(selectedService));
-        selectedFiles.forEach(file => formData.append('files', file));
+        
+        Object.entries(uploadedFiles).forEach(([key, file]) => {
+            formData.append(`file_${key}`, file, file.name);
+        });
         
         const result = await createTask(formData);
 
@@ -153,7 +172,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
       if (!isOpen) {
           setSelectedCategory('');
           setSelectedSubCategory('');
-          setSelectedFiles([]);
+          setUploadedFiles({});
           setIsSubmitting(false);
       }
   }
@@ -169,7 +188,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
       <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
         <DialogTrigger asChild>{buttonTrigger}</DialogTrigger>
         <DialogContent 
-            className="sm:max-w-2xl"
+            className="sm:max-w-3xl"
             onInteractOutside={(e) => {
                 const target = e.target as HTMLElement;
                 if (target.closest('[data-radix-popper-content-wrapper]')) {
@@ -239,30 +258,55 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                             </div>
                         )}
                     </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="documents">Attach Documents</Label>
-                        <Input
-                            id="documents"
-                            name="files"
-                            type="file"
-                            multiple
-                            onChange={handleFileChange}
-                            className="text-xs h-9"
-                        />
-                         {selectedFiles.length > 0 && (
-                            <div className="text-xs text-muted-foreground space-y-1 mt-2">
-                                <p className='font-medium'>Selected files:</p>
-                                {selectedFiles.map((file, i) => (
-                                    <p key={i} className="truncate" title={file.name}>
-                                        <FileText className="h-3 w-3 inline-block mr-1" />
-                                        {file.name}
-                                    </p>
-                                ))}
-                            </div>
-                        )}
-                    </div>
                 </div>
+
+                {selectedService && selectedService.documentGroups?.length > 0 && (
+                <>
+                  <Separator className="my-2" />
+                  <div className="space-y-4">
+                      <p className="text-sm font-medium text-muted-foreground">Document Upload</p>
+                      <div className="space-y-4">
+                        {selectedService.documentGroups.map(group => (
+                          <Card key={group.key} className="p-4 bg-muted/50">
+                              <CardHeader className="p-0 pb-2">
+                                <CardTitle className="text-base">{group.label}</CardTitle>
+                                {group.minRequired > 0 && <p className="text-xs text-muted-foreground">Please upload at least {group.minRequired} of the following:</p>}
+                              </CardHeader>
+                              <CardContent className="p-0 space-y-2">
+                                {group.options.map(option => {
+                                  const fileKey = `${group.key}:${option.key}`;
+                                  const uploadedFile = uploadedFiles[fileKey];
+                                  return (
+                                      <div key={option.key} className="flex items-center justify-between gap-2 text-sm p-2 border-b last:border-b-0">
+                                          <Label htmlFor={fileKey} className="flex-1">{option.label}</Label>
+                                          {uploadedFile ? (
+                                              <div className="flex items-center gap-2 text-green-600 font-medium">
+                                                <FileText className="h-4 w-4" />
+                                                <span className="truncate max-w-xs">{uploadedFile.name}</span>
+                                              </div>
+                                          ) : (
+                                            <Button type="button" size="sm" variant="outline" onClick={() => fileInputRefs.current[fileKey]?.click()}>
+                                                <FileUp className="h-4 w-4 mr-2"/>Upload
+                                            </Button>
+                                          )}
+                                          <Input 
+                                              id={fileKey}
+                                              type="file"
+                                              className="hidden"
+                                              ref={el => fileInputRefs.current[fileKey] = el}
+                                              onChange={(e) => handleFileChange(e, group.key, option.key)}
+                                          />
+                                      </div>
+                                  )
+                                })}
+                              </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                  </div>
+                </>
+                )}
+
 
                {selectedService && creatorProfile && (
                 <>

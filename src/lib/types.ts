@@ -34,13 +34,30 @@ export interface GovernmentProfile extends BaseProfile {
 export type UserProfile = CustomerProfile | VLEProfile | AdminProfile | GovernmentProfile;
 
 
+// --- New Document Structures ---
+
+export interface DocumentOption {
+    key: string;
+    label: string;
+}
+
+export interface DocumentGroup {
+    key: string;
+    label: string;
+    minRequired: number; // e.g., 1 for "Any one of the following"
+    options: DocumentOption[];
+}
+
+// --------------------------
+
+
 export interface Service {
     id:string;
     name: string;
     customerRate: number;
     vleRate: number;
     governmentFee: number;
-    documents: { key: string; label: string }[];
+    documentGroups: DocumentGroup[]; // Updated from 'documents'
     parentId: string | null;
     isVariable: boolean;
 }
@@ -56,6 +73,11 @@ export interface HistoryEntry {
 export interface Document {
     name: string;
     url: string;
+}
+
+export interface TaskDocument extends Document {
+    groupKey: string;
+    optionKey: string;
 }
 
 export interface Complaint {
@@ -98,7 +120,7 @@ export interface Task {
     assignedVleId: string | null;
     assignedVleName: string | null;
     creatorId: string;
-    documents?: Document[];
+    documents?: TaskDocument[]; // Updated to TaskDocument
     finalCertificate: Document | null;
 }
 

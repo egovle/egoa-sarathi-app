@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, type FormEvent, useMemo } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,8 +11,10 @@ import { Loader2, PlusCircle, Trash } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import type { Service } from '@/lib/types';
+import type { Service, DocumentGroup, DocumentOption } from '@/lib/types';
 import { addService, updateService } from './actions';
+import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 export const ServiceFormDialog = ({ service, parentServices, onFinished }: { service?: Service | null, parentServices: Service[], onFinished: () => void }) => {
     const { toast } = useToast();
@@ -23,68 +25,92 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
     const [parentId, setParentId] = useState(service?.parentId || 'none');
     const [isVariable, setIsVariable] = useState(service?.isVariable || false);
     const [loading, setLoading] = useState(false);
-
-    const initialDocs = useMemo(() => {
-        if (!service?.documents) return [];
-        return service.documents.map((doc: any) => {
-            if (typeof doc === 'string') {
-                return { key: doc.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, ''), label: doc };
-            }
-            return doc;
-        });
-    }, [service]);
-
-    const [documents, setDocuments] = useState<{key: string; label: string}[]>(initialDocs);
-    
-    useEffect(() => {
-        if (isVariable) {
-            setCustomerRate('');
-            setVleRate('');
-        }
-    }, [isVariable]);
+    const [documentGroups, setDocumentGroups] = useState<DocumentGroup[]>(service?.documentGroups || []);
     
     const isSubCategory = parentId !== 'none';
 
-    const handleDocChange = (index: number, field: 'key' | 'label', value: string) => {
-        const newDocs = [...documents];
-        const currentDoc = { ...newDocs[index], [field]: value };
+    const handleGroupChange = (index: number, field: keyof DocumentGroup, value: string | number) => {
+        const newGroups = [...documentGroups];
+        const currentGroup = { ...newGroups[index] };
         if (field === 'key') {
-            currentDoc.key = value.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+            currentGroup.key = (value as string).toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+        } else if(field === 'minRequired') {
+            currentGroup.minRequired = Number(value);
+        } else {
+             (currentGroup as any)[field] = value;
         }
-        newDocs[index] = currentDoc;
-        setDocuments(newDocs);
+        newGroups[index] = currentGroup;
+        setDocumentGroups(newGroups);
     };
 
-    const addDocField = () => {
-        setDocuments([...documents, { key: '', label: '' }]);
+    const addGroup = () => {
+        setDocumentGroups([...documentGroups, { key: '', label: '', minRequired: 1, options: [{ key: '', label: '' }] }]);
+    };
+    
+    const removeGroup = (index: number) => {
+        setDocumentGroups(documentGroups.filter((_, i) => i !== index));
+    };
+    
+    const handleOptionChange = (groupIndex: number, optionIndex: number, field: 'key' | 'label', value: string) => {
+        const newGroups = [...documentGroups];
+        const group = { ...newGroups[groupIndex] };
+        const newOptions = [...group.options];
+        const currentOption = { ...newOptions[optionIndex] };
+
+        if (field === 'key') {
+            currentOption.key = value.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+        } else {
+            currentOption.label = value;
+        }
+        newOptions[optionIndex] = currentOption;
+        group.options = newOptions;
+        newGroups[groupIndex] = group;
+        setDocumentGroups(newGroups);
     };
 
-    const removeDocField = (index: number) => {
-        setDocuments(documents.filter((_, i) => i !== index));
+    const addOption = (groupIndex: number) => {
+        const newGroups = [...documentGroups];
+        const group = { ...newGroups[groupIndex] };
+        group.options.push({ key: '', label: '' });
+        newGroups[groupIndex] = group;
+        setDocumentGroups(newGroups);
     };
+
+    const removeOption = (groupIndex: number, optionIndex: number) => {
+        const newGroups = [...documentGroups];
+        const group = { ...newGroups[groupIndex] };
+        group.options = group.options.filter((_, i) => i !== optionIndex);
+        newGroups[groupIndex] = group;
+        setDocumentGroups(newGroups);
+    };
+
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
-        const filteredDocuments = documents.filter(doc => doc.key.trim() && doc.label.trim());
+        const filteredGroups = documentGroups.map(group => ({
+            ...group,
+            minRequired: Number(group.minRequired) || 0,
+            options: group.options.filter(opt => opt.key.trim() && opt.label.trim())
+        })).filter(group => group.key.trim() && group.label.trim() && group.options.length > 0);
 
-        if (filteredDocuments.some(doc => !doc.key || !doc.label)) {
-            toast({
-                title: 'Invalid Document Fields',
-                description: 'Both a Key and a Label are required for each document.',
+        if (filteredGroups.some(g => g.options.length < g.minRequired)) {
+             toast({
+                title: 'Invalid Document Requirements',
+                description: "A group's minimum required documents cannot be greater than the number of options available.",
                 variant: 'destructive',
             });
             setLoading(false);
             return;
         }
-
+        
         const serviceData: Omit<Service, 'id'> = {
             name,
             customerRate: parseFloat(customerRate) || 0,
             vleRate: parseFloat(vleRate) || 0,
             governmentFee: parseFloat(governmentFee) || 0,
-            documents: filteredDocuments,
+            documentGroups: filteredGroups,
             parentId: parentId === 'none' ? null : parentId,
             isVariable: isVariable
         };
@@ -110,7 +136,7 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
     };
 
     return (
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-3xl">
             <form onSubmit={handleSubmit}>
                 <DialogHeader>
                     <DialogTitle>{service ? 'Edit Service' : 'Add New Service'}</DialogTitle>
@@ -118,7 +144,7 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
                         {service ? 'Update the details for this service.' : 'Fill in the details for the new service.'}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
+                <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="parent" className="text-right">Category</Label>
                         <div className="col-span-3">
@@ -178,34 +204,46 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
                         <Label htmlFor="governmentFee" className="text-right">Govt. Fee (₹)</Label>
                         <Input id="governmentFee" type="number" value={governmentFee} onChange={(e) => setGovernmentFee(e.target.value)} placeholder="e.g., 107 (optional)" className="col-span-3"/>
                     </div>
-                    <div className="grid grid-cols-4 items-start gap-4">
+
+                    <Separator className="my-2" />
+
+                    <div className="grid grid-cols-4 items-start gap-4 pt-2">
                         <Label className="text-right pt-2">Required Documents</Label>
-                        <div className="col-span-3 space-y-2">
-                            {documents.map((doc, index) => (
-                                <div key={index} className="flex items-center gap-2">
-                                    <Input 
-                                        placeholder="Key (e.g., aadhar_card)" 
-                                        value={doc.key} 
-                                        onChange={(e) => handleDocChange(index, 'key', e.target.value)} 
-                                        className="flex-1"
-                                        required
-                                    />
-                                    <Input 
-                                        placeholder="Label (e.g., Aadhaar Card)" 
-                                        value={doc.label} 
-                                        onChange={(e) => handleDocChange(index, 'label', e.target.value)} 
-                                        className="flex-1"
-                                        required
-                                    />
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeDocField(index)}>
-                                        <Trash className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                </div>
+                        <div className="col-span-3 space-y-4">
+                            {documentGroups.map((group, groupIndex) => (
+                                <Card key={groupIndex} className="p-4 bg-muted/50">
+                                    <CardContent className="p-0 space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <h4 className="font-semibold">Document Group {groupIndex + 1}</h4>
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeGroup(groupIndex)}>
+                                                <Trash className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1"><Label>Group Label</Label><Input placeholder="e.g. Identity Proof" value={group.label} onChange={e => handleGroupChange(groupIndex, 'label', e.target.value)} required /></div>
+                                            <div className="space-y-1"><Label>Group Key</Label><Input placeholder="e.g. identity_proof" value={group.key} onChange={e => handleGroupChange(groupIndex, 'key', e.target.value)} required /></div>
+                                        </div>
+                                        <div className="space-y-1"><Label>Minimum Required</Label><Input type="number" placeholder="e.g. 1" value={group.minRequired} onChange={e => handleGroupChange(groupIndex, 'minRequired', e.target.value)} required min={0} /></div>
+                                        
+                                        <Separator />
+
+                                        <div className="space-y-2">
+                                            <Label className="font-medium">Options in this group</Label>
+                                            {group.options.map((option, optionIndex) => (
+                                                <div key={optionIndex} className="flex items-end gap-2">
+                                                    <div className="flex-1 space-y-1"><Label className="text-xs">Option Label</Label><Input placeholder="e.g. Aadhaar Card" value={option.label} onChange={e => handleOptionChange(groupIndex, optionIndex, 'label', e.target.value)} required /></div>
+                                                    <div className="flex-1 space-y-1"><Label className="text-xs">Option Key</Label><Input placeholder="e.g. aadhar_card" value={option.key} onChange={e => handleOptionChange(groupIndex, optionIndex, 'key', e.target.value)} required /></div>
+                                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(groupIndex, optionIndex)}><Trash className="h-4 w-4" /></Button>
+                                                </div>
+                                            ))}
+                                            <Button type="button" size="sm" variant="link" onClick={() => addOption(groupIndex)}><PlusCircle className="mr-2 h-4 w-4" /> Add Option</Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             ))}
-                            <Button type="button" variant="outline" size="sm" onClick={addDocField}>
-                                <PlusCircle className="mr-2 h-4 w-4" /> Add Document
+                            <Button type="button" variant="outline" size="sm" onClick={addGroup}>
+                                <PlusCircle className="mr-2 h-4 w-4" /> Add Document Group
                             </Button>
-                            <p className="text-xs text-muted-foreground pt-1">The 'Key' is a unique ID for the system (no spaces). The 'Label' is what the user will see.</p>
                         </div>
                     </div>
                 </div>

@@ -4,7 +4,7 @@
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { Task, UserProfile, Service, CampPayout } from "@/lib/types";
+import type { Task, UserProfile, Service, CampPayout, TaskDocument } from "@/lib/types";
 import { calculateVleEarnings } from "@/lib/utils";
 
 // --- NOTIFICATION HELPERS ---
@@ -48,24 +48,46 @@ export async function createTask(formData: FormData) {
         const creatorProfile = JSON.parse(formData.get('creatorProfile') as string) as UserProfile;
         const service = JSON.parse(formData.get('selectedService') as string) as Service;
         const type = formData.get('type') as 'Customer Request' | 'VLE Lead';
-        const files = formData.getAll('files') as File[];
 
         if (!creatorId || !creatorProfile || !service) {
             throw new Error("Missing critical user or service data.");
         }
         
         const taskId = doc(collection(db, "tasks")).id;
-        const uploadedDocuments: { name: string, url: string }[] = [];
+        const uploadedDocuments: TaskDocument[] = [];
+        const fileUploadPromises: Promise<any>[] = [];
 
-        if (files.length > 0) {
-            for (const file of files) {
+        for (const [key, value] of formData.entries()) {
+            if (key.startsWith('file_') && value instanceof File) {
+                const file = value;
+                const keys = key.replace('file_', '').split(':');
+                const groupKey = keys[0];
+                const optionKey = keys[1];
+
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-                const metadata = { customMetadata: { creatorId: creatorId } };
-                await uploadBytes(storageRef, file, metadata);
-                const downloadURL = await getDownloadURL(storageRef);
-                uploadedDocuments.push({ name: file.name, url: downloadURL });
+                
+                const metadata = { 
+                    customMetadata: { 
+                        creatorId: creatorId,
+                        groupKey: groupKey,
+                        optionKey: optionKey,
+                    }
+                };
+
+                const uploadPromise = uploadBytes(storageRef, file, metadata).then(async (snapshot) => {
+                    const downloadURL = await getDownloadURL(snapshot.ref);
+                    uploadedDocuments.push({
+                        name: file.name,
+                        url: downloadURL,
+                        groupKey: groupKey,
+                        optionKey: optionKey,
+                    });
+                });
+                fileUploadPromises.push(uploadPromise);
             }
         }
+        
+        await Promise.all(fileUploadPromises);
         
         const isVleLead = creatorProfile.role === 'vle';
         const totalPaid = isVleLead ? service.vleRate : service.customerRate;

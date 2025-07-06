@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useRef, type ChangeEvent } from 'react';
+import { useEffect, useState, useRef, type ChangeEvent, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, onSnapshot, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -88,6 +88,27 @@ export default function TaskDetailPage() {
         }
     }, [task, isTaskCreator, isAdmin]);
 
+    const groupedDocuments = useMemo(() => {
+        if (!task?.documents) return {};
+        
+        return task.documents.reduce((acc: Record<string, any[]>, doc: any) => {
+            const groupKey = doc.groupKey || 'additional_documents';
+            if (!acc[groupKey]) {
+                acc[groupKey] = [];
+            }
+            acc[groupKey].push(doc);
+            return acc;
+        }, {});
+    }, [task?.documents]);
+
+    const documentGroupsToRender = useMemo(() => {
+        return Object.keys(groupedDocuments).reduce((acc, key) => {
+            const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            acc[key] = { label, docs: groupedDocuments[key] };
+            return acc;
+        }, {} as Record<string, {label: string, docs: any[]}>);
+    }, [groupedDocuments]);
+
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const files = Array.from(e.target.files);
@@ -114,17 +135,17 @@ export default function TaskDetailPage() {
         try {
             const uploadPromises = selectedFiles.map(async (file) => {
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
-                const metadata = { customMetadata: { uploaderId: user.uid } };
+                const metadata = { customMetadata: { uploaderId: user.uid, groupKey: 'additional_documents', optionKey: 'user_upload' } };
                 await uploadBytes(storageRef, file, metadata);
                 const downloadURL = await getDownloadURL(storageRef);
-                return { name: file.name, url: downloadURL };
+                return { name: file.name, url: downloadURL, groupKey: 'additional_documents', optionKey: 'user_upload' };
             });
     
             const newDocuments = await Promise.all(uploadPromises);
     
             const taskRef = doc(db, 'tasks', taskId as string);
             
-            const actorRole = userProfile.isAdmin ? 'Admin' : (task.type === 'VLE Lead' ? 'VLE Lead Creator' : 'Customer');
+            const actorRole = userProfile.isAdmin ? 'Admin' : (userProfile.role === 'vle' ? 'VLE' : 'Customer');
 
             const historyEntry = {
                 timestamp: new Date().toISOString(),
@@ -147,25 +168,29 @@ export default function TaskDetailPage() {
 
             const taskIdentifier = `task ${String(taskId).slice(-6).toUpperCase()}`;
 
-            // Notify Assigned VLE (if they aren't the one uploading)
             if (task.assignedVleId && task.assignedVleId !== user.uid) {
                  await createNotification(
                     task.assignedVleId,
                     `Documents Uploaded for ${taskIdentifier}`,
-                    `${actorRole} has uploaded the requested documents.`,
+                    `${actorRole} has uploaded new documents.`,
                     `/dashboard/task/${taskId}`
                 );
             }
 
-            // Notify Task Creator (if they aren't the one uploading, e.g. admin uploads)
             if (task.creatorId && task.creatorId !== user.uid) {
                  await createNotification(
                     task.creatorId,
                     `Documents Uploaded for Your Task`,
-                    `The Admin has uploaded documents on your behalf for ${taskIdentifier}.`,
+                    `${actorRole} has uploaded documents for ${taskIdentifier}.`,
                     `/dashboard/task/${taskId}`
                 );
             }
+
+            await createNotificationForAdmins(
+                `Docs Uploaded for Task #${String(taskId).slice(-6).toUpperCase()}`,
+                `${actorRole} has uploaded additional documents.`,
+                 `/dashboard/task/${taskId}`
+            );
            
             toast({ title: "Upload Complete", description: "The relevant parties have been notified." });
             setSelectedFiles([]);
@@ -351,7 +376,7 @@ export default function TaskDetailPage() {
                                         </p>
                                         <p className="text-sm mt-1">
                                             {
-                                                canSeeFullHistory || entry.action !== 'Task Assigned'
+                                                canSeeFullHistory || entry.action !== 'Task Assigned to VLE'
                                                 ? entry.details
                                                 : `Task has been assigned for processing. Fee of ₹${task.totalPaid?.toFixed(2) || '0.00'} processed.`
                                             }
@@ -499,18 +524,27 @@ export default function TaskDetailPage() {
                             <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Uploaded Documents</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ul className="space-y-3 text-sm">
-                                {task.documents?.map((doc: any, index: number) => (
-                                    <li key={index}>
-                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline break-words">
-                                           <FileText className="h-4 w-4 mt-0.5 shrink-0" /> <span className="break-all">{doc.name}</span>
-                                        </a>
-                                    </li>
-                                ))}
-                                {(!task.documents || task.documents.length === 0) && (
-                                    <p className="text-xs text-muted-foreground">No documents uploaded for this task yet.</p>
-                                )}
-                            </ul>
+                             {Object.keys(documentGroupsToRender).length > 0 ? (
+                                <div className="space-y-4">
+                                    {Object.entries(documentGroupsToRender).map(([key, group]) => (
+                                        <div key={key}>
+                                            <h4 className="font-semibold text-sm mb-2">{group.label}</h4>
+                                            <ul className="space-y-3 text-sm pl-4 border-l">
+                                                {group.docs.map((doc: any, index: number) => (
+                                                    <li key={index}>
+                                                        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline break-words">
+                                                            <FileText className="h-4 w-4 mt-0.5 shrink-0" />
+                                                            <span className="break-all">{doc.name}</span>
+                                                        </a>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-muted-foreground">No documents uploaded for this task yet.</p>
+                            )}
                         </CardContent>
                     </Card>
                     
@@ -533,3 +567,5 @@ export default function TaskDetailPage() {
     );
 
     
+
+}
