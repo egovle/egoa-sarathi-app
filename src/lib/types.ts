@@ -51,6 +51,7 @@ export interface DocumentGroup {
     key: string;
     label: string;
     isOptional: boolean;
+    minRequired?: number;
     type: 'documents' | 'text';
     options: DocumentOption[];
 }

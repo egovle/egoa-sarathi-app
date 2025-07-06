@@ -59,21 +59,31 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
     const handleGroupChange = (index: number, field: keyof DocumentGroup, value: any) => {
         const newGroups = [...documentGroups];
         const currentGroup = { ...newGroups[index] };
+    
         if (field === 'key') {
             currentGroup.key = (value as string).toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
-        } else if(field === 'type') {
+        } else if (field === 'type') {
             currentGroup.type = value;
             // Reset options when type changes
             currentGroup.options = [{ key: '', label: '', type: value === 'documents' ? 'document' : 'text', isOptional: false, allowedFileTypes: ['pdf', 'png', 'jpg'] }];
+        } else if (field === 'isOptional') {
+            currentGroup.isOptional = value;
+            // If group is optional, min required is irrelevant
+            if (value) {
+                currentGroup.minRequired = 0;
+            }
+        } else if (field === 'minRequired') {
+             currentGroup.minRequired = parseInt(value, 10) || 0;
         } else {
              (currentGroup as any)[field] = value;
         }
+    
         newGroups[index] = currentGroup;
         setDocumentGroups(newGroups);
     };
 
     const addGroup = () => {
-        setDocumentGroups([...documentGroups, { key: '', label: '', isOptional: false, type: 'documents', options: [{ key: '', label: '', type: 'document', isOptional: false, allowedFileTypes: ['pdf', 'png', 'jpg'] }] }]);
+        setDocumentGroups([...documentGroups, { key: '', label: '', isOptional: false, type: 'documents', minRequired: 1, options: [{ key: '', label: '', type: 'document', isOptional: false, allowedFileTypes: ['pdf', 'png', 'jpg'] }] }]);
     };
     
     const removeGroup = (index: number) => {
@@ -256,9 +266,26 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                                             <div className="space-y-1"><Label>Group Label</Label><Input placeholder="e.g. Identity Proof" value={group.label} onChange={e => handleGroupChange(groupIndex, 'label', e.target.value)} required /></div>
                                             <div className="space-y-1"><Label>Group Key</Label><Input placeholder="e.g. identity_proof" value={group.key} onChange={e => handleGroupChange(groupIndex, 'key', e.target.value)} required /></div>
                                         </div>
-                                        <div className="flex items-center space-x-2">
-                                            <Switch id={`optional-${groupIndex}`} checked={group.isOptional} onCheckedChange={checked => handleGroupChange(groupIndex, 'isOptional', checked)} />
-                                            <Label htmlFor={`optional-${groupIndex}`}>Group is optional</Label>
+                                        <div className="space-y-2">
+                                            <Label>Group Rules</Label>
+                                            <div className="flex items-center space-x-4">
+                                                <div className="flex items-center space-x-2">
+                                                    <Switch id={`optional-${groupIndex}`} checked={group.isOptional} onCheckedChange={checked => handleGroupChange(groupIndex, 'isOptional', checked)} />
+                                                    <Label htmlFor={`optional-${groupIndex}`}>Group is optional</Label>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Label htmlFor={`min-required-${groupIndex}`} className={cn(group.isOptional && 'text-muted-foreground')}>Min. Required</Label>
+                                                    <Input 
+                                                        id={`min-required-${groupIndex}`} 
+                                                        type="number" 
+                                                        className="w-20"
+                                                        value={group.minRequired || 0}
+                                                        onChange={(e) => handleGroupChange(groupIndex, 'minRequired', e.target.value)}
+                                                        disabled={group.isOptional}
+                                                        min="0"
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Group Type</Label>
