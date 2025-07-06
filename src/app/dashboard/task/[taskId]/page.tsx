@@ -345,9 +345,11 @@ export default function TaskDetailPage() {
                                         <p className="font-semibold">{entry.action}</p>
                                         <p className="text-sm text-muted-foreground">
                                              {
-                                                canSeeFullHistory || entry.actorRole === 'Customer' || entry.actorRole === 'Admin'
-                                                ? `by ${entry.actorRole} (${entry.actorId ? `ID: ${entry.actorId.slice(-6).toUpperCase()}` : 'System'})`
-                                                : `by VLE`
+                                                (isAssignedVle && task.type === 'VLE Lead' && entry.actorId === task.creatorId)
+                                                    ? 'by VLE'
+                                                    : (canSeeFullHistory || entry.actorRole === 'Customer' || entry.actorRole === 'Admin')
+                                                        ? `by ${entry.actorRole} (${entry.actorId ? `ID: ${entry.actorId.slice(-6).toUpperCase()}` : 'System'})`
+                                                        : `by VLE`
                                             }
                                         </p>
                                         <p className="text-sm mt-1">
@@ -540,3 +542,5 @@ export default function TaskDetailPage() {
             </div>
         </div>
     );
+
+    
