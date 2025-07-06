@@ -4,7 +4,7 @@
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { Task, UserProfile, Service } from "@/lib/types";
+import type { Task, UserProfile, Service, CampPayout } from "@/lib/types";
 import { calculateVleEarnings } from "@/lib/utils";
 
 // --- NOTIFICATION HELPERS ---
@@ -293,5 +293,61 @@ export async function processPayout(task: Task, adminUserId: string) {
     } catch (error: any) {
         console.error("Payout transaction failed:", error);
         return { success: false, error: error.message || 'An unknown error occurred.' };
+    }
+}
+
+
+export async function processCampPayout(campId: string, payoutData: { vleId: string, vleName: string, amount: number }[], adminEarnings: number, adminUserId: string) {
+    if (!adminUserId || !campId) {
+        return { success: false, error: "Missing required information for camp payout." };
+    }
+
+    const campRef = doc(db, "camps", campId);
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            const campDoc = await transaction.get(campRef);
+            if (!campDoc.exists()) {
+                throw new Error("Camp not found.");
+            }
+
+            const finalPayouts: CampPayout[] = [];
+
+            for (const payout of payoutData) {
+                if (payout.amount > 0) {
+                    const vleRef = doc(db, "vles", payout.vleId);
+                    const vleDoc = await transaction.get(vleRef);
+                    if (vleDoc.exists()) {
+                        const currentBalance = vleDoc.data().walletBalance || 0;
+                        const newBalance = currentBalance + payout.amount;
+                        transaction.update(vleRef, { walletBalance: newBalance });
+
+                        finalPayouts.push({
+                            ...payout,
+                            paidAt: new Date().toISOString(),
+                            paidBy: adminUserId
+                        });
+                    }
+                }
+            }
+            
+            transaction.update(campRef, {
+                status: 'Paid Out',
+                payouts: finalPayouts,
+                adminEarnings: adminEarnings
+            });
+        });
+
+        for (const payout of payoutData) {
+            if (payout.amount > 0) {
+                await createNotification(payout.vleId, 'Camp Payment Received', `You have received a payment of ₹${payout.amount.toFixed(2)} for your participation in a recent camp.`);
+            }
+        }
+
+        return { success: true, message: "Camp payouts processed successfully!" };
+
+    } catch (error: any) {
+        console.error("Camp payout transaction failed:", error);
+        return { success: false, error: error.message || 'An unknown error occurred during camp payout.' };
     }
 }

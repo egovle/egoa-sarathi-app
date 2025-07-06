@@ -4,24 +4,24 @@
 import { useMemo } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Mail, BarChart2, Briefcase, CheckCircle, Clock, AlertTriangle, Wallet, TrendingUp, Sparkles } from 'lucide-react';
+import { Loader2, Mail, BarChart2, Briefcase, CheckCircle, Clock, AlertTriangle, Wallet, TrendingUp, Sparkles, Tent, Award } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer, PieChart, Pie, Cell, Legend, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import type { Task, VLEProfile, UserProfile } from '@/lib/types';
+import type { Task, VLEProfile, UserProfile, Camp } from '@/lib/types';
 import { ADMIN_COMMISSION_RATE } from '@/lib/config';
 import { calculateVleEarnings } from '@/lib/utils';
 
 
-const AdminReports = ({ tasks, vles }: { tasks: Task[], vles: VLEProfile[] }) => {
+const AdminReports = ({ tasks, vles, camps }: { tasks: Task[], vles: VLEProfile[], camps: Camp[] }) => {
     const { toast } = useToast();
     const taskStatusCounts = useMemo(() => {
         return tasks.reduce((acc, task) => {
@@ -71,6 +71,16 @@ const AdminReports = ({ tasks, vles }: { tasks: Task[], vles: VLEProfile[] }) =>
             .sort((a, b) => b.count - a.count)
             .slice(0, 5); // Top 5
     }, [tasks]);
+
+    const campFinancials = useMemo(() => {
+        const paidOutCamps = camps.filter(c => c.status === 'Paid Out');
+        const totalVlePayouts = paidOutCamps.reduce((sum, camp) => {
+            const campTotal = camp.payouts?.reduce((payoutSum, p) => payoutSum + p.amount, 0) || 0;
+            return sum + campTotal;
+        }, 0);
+        const totalAdminEarnings = paidOutCamps.reduce((sum, camp) => sum + (camp.adminEarnings || 0), 0);
+        return { totalVlePayouts, totalAdminEarnings };
+    }, [camps]);
 
      const chartConfig: ChartConfig = {
         count: {
@@ -212,11 +222,11 @@ eGoa Sarathi Admin Team
                      </CardContent>
                  </Card>
             </div>
-             <div className="grid gap-4 md:grid-cols-2">
+             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle>Admin Revenue Over Time</CardTitle>
+                        <CardTitle>Task Revenue Over Time</CardTitle>
                     </CardHeader>
                     <CardDescription className="px-6 -mt-4">Based on 20% commission from completed tasks.</CardDescription>
                     <CardContent>
@@ -256,40 +266,66 @@ eGoa Sarathi Admin Team
                         </Table>
                     </CardContent>
                 </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center gap-2">
+                         <Tent className="h-5 w-5 text-muted-foreground" />
+                         <CardTitle>Camp Financials</CardTitle>
+                    </CardHeader>
+                     <CardDescription className="px-6 -mt-4">Summary of earnings from all paid out camps.</CardDescription>
+                    <CardContent className="pt-6 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Total Payouts to VLEs</span>
+                            <span className="font-medium">₹{campFinancials.totalVlePayouts.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between mt-2">
+                            <span className="text-muted-foreground">Total Admin Earnings</span>
+                             <span className="font-medium">₹{campFinancials.totalAdminEarnings.toFixed(2)}</span>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );
 };
 
-const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEProfile }) => {
+const VleReports = ({ tasks, camps, userProfile }: { tasks: Task[], camps: Camp[], userProfile: VLEProfile }) => {
     
     const stats = useMemo(() => {
         const paidOutTasks = tasks.filter(t => t.status === 'Paid Out');
-        const pending = tasks.length - paidOutTasks.length;
         
-        const totalCommission = paidOutTasks.reduce((sum, task) => {
-            const { vleCommission } = calculateVleEarnings(task);
-            return sum + vleCommission;
+        const totalTaskCommission = paidOutTasks.reduce((sum, task) => {
+            const { vleCommission, governmentFee } = calculateVleEarnings(task);
+            return sum + vleCommission + governmentFee;
+        }, 0);
+
+        const myAcceptedCamps = camps.filter(c => c.assignedVles?.some(v => v.vleId === userProfile.id && v.status === 'accepted'));
+        const paidOutCamps = myAcceptedCamps.filter(c => c.status === 'Paid Out');
+
+        const totalCampPayout = paidOutCamps.reduce((sum, camp) => {
+            const myPayout = camp.payouts?.find(p => p.vleId === userProfile.id)?.amount || 0;
+            return sum + myPayout;
         }, 0);
         
         return {
-            total: tasks.length,
-            completed: paidOutTasks.length,
-            pending,
-            totalCommission,
+            totalTasks: tasks.length,
+            completedTasks: paidOutTasks.length,
+            pendingTasks: tasks.length - paidOutTasks.length,
+            totalCamps: myAcceptedCamps.length,
+            paidOutCamps: paidOutCamps.length,
+            totalEarnings: totalTaskCommission + totalCampPayout,
         };
-    }, [tasks]);
+    }, [tasks, camps, userProfile]);
 
     return (
         <div className="space-y-6">
-             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Assigned Tasks</CardTitle>
                         <Briefcase className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.total}</div>
+                        <div className="text-2xl font-bold">{stats.totalTasks}</div>
                     </CardContent>
                 </Card>
                 <Card>
@@ -298,7 +334,25 @@ const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEPro
                         <CheckCircle className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.completed}</div>
+                        <div className="text-2xl font-bold">{stats.completedTasks}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Total Assigned Camps</CardTitle>
+                        <Tent className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats.totalCamps}</div>
+                    </CardContent>
+                </Card>
+                 <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Paid Out Camps</CardTitle>
+                        <Award className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{stats.paidOutCamps}</div>
                     </CardContent>
                 </Card>
                  <Card>
@@ -307,7 +361,7 @@ const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEPro
                         <Clock className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{stats.pending}</div>
+                        <div className="text-2xl font-bold">{stats.pendingTasks}</div>
                     </CardContent>
                 </Card>
                  <Card>
@@ -316,7 +370,7 @@ const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEPro
                         <Wallet className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">₹{stats.totalCommission.toFixed(2)}</div>
+                        <div className="text-2xl font-bold">₹{stats.totalEarnings.toFixed(2)}</div>
                     </CardContent>
                 </Card>
             </div>
@@ -359,6 +413,7 @@ export default function ReportsPage() {
     
     const [tasks, setTasks] = useState<Task[]>([]);
     const [vles, setVles] = useState<VLEProfile[]>([]);
+    const [camps, setCamps] = useState<Camp[]>([]);
     const [loadingData, setLoadingData] = useState(true);
 
     useEffect(() => {
@@ -370,8 +425,16 @@ export default function ReportsPage() {
     useEffect(() => {
         if (!userProfile) return;
 
+        setLoadingData(true);
+
         let unsubTasks: () => void = () => {};
         let unsubVles: () => void = () => {};
+        let unsubCamps: () => void = () => {};
+
+        const campsQuery = query(collection(db, "camps"), orderBy('date', 'desc'));
+        unsubCamps = onSnapshot(campsQuery, (snapshot) => {
+            setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp));
+        });
 
         if (userProfile.isAdmin) {
             const tasksQuery = query(collection(db, "tasks"));
@@ -394,6 +457,7 @@ export default function ReportsPage() {
         return () => {
             unsubTasks();
             unsubVles();
+            unsubCamps();
         };
 
     }, [userProfile]);
@@ -422,6 +486,6 @@ export default function ReportsPage() {
     }
 
     return userProfile.isAdmin 
-        ? <AdminReports tasks={tasks} vles={vles} /> 
-        : <VleReports tasks={tasks} userProfile={userProfile as VLEProfile} />;
+        ? <AdminReports tasks={tasks} vles={vles} camps={camps} /> 
+        : <VleReports tasks={tasks} camps={camps} userProfile={userProfile as VLEProfile} />;
 }

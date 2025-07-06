@@ -113,16 +113,26 @@ export interface CampVLE {
     approvedBy?: string; // Admin who assigned this VLE
 }
 
+export interface CampPayout {
+    vleId: string;
+    vleName: string;
+    amount: number;
+    paidAt: string;
+    paidBy: string;
+}
+
 export interface Camp {
     id: string;
     name: string;
     location: string;
     date: string; // ISO String
-    status: 'Upcoming' | 'Completed' | 'Cancelled';
+    status: 'Upcoming' | 'Completed' | 'Cancelled' | 'Paid Out';
     type: 'created' | 'suggested'; // Distinguishes admin-created from VLE-suggested
     services: string[];
     otherServices?: string;
     assignedVles: CampVLE[];
+    payouts?: CampPayout[];
+    adminEarnings?: number;
 }
 
 export interface CampSuggestion {

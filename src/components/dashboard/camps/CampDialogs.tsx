@@ -9,12 +9,12 @@ import { Button } from '@/components/ui/button';
 import { DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, PlusCircle, ChevronsUpDown, Check, X, Search } from 'lucide-react';
+import { Loader2, PlusCircle, ChevronsUpDown, Check, X, Search, CircleDollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DayPicker } from 'react-day-picker';
 import "react-day-picker/dist/style.css";
-import { createNotification, createNotificationForAdmins } from '@/app/actions';
+import { createNotification, createNotificationForAdmins, processCampPayout } from '@/app/actions';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
@@ -79,14 +79,14 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
             name,
             location,
             date: date.toISOString(),
-            status: 'Upcoming',
+            status: camp?.status === 'Paid Out' ? 'Paid Out' : 'Upcoming',
             type: camp ? camp.type : (suggestion ? 'suggested' : 'created'),
             services: initialData.services || [],
             otherServices: initialData.otherServices || '',
             assignedVles: assignedVles.map(vle => {
                 const existingVle = camp?.assignedVles.find(av => av.vleId === vle.id);
                 if (existingVle) return existingVle;
-                return { vleId: vle.id, status: 'pending', approvedBy: adminProfile?.id };
+                return { vleId: vle.id, status: 'pending' };
             }),
         };
 
@@ -388,6 +388,102 @@ export const SuggestCampDialog = ({ onFinished, services, userProfile }: { onFin
                     <Button type="submit" disabled={loading}>
                         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Send Suggestion
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    );
+};
+
+export const CampPayoutDialog = ({ camp, vles, adminProfile, onFinished }: { camp: Camp, vles: VLEProfile[], adminProfile: UserProfile, onFinished: () => void }) => {
+    const { toast } = useToast();
+    const [vlePayouts, setVlePayouts] = useState<{ [vleId: string]: string }>({});
+    const [adminEarnings, setAdminEarnings] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const assignedVleDetails = useMemo(() => {
+        return camp.assignedVles
+            .filter(av => av.status === 'accepted')
+            .map(av => vles.find(v => v.id === av.vleId))
+            .filter((v): v is VLEProfile => !!v);
+    }, [camp.assignedVles, vles]);
+
+    const handlePayoutChange = (vleId: string, amount: string) => {
+        setVlePayouts(prev => ({ ...prev, [vleId]: amount }));
+    };
+
+    const handleSubmit = async (e: FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+
+        const payoutData = Object.entries(vlePayouts).map(([vleId, amountStr]) => {
+            const vleName = vles.find(v => v.id === vleId)?.name || 'Unknown VLE';
+            return {
+                vleId,
+                vleName,
+                amount: parseFloat(amountStr) || 0,
+            };
+        }).filter(p => p.amount > 0);
+
+        const adminEarningsNum = parseFloat(adminEarnings) || 0;
+
+        const result = await processCampPayout(camp.id, payoutData, adminEarningsNum, adminProfile.id);
+
+        if (result.success) {
+            toast({ title: "Success", description: result.message });
+            onFinished();
+        } else {
+            toast({ title: "Error", description: result.error, variant: "destructive" });
+        }
+        setLoading(false);
+    };
+
+    return (
+        <DialogContent className="sm:max-w-md">
+            <form onSubmit={handleSubmit}>
+                <DialogHeader>
+                    <DialogTitle>Process Payouts for "{camp.name}"</DialogTitle>
+                    <DialogDescription>
+                        Enter the payout amount for each participating VLE and record admin earnings.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
+                    <h4 className="font-semibold text-sm">VLE Payouts</h4>
+                    {assignedVleDetails.length > 0 ? (
+                        assignedVleDetails.map(vle => (
+                            <div key={vle.id} className="grid grid-cols-3 items-center gap-4">
+                                <Label htmlFor={`payout-${vle.id}`} className="col-span-1">{vle.name}</Label>
+                                <Input
+                                    id={`payout-${vle.id}`}
+                                    type="number"
+                                    placeholder="Amount (₹)"
+                                    value={vlePayouts[vle.id] || ''}
+                                    onChange={(e) => handlePayoutChange(vle.id, e.target.value)}
+                                    className="col-span-2"
+                                />
+                            </div>
+                        ))
+                    ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">No VLEs accepted the invitation for this camp.</p>
+                    )}
+
+                    <h4 className="font-semibold text-sm pt-4">Admin Earnings</h4>
+                     <div className="grid grid-cols-3 items-center gap-4">
+                        <Label htmlFor="admin-earnings" className="col-span-1">Earnings (₹)</Label>
+                        <Input
+                            id="admin-earnings"
+                            type="number"
+                            placeholder="Admin Profit"
+                            value={adminEarnings}
+                            onChange={(e) => setAdminEarnings(e.target.value)}
+                            className="col-span-2"
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button type="submit" disabled={loading}>
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CircleDollarSign className="mr-2 h-4 w-4" />}
+                        Submit Payouts
                     </Button>
                 </DialogFooter>
             </form>
