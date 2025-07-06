@@ -140,13 +140,12 @@ export default function VleDashboard({ assignedTasks, myLeads, services, camps }
         return <PendingApprovalView />;
     }
 
-    const totalInvitations = taskInvitations.length + campInvitations.length;
-
     return (
-    <Tabs defaultValue="invitations" className="w-full">
+    <Tabs defaultValue="camp-invitations" className="w-full">
         <div className="flex items-center">
             <TabsList>
-                <TabsTrigger value="invitations">Invitations <Badge className="ml-2">{totalInvitations}</Badge></TabsTrigger>
+                <TabsTrigger value="camp-invitations">Camp Invitations <Badge className="ml-2">{campInvitations.length}</Badge></TabsTrigger>
+                <TabsTrigger value="task-invitations">Task Invitations <Badge className="ml-2">{taskInvitations.length}</Badge></TabsTrigger>
                 <TabsTrigger value="active">Active Tasks</TabsTrigger>
                 <TabsTrigger value="leads">My Generated Leads</TabsTrigger>
             </TabsList>
@@ -154,7 +153,7 @@ export default function VleDashboard({ assignedTasks, myLeads, services, camps }
                 <TaskCreatorDialog services={services} type="VLE Lead" creatorId={user.uid} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
             </div>
         </div>
-        <TabsContent value="invitations" className="mt-4 space-y-6">
+        <TabsContent value="camp-invitations" className="mt-4">
             <Card>
                 <CardHeader>
                     <CardTitle>New Camp Invitations</CardTitle>
@@ -187,7 +186,8 @@ export default function VleDashboard({ assignedTasks, myLeads, services, camps }
                     </Table>
                 </CardContent>
             </Card>
-
+        </TabsContent>
+        <TabsContent value="task-invitations" className="mt-4">
              <Card>
                 <CardHeader>
                     <CardTitle>New Task Invitations</CardTitle>
@@ -337,4 +337,4 @@ export default function VleDashboard({ assignedTasks, myLeads, services, camps }
                 </Card>
         </TabsContent>
     </Tabs>
-)};
+)
