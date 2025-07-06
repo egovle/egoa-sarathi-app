@@ -42,6 +42,7 @@ export interface DocumentOption {
     key: string;
     label: string;
     type: 'document' | 'text';
+    isOptional: boolean;
     allowedFileTypes?: AllowedFileTypes[];
     placeholder?: string;
 }

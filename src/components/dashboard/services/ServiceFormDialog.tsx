@@ -64,7 +64,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
         } else if(field === 'type') {
             currentGroup.type = value;
             // Reset options when type changes
-            currentGroup.options = [{ key: '', label: '', type: value === 'documents' ? 'document' : 'text', allowedFileTypes: ['pdf', 'png', 'jpg'] }];
+            currentGroup.options = [{ key: '', label: '', type: value === 'documents' ? 'document' : 'text', isOptional: false, allowedFileTypes: ['pdf', 'png', 'jpg'] }];
         } else {
              (currentGroup as any)[field] = value;
         }
@@ -73,7 +73,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
     };
 
     const addGroup = () => {
-        setDocumentGroups([...documentGroups, { key: '', label: '', isOptional: false, type: 'documents', options: [{ key: '', label: '', type: 'document', allowedFileTypes: ['pdf', 'png', 'jpg'] }] }]);
+        setDocumentGroups([...documentGroups, { key: '', label: '', isOptional: false, type: 'documents', options: [{ key: '', label: '', type: 'document', isOptional: false, allowedFileTypes: ['pdf', 'png', 'jpg'] }] }]);
     };
     
     const removeGroup = (index: number) => {
@@ -115,7 +115,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
         const newGroups = [...documentGroups];
         const group = { ...newGroups[groupIndex] };
         const newType = group.type === 'documents' ? 'document' : 'text';
-        group.options.push({ key: '', label: '', type: newType, allowedFileTypes: ['pdf', 'png', 'jpg'] });
+        group.options.push({ key: '', label: '', type: newType, isOptional: false, allowedFileTypes: ['pdf', 'png', 'jpg'] });
         newGroups[groupIndex] = group;
         setDocumentGroups(newGroups);
     };
@@ -273,11 +273,15 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                                         <div className="space-y-2">
                                             <Label className="font-medium">Fields in this group</Label>
                                             {group.options.map((option, optionIndex) => (
-                                                <div key={optionIndex} className="flex items-end gap-2 p-2 border rounded-md">
+                                                <div key={optionIndex} className="flex items-start gap-2 p-2 border rounded-md">
                                                     <div className="flex-1 space-y-3">
                                                         <div className="grid grid-cols-2 gap-2">
                                                             <div className="space-y-1"><Label className="text-xs">Field Label</Label><Input placeholder="e.g. Aadhaar Card" value={option.label} onChange={e => handleOptionChange(groupIndex, optionIndex, 'label', e.target.value)} required /></div>
                                                             <div className="space-y-1"><Label className="text-xs">Field Key</Label><Input placeholder="e.g. aadhar_card" value={option.key} onChange={e => handleOptionChange(groupIndex, optionIndex, 'key', e.target.value)} required /></div>
+                                                        </div>
+                                                         <div className="flex items-center space-x-2 pt-1">
+                                                            <Switch id={`option-optional-${groupIndex}-${optionIndex}`} checked={option.isOptional} onCheckedChange={checked => handleOptionChange(groupIndex, optionIndex, 'isOptional', checked)} />
+                                                            <Label htmlFor={`option-optional-${groupIndex}-${optionIndex}`} className="text-xs font-normal">This field is optional</Label>
                                                         </div>
                                                         {group.type === 'documents' ? (
                                                             <div>

@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 import { validateFiles } from '@/lib/utils';
 import { Briefcase, Users, Users2, AlertTriangle } from 'lucide-react';
 import { createTask } from '@/app/actions';
+import { Badge } from '../ui/badge';
 
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -117,30 +118,33 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
         for (const group of selectedService.documentGroups) {
             if (group.isOptional) continue;
             
-            if (group.type === 'documents') {
-                const uploadedInGroup = Object.keys(uploadedFiles).filter(key => key.startsWith(`${group.key}:`)).length;
-                if (uploadedInGroup < 1) { // Simplified from minRequired to just checking if at least one is uploaded for mandatory doc groups
-                     toast({
-                        title: `Document Required for "${group.label}"`,
-                        description: `Please upload at least one document for this mandatory group.`,
-                        variant: 'destructive',
-                    });
-                    setIsSubmitting(false);
-                    return;
-                }
-            } else if (group.type === 'text') {
-                 for (const option of group.options) {
-                    const fieldKey = `text_${group.key}:${option.key}`;
-                    if (!formData.get(fieldKey)) {
-                         toast({
-                            title: `Field Required in "${group.label}"`,
-                            description: `The field "${option.label}" is required.`,
+            for (const option of group.options) {
+                if (option.isOptional) continue;
+
+                if (group.type === 'documents') {
+                    const fileKey = `${group.key}:${option.key}`;
+                    if (!uploadedFiles[fileKey]) {
+                        toast({
+                            title: `Mandatory Document Missing`,
+                            description: `Please upload the "${option.label}" document for the "${group.label}" group.`,
                             variant: 'destructive',
                         });
                         setIsSubmitting(false);
                         return;
                     }
-                 }
+                } else if (group.type === 'text') {
+                     const fieldKey = `text_${group.key}:${option.key}`;
+                     const value = formData.get(fieldKey) as string;
+                    if (!value || !value.trim()) {
+                         toast({
+                            title: `Mandatory Field Missing`,
+                            description: `Please fill in the "${option.label}" field for the "${group.label}" group.`,
+                            variant: 'destructive',
+                        });
+                        setIsSubmitting(false);
+                        return;
+                    }
+                }
             }
         }
     }
@@ -280,18 +284,22 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                               <CardHeader className="p-0 pb-2">
                                 <CardTitle className="text-base flex items-center gap-2">
                                     {group.label}
-                                    {group.isOptional && <Badge variant="outline">Optional</Badge>}
+                                    {group.isOptional && <Badge variant="outline">Optional Group</Badge>}
                                 </CardTitle>
-                                {group.type === 'documents' && !group.isOptional && <p className="text-xs text-muted-foreground">Please upload at least one of the following:</p>}
                               </CardHeader>
                               <CardContent className="p-0 space-y-2">
                                 {group.options.map(option => {
                                   const fileKey = `${group.key}:${option.key}`;
+                                  const isMandatory = !group.isOptional && !option.isOptional;
                                   const uploadedFile = uploadedFiles[fileKey];
                                   if (group.type === 'documents') {
                                       return (
                                           <div key={option.key} className="flex items-center justify-between gap-2 text-sm p-2 border-b last:border-b-0">
-                                              <Label htmlFor={fileKey} className="flex-1">{option.label}</Label>
+                                              <Label htmlFor={fileKey} className="flex-1">
+                                                {option.label}
+                                                {isMandatory && <span className="text-destructive ml-1">*</span>}
+                                                {option.isOptional && !group.isOptional && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
+                                              </Label>
                                               {uploadedFile ? (
                                                   <div className="flex items-center gap-2 text-green-600 font-medium">
                                                     <FileText className="h-4 w-4" />
@@ -315,12 +323,16 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                   } else { // group.type === 'text'
                                       return (
                                           <div key={option.key} className="space-y-2 p-2">
-                                              <Label htmlFor={`text_${group.key}:${option.key}`}>{option.label}</Label>
+                                              <Label htmlFor={`text_${group.key}:${option.key}`}>
+                                                {option.label}
+                                                {isMandatory && <span className="text-destructive ml-1">*</span>}
+                                                {option.isOptional && !group.isOptional && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
+                                              </Label>
                                               <Input 
                                                 id={`text_${group.key}:${option.key}`}
                                                 name={`text_${group.key}:${option.key}`}
                                                 placeholder={option.placeholder || ''}
-                                                required={!group.isOptional}
+                                                required={isMandatory}
                                               />
                                           </div>
                                       )
