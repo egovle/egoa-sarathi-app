@@ -64,9 +64,11 @@ export default function DashboardPage() {
             }));
         
         } else if (userProfile.role === 'customer') {
-            const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
+            const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
             unsubscribers.push(onSnapshot(tasksQuery, (snapshot) => {
-                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task));
+                const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
+                fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                setTasks(fetchedTasks);
             }));
         }
         
