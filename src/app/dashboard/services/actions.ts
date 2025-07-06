@@ -27,7 +27,20 @@ export async function updateService(id: string, data: Partial<Omit<Service, 'id'
 
 export async function deleteService(id: string) {
     try {
-        await deleteDoc(doc(db, "services", id));
+        const batch = writeBatch(db);
+        const serviceRef = doc(db, "services", id);
+        
+        // Find and delete all sub-services first to prevent orphans
+        const childrenQuery = query(collection(db, "services"), where("parentId", "==", id));
+        const childrenSnapshot = await getDocs(childrenQuery);
+        childrenSnapshot.forEach(childDoc => {
+            batch.delete(childDoc.ref);
+        });
+
+        // Delete the parent service
+        batch.delete(serviceRef);
+
+        await batch.commit();
         return { success: true };
     } catch (error: any) {
         return { success: false, error: error.message };
@@ -94,7 +107,23 @@ export async function resetApplicationData() {
         }
 
         await processInBatches(collection(db, 'users'), 'update', { walletBalance: 0 });
-        await processInBatches(collection(db, 'vles'), 'update', { walletBalance: 0 }); // This will reset admin too if they are in 'vles'
+        const vleCollection = collection(db, 'vles');
+        const adminQuery = query(vleCollection, where("isAdmin", "==", true));
+        const adminSnapshot = await getDocs(adminQuery);
+        const adminId = adminSnapshot.docs.length > 0 ? adminSnapshot.docs[0].id : null;
+
+        await processInBatches(vleCollection, 'update', { walletBalance: 0 }); 
+
+        // After resetting VLEs, if an admin was found, ensure their balance is reset too.
+        // This is a safeguard in case the batch update misses it or runs into edge cases.
+        if(adminId){
+            const adminRef = doc(db, 'vles', adminId);
+            const adminDoc = await getDoc(adminRef);
+            if(adminDoc.exists() && adminDoc.data().walletBalance !== 0){
+                await updateDoc(adminRef, { walletBalance: 0 });
+            }
+        }
+
 
         let seedBatch = writeBatch(db);
         seedServices.forEach(service => {

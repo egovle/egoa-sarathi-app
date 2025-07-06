@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link"
@@ -232,15 +233,7 @@ export default function DashboardLayout({
                         </button>
                     </PopoverTrigger>
                     <PopoverContent side="right" align="start" className="w-auto p-4">
-                        <div className="grid gap-4">
-                            <div className="space-y-1">
-                                <h4 className="font-medium leading-none">Support</h4>
-                                <p className="text-sm text-muted-foreground">
-                                    Get help with our services.
-                                </p>
-                            </div>
-                            <SupportContent />
-                        </div>
+                        <SupportContent />
                     </PopoverContent>
                 </Popover>
             )}

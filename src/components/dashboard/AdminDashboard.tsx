@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Loader2, UserPlus, MoreHorizontal, Eye, GitFork, AlertTriangle, Mail, Phone, Search, Trash2, CircleDollarSign, Briefcase, Users, Users2, Wallet, Send } from 'lucide-react';
+import { Loader2, UserPlus, MoreHorizontal, Eye, GitFork, AlertTriangle, Mail, Phone, Search, Trash2, CircleDollarSign, Briefcase, Users, Users2, Wallet, Send, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { doc, updateDoc, writeBatch, query, arrayUnion, getDoc, runTransaction, getDocs, where, collection } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, query, arrayUnion, getDoc, runTransaction, getDocs, where, collection, onSnapshot, orderBy, startAt, endAt } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { createNotification, processPayout } from '@/app/actions';
 import { resetApplicationData } from '@/app/dashboard/services/actions';
@@ -21,10 +21,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
 import { StatCard } from './shared';
 import { ComplaintResponseDialog } from './dialogs/ComplaintResponseDialog';
@@ -32,19 +28,88 @@ import { AssignVleDialog, AddBalanceDialog } from './dialogs/AdminDialogs';
 import type { Task, VLEProfile, CustomerProfile, PaymentRequest, Complaint as ComplaintType } from '@/lib/types';
 
 
-export default function AdminDashboard({ allTasks, vles, customers, paymentRequests }: { allTasks: Task[], vles: VLEProfile[], customers: CustomerProfile[], paymentRequests: PaymentRequest[] }) {
+// Debounce hook
+function useDebounce(value: string, delay: number) {
+    const [debouncedValue, setDebouncedValue] = useState(value);
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+    return debouncedValue;
+}
+
+export default function AdminDashboard() {
     const { toast } = useToast();
     const { user, userProfile } = useAuth();
-    const [activeTab, setActiveTab] = useState('overview');
     
+    // UI State
+    const [activeTab, setActiveTab] = useState('overview');
     const [processingVleId, setProcessingVleId] = useState<string | null>(null);
     const [processingBalanceRequestId, setProcessingBalanceRequestId] = useState<string | null>(null);
     const [processingPayoutTaskId, setProcessingPayoutTaskId] = useState<string | null>(null);
     
+    // Search State
     const [vleSearch, setVleSearch] = useState('');
     const [customerSearch, setCustomerSearch] = useState('');
     const [taskSearch, setTaskSearch] = useState('');
+    const debouncedVleSearch = useDebounce(vleSearch, 500);
+    const debouncedCustomerSearch = useDebounce(customerSearch, 500);
+    const debouncedTaskSearch = useDebounce(taskSearch, 500);
     
+    // Data State
+    const [allTasks, setAllTasks] = useState<Task[]>([]);
+    const [vles, setVles] = useState<VLEProfile[]>([]);
+    const [customers, setCustomers] = useState<CustomerProfile[]>([]);
+    const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        setIsLoading(true);
+        const q = debouncedTaskSearch 
+            ? query(collection(db, "tasks"), orderBy("customer"), startAt(debouncedTaskSearch), endAt(debouncedTaskSearch + '\uf8ff'))
+            : query(collection(db, "tasks"), orderBy("date", "desc"));
+        const unsub = onSnapshot(q, (s) => {
+            setAllTasks(s.docs.map(d => ({ id: d.id, ...d.data() }) as Task));
+            setIsLoading(false);
+        });
+        return () => unsub();
+    }, [debouncedTaskSearch]);
+    
+    useEffect(() => {
+        setIsLoading(true);
+        const q = debouncedVleSearch
+            ? query(collection(db, "vles"), orderBy("name"), startAt(debouncedVleSearch), endAt(debouncedVleSearch + '\uf8ff'))
+            : query(collection(db, "vles"), orderBy("name"));
+        const unsub = onSnapshot(q, (s) => {
+            setVles(s.docs.map(d => ({ id: d.id, ...d.data() }) as VLEProfile));
+            setIsLoading(false);
+        });
+        return () => unsub();
+    }, [debouncedVleSearch]);
+
+    useEffect(() => {
+        setIsLoading(true);
+         const q = debouncedCustomerSearch
+            ? query(collection(db, "users"), orderBy("name"), startAt(debouncedCustomerSearch), endAt(debouncedCustomerSearch + '\uf8ff'))
+            : query(collection(db, "users"), orderBy("name"));
+        const unsub = onSnapshot(q, (s) => {
+            setCustomers(s.docs.map(d => ({ id: d.id, ...d.data() }) as CustomerProfile));
+            setIsLoading(false);
+        });
+        return () => unsub();
+    }, [debouncedCustomerSearch]);
+    
+    useEffect(() => {
+        const q = query(collection(db, "paymentRequests"), where("status", "==", "pending"));
+        const unsub = onSnapshot(q, (s) => setPaymentRequests(s.docs.map(d => ({ id: d.id, ...d.data() }) as PaymentRequest)));
+        return () => unsub();
+    }, []);
+
+
     const handleComplaintResponse = async (taskId: string, customerId: string, response: any) => {
         const taskRef = doc(db, "tasks", taskId);
         const taskSnap = await getDoc(taskRef);
@@ -150,28 +215,33 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
         }
     };
     
-    const handleApproveBalanceRequest = async (req: PaymentRequest) => {
+    const handleBalanceRequest = async (req: PaymentRequest, status: 'approved' | 'rejected') => {
         setProcessingBalanceRequestId(req.id);
         const userRef = doc(db, req.userRole === 'vle' ? 'vles' : 'users', req.userId);
         const reqRef = doc(db, 'paymentRequests', req.id);
 
         try {
-            await runTransaction(db, async (transaction) => {
-                const userDoc = await transaction.get(userRef);
-                if (!userDoc.exists()) throw new Error("User document not found.");
+            if (status === 'approved') {
+                 await runTransaction(db, async (transaction) => {
+                    const userDoc = await transaction.get(userRef);
+                    if (!userDoc.exists()) throw new Error("User document not found.");
 
-                const currentBalance = userDoc.data().walletBalance || 0;
-                const newBalance = currentBalance + req.amount;
-                
-                transaction.update(userRef, { walletBalance: newBalance });
-                transaction.update(reqRef, { status: 'approved', approvedBy: user?.uid, approvedAt: new Date().toISOString() });
-            });
-
-            toast({ title: 'Balance Added', description: `Successfully added ₹${req.amount.toFixed(2)} to ${req.userName}'s wallet.` });
-            await createNotification(req.userId, 'Wallet Balance Updated', `An admin has approved your request and added ₹${req.amount.toFixed(2)} to your wallet.`);
+                    const currentBalance = userDoc.data().walletBalance || 0;
+                    const newBalance = currentBalance + req.amount;
+                    
+                    transaction.update(userRef, { walletBalance: newBalance });
+                    transaction.update(reqRef, { status: 'approved', approvedBy: user?.uid, approvedAt: new Date().toISOString() });
+                });
+                toast({ title: 'Balance Added', description: `Successfully added ₹${req.amount.toFixed(2)} to ${req.userName}'s wallet.` });
+                await createNotification(req.userId, 'Wallet Balance Updated', `An admin has approved your request and added ₹${req.amount.toFixed(2)} to your wallet.`);
+            } else {
+                 await updateDoc(reqRef, { status: 'rejected', approvedBy: user?.uid, approvedAt: new Date().toISOString() });
+                 toast({ title: 'Request Rejected', description: `The balance request from ${req.userName} has been rejected.` });
+                 await createNotification(req.userId, 'Balance Request Rejected', `Your request to add ₹${req.amount.toFixed(2)} has been rejected by an admin.`);
+            }
         } catch (error: any) {
-            console.error("Failed to approve balance request:", error);
-            toast({ title: "Approval Failed", description: error.message || "Could not update the user's balance.", variant: 'destructive' });
+            console.error("Failed to process balance request:", error);
+            toast({ title: "Action Failed", description: error.message || "Could not process the balance request.", variant: 'destructive' });
         } finally {
             setProcessingBalanceRequestId(null);
         }
@@ -210,50 +280,12 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
     const pendingVles = vles.filter(v => v.status === 'Pending');
     const pricingTasks = allTasks.filter(t => t.status === 'Pending Price Approval');
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
-    const payoutTasks = useMemo(() => allTasks.filter(t => t.status === 'Completed'), [allTasks]);
+    const payoutTasks = allTasks.filter(t => t.status === 'Completed');
     
     const pendingVleCount = pendingVles.length;
     const unassignedTaskCount = allTasks.filter(t => t.status === 'Unassigned' || t.status === 'Pending Price Approval').length;
     const openComplaintsCount = complaints.filter(c => c.status === 'Open').length;
     const payoutTaskCount = payoutTasks.length;
-    
-    const filteredVles = useMemo(() => {
-        if (!vleSearch) return vles;
-        const query = vleSearch.toLowerCase();
-        return vles.filter(vle => 
-            vle.name.toLowerCase().includes(query) ||
-            vle.location.toLowerCase().includes(query)
-        );
-    }, [vles, vleSearch]);
-
-    const filteredCustomers = useMemo(() => {
-        if (!customerSearch) return customers;
-        const query = customerSearch.toLowerCase();
-        
-        const tasksByCustomer: {[key: string]: string[]} = {};
-        allTasks.forEach(task => {
-            if (!tasksByCustomer[task.creatorId]) tasksByCustomer[task.creatorId] = [];
-            tasksByCustomer[task.creatorId].push(task.id);
-        });
-
-        return customers.filter(user => 
-            user.name.toLowerCase().includes(query) ||
-            user.email.toLowerCase().includes(query) ||
-            user.mobile.includes(query) ||
-            (tasksByCustomer[user.id] || []).some(taskId => taskId.toLowerCase().includes(query))
-        );
-    }, [customers, allTasks, customerSearch]);
-
-    const filteredTasks = useMemo(() => {
-        if (!taskSearch) return allTasks;
-        const query = taskSearch.toLowerCase();
-        return allTasks.filter(task => 
-            task.id.toLowerCase().includes(query) ||
-            task.customer.toLowerCase().includes(query) ||
-            task.service.toLowerCase().includes(query)
-        );
-    }, [allTasks, taskSearch]);
-
 
     const TabTriggerWithBadge = ({ value, label, count }: { value: string, label: string, count: number }) => (
         <TabsTrigger value={value} className="relative">
@@ -331,10 +363,9 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                                             <TableRow key={req.id}>
                                                 <TableCell>{req.userName}</TableCell>
                                                 <TableCell>₹{req.amount.toFixed(2)}</TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button variant="outline" size="sm" onClick={() => handleApproveBalanceRequest(req)} disabled={processingBalanceRequestId === req.id}>
-                                                        {processingBalanceRequestId === req.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Approve"}
-                                                    </Button>
+                                                <TableCell className="text-right space-x-2">
+                                                    <Button size="sm" variant="destructive" onClick={() => handleBalanceRequest(req, 'rejected')} disabled={processingBalanceRequestId === req.id}><XCircle className="mr-2 h-4 w-4"/>Reject</Button>
+                                                    <Button size="sm" variant="outline" onClick={() => handleBalanceRequest(req, 'approved')} disabled={processingBalanceRequestId === req.id}>{processingBalanceRequestId === req.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Approve"}</Button>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -344,16 +375,43 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                         </CardContent>
                     </Card>
                 </div>
+                 <div className='pt-4'>
+                    <Card className='border-destructive/50'>
+                        <CardHeader>
+                            <CardTitle className='text-destructive'>Danger Zone</CardTitle>
+                            <CardDescription>These are irreversible actions. Use with caution.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                             <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                     <Button variant="destructive">Reset All Application Data</Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This action cannot be undone. This will permanently delete all tasks, camps, and notifications, and reset all user wallet balances to zero.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction onClick={handleResetData}>Yes, reset everything</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </CardContent>
+                    </Card>
+                </div>
             </TabsContent>
 
             <TabsContent value="vle-management" className="mt-4">
                 <Card>
-                    <CardHeader><div className="flex items-center justify-between"><div><CardTitle>VLE Management</CardTitle><CardDescription>Approve or manage VLE accounts and see their availability.</CardDescription></div><div className="relative"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search VLE by name or location..." className="pl-8 w-72" value={vleSearch} onChange={(e) => setVleSearch(e.target.value)} /></div></div></CardHeader>
+                    <CardHeader><div className="flex items-center justify-between"><div><CardTitle>VLE Management</CardTitle><CardDescription>Approve or manage VLE accounts and see their availability.</CardDescription></div><div className="relative"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search VLE by name..." className="pl-8 w-72" value={vleSearch} onChange={(e) => setVleSearch(e.target.value)} /></div></div></CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Balance</TableHead><TableHead>Status</TableHead><TableHead>Availability</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {filteredVles.map(vle => (
+                                {vles.map(vle => (
                                 <TableRow key={vle.id}>
                                     <TableCell>{vle.name}</TableCell>
                                     <TableCell>{vle.location}</TableCell>
@@ -383,11 +441,11 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
             
             <TabsContent value="customer-management" className="mt-4">
                 <Card>
-                    <CardHeader><div className="flex items-center justify-between"><div><CardTitle>Customer Management</CardTitle><CardDescription>View all registered customers in the system.</CardDescription></div><div className="relative"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search by name, email, mobile or Task ID..." className="pl-8 w-80" value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} /></div></div></CardHeader>
+                    <CardHeader><div className="flex items-center justify-between"><div><CardTitle>Customer Management</CardTitle><CardDescription>View all registered customers in the system.</CardDescription></div><div className="relative"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search by name..." className="pl-8 w-80" value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} /></div></div></CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Mobile</TableHead><TableHead>Location</TableHead></TableRow></TableHeader>
-                            <TableBody>{filteredCustomers.map(user => (<TableRow key={user.id}><TableCell>{user.name}</TableCell><TableCell>{user.email}</TableCell><TableCell>{user.mobile}</TableCell><TableCell>{user.location}</TableCell></TableRow>))}</TableBody>
+                            <TableBody>{customers.map(user => (<TableRow key={user.id}><TableCell>{user.name}</TableCell><TableCell>{user.email}</TableCell><TableCell>{user.mobile}</TableCell><TableCell>{user.location}</TableCell></TableRow>))}</TableBody>
                         </Table>
                     </CardContent>
                 </Card>
@@ -395,12 +453,12 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
 
             <TabsContent value="all-tasks" className="mt-4">
                 <Card>
-                    <CardHeader><div className="flex items-center justify-between"><div><CardTitle>All Service Requests</CardTitle><CardDescription>View and manage all tasks in the system.</CardDescription></div><div className="relative"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search by ID, customer, or service..." className="pl-8 w-80" value={taskSearch} onChange={(e) => setTaskSearch(e.target.value)} /></div></div></CardHeader>
+                    <CardHeader><div className="flex items-center justify-between"><div><CardTitle>All Service Requests</CardTitle><CardDescription>View and manage all tasks in the system.</CardDescription></div><div className="relative"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search by customer name..." className="pl-8 w-80" value={taskSearch} onChange={(e) => setTaskSearch(e.target.value)} /></div></div></CardHeader>
                     <CardContent>
                         <Table>
                             <TableHeader><TableRow><TableHead>Task ID</TableHead><TableHead>Customer</TableHead><TableHead>Service</TableHead><TableHead>Status</TableHead><TableHead>Assigned VLE</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {filteredTasks.map(task => {
+                                {allTasks.map(task => {
                                     const availableVles = vles.filter(vle => vle.status === 'Approved' && vle.available);
                                     return (
                                         <TableRow key={task.id}>

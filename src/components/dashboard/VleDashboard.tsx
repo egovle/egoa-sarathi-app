@@ -10,7 +10,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import { createNotificationForAdmins } from '@/app/actions';
 
-import { FilePlus, Search, ToggleRight, CheckCircle2, XCircle } from 'lucide-react';
+import { FilePlus, Search, ToggleRight, CheckCircle2, XCircle, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,10 +19,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskCreatorDialog } from './shared';
 import { calculateVleEarnings } from '@/lib/utils';
-import type { Task, Service, UserProfile, VLEProfile } from '@/lib/types';
+import type { Task, Service, VLEProfile } from '@/lib/types';
 
+
+const PendingApprovalView = () => (
+    <Alert>
+        <Info className="h-4 w-4" />
+        <AlertTitle>Account Pending Approval</AlertTitle>
+        <AlertDescription>
+            Your VLE account is currently under review by an administrator. You will be notified once it has been approved. You cannot generate leads or accept tasks until your account is approved.
+        </AlertDescription>
+    </Alert>
+);
 
 export default function VleDashboard({ assignedTasks, myLeads, services }: { assignedTasks: Task[], myLeads: Task[], services: Service[] }) {
     const { toast } = useToast();
@@ -115,6 +126,10 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
     }, [myLeads, searchQuery]);
 
     if (!user || !userProfile) return null;
+    
+    if ((userProfile as VLEProfile).status === 'Pending') {
+        return <PendingApprovalView />;
+    }
 
     return (
     <Tabs defaultValue="invitations" className="w-full">

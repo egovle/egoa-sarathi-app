@@ -118,7 +118,7 @@ export const ServiceFormDialog = ({ service, parentServices, onFinished }: { ser
                         {service ? 'Update the details for this service.' : 'Fill in the details for the new service.'}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto">
+                <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="parent" className="text-right">Category</Label>
                         <div className="col-span-3">

@@ -13,6 +13,7 @@ import { validateFiles } from '@/lib/utils';
 import { storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/context/AuthContext';
+import type { Document } from '@/lib/types';
 
 
 export const ComplaintResponseDialog = ({ trigger, complaint, taskId, customerId, onResponseSubmit }: { trigger: React.ReactNode, complaint: any, taskId: string, customerId: string, onResponseSubmit: (taskId: string, customerId: string, response: any) => void }) => {
@@ -29,7 +30,7 @@ export const ComplaintResponseDialog = ({ trigger, complaint, taskId, customerId
         setIsSubmitting(true);
         
         try {
-            const uploadedDocuments: { name: string; url: string }[] = [];
+            const uploadedDocuments: Document[] = [];
             if (selectedFiles.length > 0) {
                 for (const file of selectedFiles) {
                     const storageRef = ref(storage, `tasks/${taskId}/complaint_responses/${Date.now()}_${file.name}`);

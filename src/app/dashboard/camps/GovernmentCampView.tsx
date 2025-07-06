@@ -3,10 +3,10 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, PlusCircle, Phone } from 'lucide-react';
+import { PlusCircle, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { SuggestCampDialog } from './CampDialogs';
 import type { Camp, Service, GovernmentProfile, VLEProfile } from '@/lib/types';
@@ -45,9 +45,9 @@ export default function GovernmentCampView({ allCamps, services, vles, userProfi
                     <TableBody>
                         {upcomingCamps.length > 0 ? upcomingCamps.map((camp) => (
                             <TableRow key={camp.id}>
-                                <TableCell className="font-medium">{camp.type === 'suggested' ? `Goa Sarathi Camp at ${camp.location}` : camp.name}</TableCell>
+                                <TableCell className="font-medium">{camp.name}</TableCell>
                                 <TableCell>{camp.location}</TableCell>
-                                <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
                                 <TableCell>
                                     <div className="flex flex-col gap-2">
                                         {camp.assignedVles?.filter((vle) => vle.status === 'accepted').map((assignedVle) => {

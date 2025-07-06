@@ -22,17 +22,14 @@ export default function DashboardPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     
-    const [allTasks, setAllTasks] = useState<Task[]>([]);
-    const [allUsers, setAllUsers] = useState<(VLEProfile | CustomerProfile)[]>([]);
-    const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
+    const [tasks, setTasks] = useState<Task[]>([]);
     const [services, setServices] = useState<Service[]>([]);
     
     const activeTab = useMemo(() => {
         const tabFromUrl = searchParams.get('tab');
         if (tabFromUrl) return tabFromUrl;
-        if (userProfile?.isAdmin) return 'overview';
-        return 'tasks';
-    }, [searchParams, userProfile]);
+        return 'overview';
+    }, [searchParams]);
 
     useEffect(() => {
         if (!loading && !user) {
@@ -53,59 +50,39 @@ export default function DashboardPage() {
         }));
 
         if (userProfile.isAdmin) {
-            unsubscribers.push(onSnapshot(query(collection(db, "tasks"), orderBy("date", "desc")), (s) => setAllTasks(s.docs.map(d => ({ id: d.id, ...d.data() }) as Task))));
-            
-            const unsubUsers = onSnapshot(query(collection(db, "users")), (userSnapshot) => {
-                 const customerData = userSnapshot.docs.map(d => ({ id: d.id, ...d.data() }) as CustomerProfile);
-                 const unsubVles = onSnapshot(query(collection(db, 'vles')), (vleSnapshot) => {
-                    const vleData = vleSnapshot.docs.map(d => ({ id: d.id, ...d.data() }) as VLEProfile);
-                    setAllUsers([...customerData, ...vleData]);
-                 });
-                 unsubscribers.push(unsubVles);
-            });
-            unsubscribers.push(unsubUsers);
-            
-            unsubscribers.push(onSnapshot(query(collection(db, "paymentRequests"), where("status", "==", "pending")), (s) => setPaymentRequests(s.docs.map(d => ({ id: d.id, ...d.data() }) as PaymentRequest))));
-        
+             // Admin data is now fetched inside the AdminDashboard component for scalability.
         } else if (userProfile.role === 'vle') {
-            let assignedTasks: Task[] = [];
-            let myLeads: Task[] = [];
-
-            const combineAndSetTasks = () => {
-                const allTaskIds = new Set<string>();
-                const combinedTasks: Task[] = [];
-
-                [...assignedTasks, ...myLeads].forEach(task => {
-                    if (!allTaskIds.has(task.id)) {
-                        allTaskIds.add(task.id);
-                        combinedTasks.push(task);
-                    }
-                });
-                
-                combinedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setAllTasks(combinedTasks);
-            };
-            
             const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
-            const unsubAssigned = onSnapshot(assignedTasksQuery, (snapshot) => {
-                assignedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-                combineAndSetTasks();
-            });
-
             const myLeadsQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
-            const unsubLeads = onSnapshot(myLeadsQuery, (snapshot) => {
-                myLeads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-                combineAndSetTasks();
-            });
 
-            unsubscribers.push(unsubAssigned, unsubLeads);
+            // Use Promise.all to wait for both queries, preventing UI pop-in
+            const unsubAssigned = onSnapshot(assignedTasksQuery, assignedSnapshot => {
+                const assignedTasks = assignedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
+                
+                const unsubLeads = onSnapshot(myLeadsQuery, leadsSnapshot => {
+                    const myLeads = leadsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
+                    
+                    const allTaskIds = new Set<string>();
+                    const combinedTasks: Task[] = [];
+                    
+                    [...assignedTasks, ...myLeads].forEach(task => {
+                        if (!allTaskIds.has(task.id)) {
+                            allTaskIds.add(task.id);
+                            combinedTasks.push(task);
+                        }
+                    });
+                    
+                    combinedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                    setTasks(combinedTasks);
+                });
+                unsubscribers.push(unsubLeads);
+            });
+            unsubscribers.push(unsubAssigned);
         
         } else if (userProfile.role === 'customer') {
-            const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
+            const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
             unsubscribers.push(onSnapshot(tasksQuery, (snapshot) => {
-                 const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-                fetched.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                setAllTasks(fetched);
+                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task));
             }));
         }
         
@@ -114,18 +91,6 @@ export default function DashboardPage() {
         };
     }, [user, userProfile]);
 
-    const { vles, customers } = useMemo(() => {
-        const vles: VLEProfile[] = [];
-        const customers: CustomerProfile[] = [];
-        allUsers.forEach(user => {
-            if (user.role === 'vle') {
-                vles.push(user as VLEProfile);
-            } else if (user.role === 'customer') {
-                customers.push(user as CustomerProfile);
-            }
-        });
-        return { vles, customers };
-    }, [allUsers]);
 
     if (loading || !user || !userProfile) {
         return (
@@ -142,14 +107,13 @@ export default function DashboardPage() {
 
         switch (userProfile.role) {
             case 'admin':
-                return <AdminDashboard allTasks={allTasks} vles={vles} customers={customers} paymentRequests={paymentRequests} />;
+                return <AdminDashboard />;
             case 'vle':
-                const assignedTasks = allTasks.filter(t => t.assignedVleId === user.uid);
-                const myLeads = allTasks.filter(t => t.creatorId === user.uid);
+                const assignedTasks = tasks.filter(t => t.assignedVleId === user.uid);
+                const myLeads = tasks.filter(t => t.creatorId === user.uid);
                 return <VleDashboard assignedTasks={assignedTasks} myLeads={myLeads} services={services} />;
             case 'customer':
-                const customerTasks = allTasks.filter(t => t.creatorId === user.uid);
-                return <CustomerDashboard tasks={customerTasks} services={services} />;
+                return <CustomerDashboard tasks={tasks} services={services} />;
             case 'government':
                 return <GovernmentDashboard />;
             default:

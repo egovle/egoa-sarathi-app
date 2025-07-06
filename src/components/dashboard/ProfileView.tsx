@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect } from 'react';
 import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -181,10 +181,13 @@ export default function ProfileView({ userId, profileData, services }: { userId:
         {userRole !== 'government' && (
             <Card>
                 <CardHeader className='flex-row items-center justify-between'>
-                    <CardTitle className="flex items-center gap-2">
-                        <Wallet className="h-5 w-5 text-muted-foreground" />
-                        <span>Wallet Balance</span>
-                    </CardTitle>
+                    <div className='space-y-1.5'>
+                        <CardTitle className="flex items-center gap-2">
+                            <Wallet className="h-5 w-5 text-muted-foreground" />
+                            <span>Wallet Balance</span>
+                        </CardTitle>
+                        <CardDescription>Available balance for transactions</CardDescription>
+                    </div>
                     {userRole !== 'admin' && (
                         <AddBalanceRequestDialog 
                             trigger={<Button variant="outline" size="sm"><PlusCircle className="mr-2 h-4 w-4"/>Add Balance</Button>}
@@ -194,7 +197,6 @@ export default function ProfileView({ userId, profileData, services }: { userId:
                 </CardHeader>
                 <CardContent>
                     <div className="text-3xl font-bold">₹{profileData.walletBalance?.toFixed(2) || '0.00'}</div>
-                    <p className="text-xs text-muted-foreground">Available balance</p>
                 </CardContent>
             </Card>
         )}
@@ -204,12 +206,15 @@ export default function ProfileView({ userId, profileData, services }: { userId:
             <div className="space-y-6">
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                            <span>Profile Details</span>
-                            {!isEditingProfile && (
+                        <div className='flex items-center justify-between'>
+                            <div className='space-y-1.5'>
+                                <CardTitle>Profile Details</CardTitle>
+                                <CardDescription>Your personal information</CardDescription>
+                            </div>
+                             {!isEditingProfile && (
                                 <Button variant="ghost" size="icon" onClick={() => setIsEditingProfile(true)}><Edit className="h-4 w-4" /></Button>
                             )}
-                        </CardTitle>
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {isEditingProfile ? (

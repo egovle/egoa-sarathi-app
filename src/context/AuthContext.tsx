@@ -7,6 +7,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
+import { toast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: User | null;
@@ -53,7 +54,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUserProfile(profileData);
         } else {
             console.error("Authenticated user not found in any known collection. Logging out.");
-            // Do not redirect here, let the page handle it.
+            toast({
+                title: "Profile Error",
+                description: "Your user profile could not be loaded. Please contact support.",
+                variant: "destructive"
+            });
+            await auth.signOut();
             setUserProfile(null);
             setUser(null);
         }

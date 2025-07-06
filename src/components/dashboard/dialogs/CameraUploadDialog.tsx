@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Camera } from 'lucide-react';
+import { Camera, VideoOff } from 'lucide-react';
 
 export const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: boolean, onOpenChange: (open: boolean) => void, onCapture: (file: File) => void }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -48,7 +48,7 @@ export const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: bo
     }, [open, toast]);
 
     const handleCapture = () => {
-        if (!videoRef.current || !canvasRef.current) return;
+        if (!videoRef.current || !canvasRef.current || hasCameraPermission !== true) return;
         const video = videoRef.current;
         const canvas = canvasRef.current;
         canvas.width = video.videoWidth;
@@ -80,6 +80,7 @@ export const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: bo
                     {hasCameraPermission === false && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-md">
                            <Alert variant="destructive" className="w-auto">
+                              <VideoOff className='h-4 w-4'/>
                               <AlertTitle>Camera Access Required</AlertTitle>
                               <AlertDescription>
                                 Please allow camera access to use this feature.

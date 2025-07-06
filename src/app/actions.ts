@@ -5,7 +5,7 @@ import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, wh
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Task, UserProfile, Service } from "@/lib/types";
-import { ADMIN_COMMISSION_RATE, VLE_COMMISSION_RATE } from "@/lib/config";
+import { calculateVleEarnings } from "@/lib/utils";
 
 // --- NOTIFICATION HELPERS ---
 export async function createNotification(userId: string, title: string, description: string, link?: string) {
@@ -256,13 +256,7 @@ export async function processPayout(task: Task, adminUserId: string) {
             const adminBalance = adminDoc.data().walletBalance || 0;
             const assignedVleBalance = assignedVleDoc.data().walletBalance || 0;
 
-            const totalPaid = parseFloat(task.totalPaid.toString());
-            const governmentFee = parseFloat(task.governmentFeeApplicable?.toString() || '0');
-
-            const serviceProfit = totalPaid - governmentFee;
-            const vleCommission = serviceProfit * VLE_COMMISSION_RATE;
-            const adminCommission = serviceProfit * ADMIN_COMMISSION_RATE;
-            
+            const { governmentFee, vleCommission, adminCommission } = calculateVleEarnings(task);
             const amountToVle = governmentFee + vleCommission;
 
             if (adminBalance < amountToVle) {

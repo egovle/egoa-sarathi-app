@@ -1,18 +1,17 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import type { FormEvent } from 'react';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, runTransaction, writeBatch, where } from 'firebase/firestore';
+import { useState } from 'react';
+import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, PlusCircle, Trash, MoreHorizontal, UserCog, UserPlus } from 'lucide-react';
+import { PlusCircle, Trash, MoreHorizontal, UserCog, UserPlus } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -20,7 +19,7 @@ import { createNotification } from '@/app/actions';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampFormDialog } from './CampDialogs';
-import type { Camp, CampSuggestion, Service, VLEProfile, UserProfile } from '@/lib/types';
+import type { Camp, CampSuggestion, VLEProfile } from '@/lib/types';
 
 
 const AdminCampTable = ({ data, vles, onEdit, onDelete }: { data: Camp[], vles: VLEProfile[], onEdit: (camp: Camp) => void, onDelete: (camp: Camp) => void }) => (
@@ -42,7 +41,7 @@ const AdminCampTable = ({ data, vles, onEdit, onDelete }: { data: Camp[], vles: 
                         <TableRow key={camp.id}>
                             <TableCell className="font-medium">{camp.name}</TableCell>
                             <TableCell>{camp.location}</TableCell>
-                            <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                            <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
                             <TableCell>
                                 <div className="flex flex-wrap gap-1 max-w-xs">
                                     {camp.services?.map((service: string) => <Badge key={service} variant="outline">{service}</Badge>)}
@@ -183,11 +182,9 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
 
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold tracking-tight">Camp Management</h1>
-                <DialogTrigger asChild>
-                    <Button onClick={() => { setSelectedCamp(null); setSelectedSuggestion(null); setIsFormOpen(true); }}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Create New Camp
-                    </Button>
-                </DialogTrigger>
+                <Button onClick={() => { setSelectedCamp(null); setSelectedSuggestion(null); setIsFormOpen(true); }}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Create New Camp
+                </Button>
             </div>
             
             <Tabs defaultValue='upcoming' className="w-full">
@@ -218,7 +215,7 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
                                         <TableRow key={camp.id}>
                                             <TableCell>{camp.suggestedBy?.name || 'Unknown'}</TableCell>
                                             <TableCell>{camp.location}</TableCell>
-                                            <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                            <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1 max-w-xs">
                                                     {camp.services?.map((service: string) => <Badge key={service} variant="outline">{service}</Badge>)}

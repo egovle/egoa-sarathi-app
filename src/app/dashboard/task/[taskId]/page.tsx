@@ -125,7 +125,6 @@ export default function TaskDetailPage() {
                 history: arrayUnion(historyEntry),
             };
 
-            // Only change status if it was previously 'Awaiting Documents'
             if (task.status === 'Awaiting Documents') {
                 updateData.status = 'Assigned';
             }
@@ -446,7 +445,7 @@ export default function TaskDetailPage() {
                                     <span>+ ₹{earnings.governmentFee.toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Your Commission (80%)</span>
+                                    <span className="text-muted-foreground">Your Commission ({earnings.commissionRate * 100}%)</span>
                                     <span>+ ₹{earnings.vleCommission.toFixed(2)}</span>
                                 </div>
                                 <Separator className="my-2"/>

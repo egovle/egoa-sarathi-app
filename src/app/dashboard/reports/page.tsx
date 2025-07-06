@@ -17,7 +17,8 @@ import type { ChartConfig } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import type { Task, VLEProfile, UserProfile } from '@/lib/types';
-import { ADMIN_COMMISSION_RATE, VLE_COMMISSION_RATE } from '@/lib/config';
+import { ADMIN_COMMISSION_RATE } from '@/lib/config';
+import { calculateVleEarnings } from '@/lib/utils';
 
 
 const AdminReports = ({ tasks, vles }: { tasks: Task[], vles: VLEProfile[] }) => {
@@ -34,11 +35,10 @@ const AdminReports = ({ tasks, vles }: { tasks: Task[], vles: VLEProfile[] }) =>
     const vlePerformance = useMemo(() => {
         return vles.filter(v => !v.isAdmin).map(vle => {
             const assignedTasks = tasks.filter(t => t.assignedVleId === vle.id);
-            const completedTasks = assignedTasks.filter(t => t.status === 'Completed' || t.status === 'Paid Out');
+            const completedTasks = assignedTasks.filter(t => t.status === 'Paid Out');
             const totalCommission = completedTasks.reduce((sum, task) => {
-                const profit = (task.totalPaid || 0) - (task.governmentFeeApplicable || 0);
-                const commission = profit * VLE_COMMISSION_RATE;
-                return sum + commission;
+                 const { vleCommission } = calculateVleEarnings(task);
+                return sum + vleCommission;
             }, 0);
             return {
                 ...vle,
@@ -53,9 +53,8 @@ const AdminReports = ({ tasks, vles }: { tasks: Task[], vles: VLEProfile[] }) =>
         const data: { [key: string]: number } = {};
         tasks.filter(t => t.status === 'Paid Out' || t.status === 'Completed').forEach(task => {
             const month = format(new Date(task.date), 'yyyy-MM');
-            const profit = (task.totalPaid || 0) - (task.governmentFeeApplicable || 0);
-            const adminRevenue = profit * ADMIN_COMMISSION_RATE;
-            data[month] = (data[month] || 0) + adminRevenue;
+            const { adminCommission } = calculateVleEarnings(task);
+            data[month] = (data[month] || 0) + adminCommission;
         });
         return Object.entries(data)
             .map(([month, revenue]) => ({ month: format(new Date(month), 'MMM yy'), revenue }))
@@ -265,18 +264,17 @@ eGoa Sarathi Admin Team
 const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEProfile }) => {
     
     const stats = useMemo(() => {
-        const completedTasks = tasks.filter(t => t.status === 'Completed' || t.status === 'Paid Out');
-        const pending = tasks.length - completedTasks.length;
+        const paidOutTasks = tasks.filter(t => t.status === 'Paid Out');
+        const pending = tasks.length - paidOutTasks.length;
         
-        const totalCommission = completedTasks.reduce((sum, task) => {
-            const serviceProfit = (task.totalPaid || 0) - (task.governmentFeeApplicable || 0);
-            const commission = serviceProfit * VLE_COMMISSION_RATE;
-            return sum + commission;
+        const totalCommission = paidOutTasks.reduce((sum, task) => {
+            const { vleCommission } = calculateVleEarnings(task);
+            return sum + vleCommission;
         }, 0);
         
         return {
             total: tasks.length,
-            completed: completedTasks.length,
+            completed: paidOutTasks.length,
             pending,
             totalCommission,
         };
@@ -296,7 +294,7 @@ const VleReports = ({ tasks, userProfile }: { tasks: Task[], userProfile: VLEPro
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Completed Tasks</CardTitle>
+                        <CardTitle className="text-sm font-medium">Paid Out Tasks</CardTitle>
                         <CheckCircle className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
