@@ -241,7 +241,7 @@ export default function AdminDashboard() {
             }
         } catch (error: any) {
             console.error("Failed to process balance request:", error);
-            toast({ title: "Action Failed", description: error.message || "Could not process the balance request.", variant: 'destructive' });
+            toast({ title: "Action Failed", description: error.message || "Could not process the balance request.", variant: "destructive" });
         } finally {
             setProcessingBalanceRequestId(null);
         }
@@ -450,7 +450,15 @@ export default function AdminDashboard() {
                             <TableHeader><TableRow><TableHead>Task ID</TableHead><TableHead>Customer</TableHead><TableHead>Service</TableHead><TableHead>Status</TableHead><TableHead>Assigned VLE</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {allTasks.map(task => {
-                                    const availableVles = vles.filter(vle => vle.status === 'Approved' && vle.available);
+                                    const availableVles = vles.filter(vle => {
+                                        if (vle.status !== 'Approved' || !vle.available) {
+                                            return false;
+                                        }
+                                        if (task.type === 'VLE Lead' && vle.id === task.creatorId) {
+                                            return false;
+                                        }
+                                        return true;
+                                    });
                                     return (
                                         <TableRow key={task.id}>
                                             <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
