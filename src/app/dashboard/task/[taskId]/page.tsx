@@ -7,21 +7,21 @@ import { doc, onSnapshot, updateDoc, arrayUnion, getDoc } from 'firebase/firesto
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
-import { createNotification, processPayout, payForVariablePriceTask } from '@/app/actions';
+import { createNotification, processPayout, payForVariablePriceTask, createNotificationForAdmins } from '@/app/actions';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, FileText, History, CheckCircle, Wallet, Phone, CircleDollarSign, User, Mail, FileUp } from 'lucide-react';
+import { Loader2, FileText, History, CheckCircle, Wallet, Phone, CircleDollarSign, User, Mail, FileUp, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn, validateFiles, calculateVleEarnings } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { TaskChat } from '@/components/dashboard/task/TaskChat';
-import { RequestOtpDialog, SetPriceDialog, RequestInfoDialog, SubmitAcknowledgementDialog, UploadCertificateDialog } from '@/components/dashboard/task/TaskDialogs';
+import { SetPriceDialog, RequestInfoDialog, SubmitAcknowledgementDialog, UploadCertificateDialog } from '@/components/dashboard/task/TaskDialogs';
 
 
 export default function TaskDetailPage() {
@@ -35,6 +35,7 @@ export default function TaskDetailPage() {
     const [isPaying, setIsPaying] = useState(false);
     const [vleContact, setVleContact] = useState<string | null>(null);
     const [isPayoutProcessing, setIsPayoutProcessing] = useState(false);
+    const [informationRequest, setInformationRequest] = useState<string | null>(null);
     
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
@@ -45,7 +46,18 @@ export default function TaskDetailPage() {
         const taskRef = doc(db, 'tasks', taskId as string);
         const unsubscribe = onSnapshot(taskRef, (docSnap) => {
             if (docSnap.exists()) {
-                setTask({ id: docSnap.id, ...docSnap.data() });
+                const taskData = { id: docSnap.id, ...docSnap.data() };
+                setTask(taskData);
+                
+                if (taskData.status === 'Awaiting Documents') {
+                    const lastRequest = taskData.history?.slice().reverse().find((h:any) => h.action === 'Information Requested');
+                    if (lastRequest) {
+                        setInformationRequest(lastRequest.details);
+                    }
+                } else {
+                    setInformationRequest(null);
+                }
+
             } else {
                 console.error("Task not found");
                 setTask(null);
@@ -112,10 +124,12 @@ export default function TaskDetailPage() {
     
             const taskRef = doc(db, 'tasks', taskId as string);
             
+            const actorRole = userProfile.isAdmin ? 'Admin' : (task.type === 'VLE Lead' ? 'VLE Lead Creator' : 'Customer');
+
             const historyEntry = {
                 timestamp: new Date().toISOString(),
                 actorId: user.uid,
-                actorRole: userProfile.isAdmin ? 'Admin' : (userProfile.role === 'vle' ? 'VLE' : 'Customer'),
+                actorRole: actorRole,
                 action: 'Additional Documents Uploaded',
                 details: `${newDocuments.length} new document(s) uploaded.`,
             };
@@ -126,21 +140,34 @@ export default function TaskDetailPage() {
             };
 
             if (task.status === 'Awaiting Documents') {
-                updateData.status = 'Assigned';
+                updateData.status = task.acknowledgementNumber ? 'In Progress' : 'Assigned';
             }
             
             await updateDoc(taskRef, updateData);
-    
-            if (task.assignedVleId) {
+
+            const taskIdentifier = `task ${String(taskId).slice(-6).toUpperCase()}`;
+
+            // Notify Assigned VLE (if they aren't the one uploading)
+            if (task.assignedVleId && task.assignedVleId !== user.uid) {
                  await createNotification(
                     task.assignedVleId,
-                    'Documents Uploaded by Customer',
-                    `The customer has uploaded the requested documents for task ${String(taskId).slice(-6).toUpperCase()}.`,
+                    `Documents Uploaded for ${taskIdentifier}`,
+                    `${actorRole} has uploaded the requested documents.`,
+                    `/dashboard/task/${taskId}`
+                );
+            }
+
+            // Notify Task Creator (if they aren't the one uploading, e.g. admin uploads)
+            if (task.creatorId && task.creatorId !== user.uid) {
+                 await createNotification(
+                    task.creatorId,
+                    `Documents Uploaded for Your Task`,
+                    `The Admin has uploaded documents on your behalf for ${taskIdentifier}.`,
                     `/dashboard/task/${taskId}`
                 );
             }
            
-            toast({ title: "Upload Complete", description: "The VLE has been notified." });
+            toast({ title: "Upload Complete", description: "The relevant parties have been notified." });
             setSelectedFiles([]);
             if(fileInputRef.current) {
                 fileInputRef.current.value = "";
@@ -176,30 +203,6 @@ export default function TaskDetailPage() {
         }
     };
     
-    const handleFulfillOtp = async () => {
-        if (!user || !task) return;
-        const taskRef = doc(db, "tasks", taskId as string);
-
-        const historyEntry = {
-            timestamp: new Date().toISOString(),
-            actorId: user.uid,
-            actorRole: 'VLE',
-            action: 'OTP Request Fulfilled',
-            details: 'VLE confirmed receipt of OTP.',
-        };
-
-        try {
-            await updateDoc(taskRef, {
-                otpRequest: null,
-                history: arrayUnion(historyEntry)
-            });
-            toast({ title: 'OTP Confirmed', description: 'You can now proceed with the task.' });
-        } catch (error) {
-            console.error("Error fulfilling OTP:", error);
-            toast({ title: "Error", description: "Failed to update task.", variant: "destructive" });
-        }
-    }
-
     const handleApprovePayout = async (task: any) => {
         if (!user || !userProfile?.isAdmin) {
             toast({ title: 'Error', description: 'Permission denied.', variant: 'destructive' });
@@ -248,15 +251,13 @@ export default function TaskDetailPage() {
             </div>
         )
     }
-
-    const canVleTakeAction = isAssignedVle && (task.status === 'Assigned');
-    const isVleInProgress = isAssignedVle && task.status === 'In Progress';
+    
+    const canVleTakeAction = isAssignedVle && task.status === 'Assigned' && !task.acknowledgementNumber;
+    const canVleWorkOnTask = isAssignedVle && (task.status === 'In Progress' || (task.status === 'Assigned' && task.acknowledgementNumber));
     const canAdminSetPrice = isAdmin && task.status === 'Pending Price Approval';
     const canAdminApprovePayout = isAdmin && task.status === 'Completed';
     const canCustomerPay = isTaskCreator && task.status === 'Awaiting Payment';
     const canUploadMoreDocs = (isTaskCreator || isAdmin) && task.status === 'Awaiting Documents';
-    
-    const isOtpRequestPending = task.otpRequest?.status === 'pending';
 
     const displayStatus = task.status === 'Paid Out' && isTaskCreator ? 'Completed' : task.status;
     
@@ -264,17 +265,13 @@ export default function TaskDetailPage() {
 
     return (
         <div className="w-full space-y-6">
-            {isTaskCreator && isOtpRequestPending && (
-                <Alert variant="default" className="border-yellow-500/50 bg-yellow-500/10 text-yellow-800">
-                    <AlertTitle className="font-bold">Action Required: OTP Needed by VLE</AlertTitle>
+            {(isTaskCreator || isAdmin) && informationRequest && (
+                 <Alert variant="default" className="border-yellow-500/50 bg-yellow-500/10 text-yellow-800">
+                    <Info className="h-4 w-4 !text-yellow-800" />
+                    <AlertTitle className="font-bold">Action Required: More Information Needed</AlertTitle>
                     <AlertDescription>
-                        <p className="mb-2">The VLE needs an OTP to proceed with your request. Please contact them directly to provide the code.</p>
-                        {vleContact && (
-                            <div className="flex items-center gap-2 font-medium">
-                                <p>VLE: {task.assignedVleName}</p>
-                                <a href={`tel:${vleContact}`} className="flex items-center gap-1.5 text-primary hover:underline"><Phone className="h-3 w-3" />{vleContact}</a>
-                            </div>
-                        )}
+                        <p className="mb-2">The VLE has requested the following to proceed with your request:</p>
+                        <p className="font-semibold italic">"{informationRequest}"</p>
                     </AlertDescription>
                 </Alert>
             )}
@@ -377,26 +374,18 @@ export default function TaskDetailPage() {
                            {canAdminSetPrice && user && (
                                 <SetPriceDialog taskId={task.id} customerId={task.creatorId} onPriceSet={() => {}} adminId={user.uid} />
                            )}
-                           
-                           {isOtpRequestPending && isAssignedVle && (
-                                <Button onClick={handleFulfillOtp} className="w-full">
-                                    <CheckCircle /> Mark OTP as Received
-                                </Button>
-                           )}
 
-                           {!isOtpRequestPending && canVleTakeAction && user ? (
+                           {canVleTakeAction && user ? (
                                 <div className='flex flex-col gap-2'>
                                     <RequestInfoDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
                                     <SubmitAcknowledgementDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
-                                    <RequestOtpDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
                                 </div>
                            ) : null }
                            
-                           {!isOtpRequestPending && isVleInProgress && user ? (
+                           {canVleWorkOnTask && user ? (
                                <div className='flex flex-col gap-2'>
                                    <RequestInfoDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
                                    <UploadCertificateDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} onUploadComplete={() => {}} />
-                                    <RequestOtpDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
                                </div>
                            ) : null }
                            
@@ -407,7 +396,7 @@ export default function TaskDetailPage() {
                                </Button>
                            )}
                            
-                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !isVleInProgress && !canAdminSetPrice && !canAdminApprovePayout) && task.status !== 'Completed' && task.status !== 'Pending VLE Acceptance' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
+                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !canVleWorkOnTask && !canAdminSetPrice && !canAdminApprovePayout) && task.status !== 'Completed' && task.status !== 'Pending VLE Acceptance' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
                            )}
                         </CardContent>

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, type FormEvent, type ChangeEvent } from 'react';
@@ -5,103 +6,15 @@ import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { createNotification } from '@/app/actions';
+import { createNotification, createNotificationForAdmins } from '@/app/actions';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2, KeyRound, Send, PenSquare, MessageSquarePlus, CheckCircle, UploadCloud, FileUp, FileText } from 'lucide-react';
+import { Loader2, Send, PenSquare, MessageSquarePlus, CheckCircle, UploadCloud, FileUp, FileText } from 'lucide-react';
 import { validateFiles } from '@/lib/utils';
-
-
-export const RequestOtpDialog = ({ taskId, vleId, customerId }: { taskId: string, vleId: string, customerId: string }) => {
-    const [open, setOpen] = useState(false);
-    const [otpType, setOtpType] = useState<'mobile' | 'email' | ''>('');
-    const { toast } = useToast();
-
-    const handleSubmit = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!otpType) {
-            toast({ title: "Selection Required", description: "Please select OTP type (Mobile or Email).", variant: "destructive" });
-            return;
-        }
-
-        const taskRef = doc(db, "tasks", taskId);
-        const historyEntry = {
-            timestamp: new Date().toISOString(),
-            actorId: vleId,
-            actorRole: 'VLE',
-            action: 'OTP Requested',
-            details: `VLE requested ${otpType} OTP from the customer.`,
-        };
-
-        try {
-            await updateDoc(taskRef, {
-                otpRequest: {
-                    type: otpType,
-                    status: 'pending',
-                    requestedAt: new Date().toISOString()
-                },
-                history: arrayUnion(historyEntry)
-            });
-            await createNotification(
-                customerId,
-                'OTP Required for Your Task',
-                `The VLE working on task ${taskId.slice(-6).toUpperCase()} needs an OTP to proceed.`,
-                `/dashboard/task/${taskId}`
-            );
-            toast({ title: 'OTP Request Sent', description: 'The customer has been notified.' });
-            setOpen(false);
-        } catch (error) {
-            console.error("Error requesting OTP:", error);
-            toast({ title: "Error", description: "Failed to send OTP request.", variant: "destructive" });
-        }
-    };
-    
-    const handleOpenChange = (isOpen: boolean) => {
-        if (!isOpen) {
-            setOtpType('');
-        }
-        setOpen(isOpen);
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>
-                <Button variant="outline"><KeyRound />Request OTP</Button>
-            </DialogTrigger>
-            <DialogContent>
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader>
-                        <DialogTitle>Request OTP</DialogTitle>
-                        <DialogDescription>
-                            The portal will notify the customer that you need an OTP. They will contact you directly to provide it. This request will be logged.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Label>What type of OTP do you need?</Label>
-                        <RadioGroup value={otpType} onValueChange={(value) => setOtpType(value as 'mobile' | 'email')} className="mt-2">
-                             <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="mobile" id="otp-mobile" />
-                                <Label htmlFor="otp-mobile">Mobile OTP</Label>
-                            </div>
-                             <div className="flex items-center space-x-2">
-                                <RadioGroupItem value="email" id="otp-email" />
-                                <Label htmlFor="otp-email">Email OTP</Label>
-                            </div>
-                        </RadioGroup>
-                    </div>
-                    <DialogFooter>
-                        <Button type="submit"><Send /> Send Request</Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-};
 
 
 export const SetPriceDialog = ({ taskId, customerId, onPriceSet, adminId }: { taskId: string, customerId: string, onPriceSet: () => void, adminId: string }) => {
@@ -213,7 +126,12 @@ export const RequestInfoDialog = ({ taskId, vleId, customerId }: { taskId:string
                 `More information has been requested for task ${taskId.slice(-6).toUpperCase()}.`,
                 `/dashboard/task/${taskId}`
             );
-            toast({ title: 'Request Sent', description: 'The customer has been notified.' });
+            await createNotificationForAdmins(
+                `Info Requested for Task #${taskId.slice(-6).toUpperCase()}`,
+                `A VLE has requested more information from the customer.`,
+                `/dashboard/task/${taskId}`
+            );
+            toast({ title: 'Request Sent', description: 'The customer and admins have been notified.' });
             setMessage('');
             setOpen(false);
         } catch (error) {

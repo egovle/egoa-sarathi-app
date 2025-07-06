@@ -100,11 +100,6 @@ export interface Task {
     creatorId: string;
     documents?: Document[];
     finalCertificate: Document | null;
-    otpRequest?: {
-        type: 'mobile' | 'email';
-        status: 'pending';
-        requestedAt: string;
-    } | null;
 }
 
 export interface CampVLE {
@@ -167,4 +162,10 @@ export interface Notification {
     link?: string;
     read: boolean;
     date: string; // ISO String
+}
+
+export interface User {
+  uid: string;
+  email: string | null;
+  // Add any other properties you expect from a Firebase User object
 }
