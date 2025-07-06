@@ -18,7 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Service } from '@/lib/types';
-import { deleteService } from './actions';
+import { deleteService, seedDatabase } from './actions';
 import { ServiceFormDialog } from './ServiceFormDialog';
 
 export default function ServiceManagementPage() {
@@ -28,8 +28,10 @@ export default function ServiceManagementPage() {
     
     const [services, setServices] = useState<Service[]>([]);
     const [loadingServices, setLoadingServices] = useState(true);
+    const [isSeeding, setIsSeeding] = useState(false);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
+    const [isSeedAlertOpen, setIsSeedAlertOpen] = useState(false);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
     const [prefilledParentId, setPrefilledParentId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -103,6 +105,21 @@ export default function ServiceManagementPage() {
 
     }, [orderedServices, services, searchQuery]);
 
+
+    const handleSeedClick = async () => {
+        setIsSeeding(true);
+        setIsSeedAlertOpen(false);
+        
+        const result = await seedDatabase();
+
+        if (result.success) {
+            toast({ title: "Database Seeded", description: "Common services have been added." });
+        } else {
+            console.error("Error seeding database:", result.error);
+            toast({ title: "Error", description: "Could not seed the database. Check console for details.", variant: "destructive" });
+        }
+        setIsSeeding(false);
+    };
 
     const handleAddSubCategory = (parentService: Service) => {
         setSelectedService(null);
@@ -254,12 +271,34 @@ export default function ServiceManagementPage() {
                                         <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50 my-4">
                                             <h3 className="text-lg font-semibold">No Services Found</h3>
                                             <p className="text-muted-foreground mt-2 mb-4 max-w-md">
-                                                It looks like you don't have any services configured yet. You can add them manually to get started.
+                                                It looks like you don't have any services configured yet. You can add them manually or seed the database with a list of common services to get started.
                                             </p>
                                             <div className="flex flex-wrap justify-center gap-4">
                                                 <Button size="sm" onClick={() => { setSelectedService(null); setPrefilledParentId(null); setIsFormOpen(true); }}>
                                                     <PlusCircle className="mr-2 h-4 w-4" /> Add Your First Service
                                                 </Button>
+
+                                                <AlertDialog open={isSeedAlertOpen} onOpenChange={setIsSeedAlertOpen}>
+                                                    <AlertDialogTrigger asChild>
+                                                         <Button size="sm" variant="outline" disabled={isSeeding}>
+                                                            {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
+                                                            Seed Common Services
+                                                        </Button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                This action will permanently delete ALL current services and replace them with the default list. This cannot be undone.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={handleSeedClick} className={cn("bg-destructive hover:bg-destructive/90")}>Yes, Delete and Seed</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+
                                             </div>
                                         </div>
                                     </TableCell>
