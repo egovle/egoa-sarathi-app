@@ -29,11 +29,16 @@ export default function CampManagementPage() {
     }, [user, authLoading, router]);
 
     useEffect(() => {
+        if (!userProfile) return;
         setLoadingData(true);
+
         const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
         const unsubCamps = onSnapshot(campsQuery, (snapshot) => {
              setAllCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp));
-             if (userProfile && !userProfile.isAdmin && userProfile.role !== 'government') setLoadingData(false);
+             // Customer is the only role that doesn't need to wait for VLE list
+             if (userProfile?.role === 'customer') {
+                setLoadingData(false);
+             }
         }, (error) => {
             console.error("Error fetching camps: ", error);
             setLoadingData(false);
@@ -47,7 +52,8 @@ export default function CampManagementPage() {
         let unsubSuggestions: () => void = () => {};
         let unsubVles: () => void = () => {};
 
-        if (userProfile && (userProfile.isAdmin || userProfile.role === 'government')) {
+        // Fetch VLEs for Admin, Government, and VLE roles
+        if (userProfile.isAdmin || userProfile.role === 'government' || userProfile.role === 'vle') {
              if (userProfile.isAdmin) {
                 const suggestionsQuery = query(collection(db, 'campSuggestions'), orderBy('date', 'asc'));
                 unsubSuggestions = onSnapshot(suggestionsQuery, (snapshot) => {
@@ -60,7 +66,7 @@ export default function CampManagementPage() {
                 const fetchedVles = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as VLEProfile);
                 fetchedVles.sort((a, b) => a.name.localeCompare(b.name));
                 setVles(fetchedVles);
-                setLoadingData(false);
+                setLoadingData(false); // Set loading to false for these roles after VLEs are fetched
             }, (error) => {
                 console.error("Error fetching VLEs:", error)
                 setLoadingData(false);
@@ -82,7 +88,7 @@ export default function CampManagementPage() {
         return <AdminCampView allCamps={allCamps} suggestions={campSuggestions} vles={vles} userProfile={userProfile} />;
     }
     if (userProfile.role === 'vle') {
-        return <VleCampView allCamps={allCamps} services={services} userProfile={userProfile as VLEProfile} />;
+        return <VleCampView allCamps={allCamps} services={services} userProfile={userProfile as VLEProfile} vles={vles} />;
     }
     if (userProfile.role === 'government') {
         return <GovernmentCampView allCamps={allCamps} services={services} vles={vles} userProfile={userProfile as GovernmentProfile} />;
