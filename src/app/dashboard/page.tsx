@@ -105,9 +105,11 @@ export default function DashboardPage() {
             return <ProfileView userId={user!.uid} profileData={userProfile} services={services} />
         }
 
+        if (userProfile.isAdmin) {
+            return <AdminDashboard />;
+        }
+
         switch (userProfile.role) {
-            case 'admin':
-                return <AdminDashboard />;
             case 'vle':
                 const assignedTasks = tasks.filter(t => t.assignedVleId === user.uid);
                 const myLeads = tasks.filter(t => t.creatorId === user.uid);
