@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -80,7 +79,7 @@ export default function CampManagementPage() {
     }
     
     if (userProfile.isAdmin) {
-        return <AdminCampView allCamps={allCamps} suggestions={campSuggestions} vles={vles} />;
+        return <AdminCampView allCamps={allCamps} suggestions={campSuggestions} vles={vles} userProfile={userProfile} />;
     }
     if (userProfile.role === 'vle') {
         return <VleCampView allCamps={allCamps} services={services} userProfile={userProfile as VLEProfile} />;
