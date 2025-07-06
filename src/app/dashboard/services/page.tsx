@@ -31,6 +31,7 @@ export default function ServiceManagementPage() {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
+    const [prefilledParentId, setPrefilledParentId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
@@ -103,8 +104,15 @@ export default function ServiceManagementPage() {
     }, [orderedServices, services, searchQuery]);
 
 
+    const handleAddSubCategory = (parentService: Service) => {
+        setSelectedService(null);
+        setPrefilledParentId(parentService.id);
+        setIsFormOpen(true);
+    };
+
     const handleEdit = (service: Service) => {
         setSelectedService(service);
+        setPrefilledParentId(null);
         setIsFormOpen(true);
     };
 
@@ -128,6 +136,7 @@ export default function ServiceManagementPage() {
     const handleFormFinished = () => {
         setIsFormOpen(false);
         setSelectedService(null);
+        setPrefilledParentId(null);
     }
     
     if (authLoading || (!userProfile && !authLoading)) {
@@ -156,11 +165,12 @@ export default function ServiceManagementPage() {
             </AlertDialog>
             <Dialog open={isFormOpen} onOpenChange={(open) => {
                 if (!open) {
-                    setSelectedService(null);
+                    handleFormFinished();
+                } else {
+                    setIsFormOpen(true);
                 }
-                setIsFormOpen(open);
             }}>
-                <ServiceFormDialog service={selectedService} parentServices={parentServices} onFinished={handleFormFinished} />
+                <ServiceFormDialog service={selectedService} parentServices={parentServices} prefilledParentId={prefilledParentId} onFinished={handleFormFinished} />
             </Dialog>
 
             <Card>
@@ -180,7 +190,7 @@ export default function ServiceManagementPage() {
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                 />
                             </div>
-                            <Button onClick={() => { setSelectedService(null); setIsFormOpen(true); }}>
+                            <Button onClick={() => { setSelectedService(null); setPrefilledParentId(null); setIsFormOpen(true); }}>
                                 <PlusCircle className="mr-2 h-4 w-4" /> Add New Service
                             </Button>
                         </div>
@@ -227,6 +237,11 @@ export default function ServiceManagementPage() {
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuItem onClick={() => handleEdit(service)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
+                                                    {!service.parentId && (
+                                                        <DropdownMenuItem onClick={() => handleAddSubCategory(service)}>
+                                                            <PlusCircle className="mr-2 h-4 w-4" />Add Sub-category
+                                                        </DropdownMenuItem>
+                                                    )}
                                                     <DropdownMenuItem onClick={() => handleDelete(service)} className="text-destructive focus:text-destructive"><Trash className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -242,7 +257,7 @@ export default function ServiceManagementPage() {
                                                 It looks like you don't have any services configured yet. You can add them manually to get started.
                                             </p>
                                             <div className="flex flex-wrap justify-center gap-4">
-                                                <Button size="sm" onClick={() => { setSelectedService(null); setIsFormOpen(true); }}>
+                                                <Button size="sm" onClick={() => { setSelectedService(null); setPrefilledParentId(null); setIsFormOpen(true); }}>
                                                     <PlusCircle className="mr-2 h-4 w-4" /> Add Your First Service
                                                 </Button>
                                             </div>
