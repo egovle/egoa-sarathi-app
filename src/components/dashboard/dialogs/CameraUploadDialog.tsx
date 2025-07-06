@@ -90,7 +90,7 @@ export const CameraUploadDialog = ({ open, onOpenChange, onCapture }: { open: bo
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                    <Button onClick={handleCapture} disabled={!hasCameraPermission}>
+                    <Button onClick={handleCapture} disabled={hasCameraPermission !== true}>
                         <Camera className="mr-2 h-4 w-4" /> Capture
                     </Button>
                 </DialogFooter>

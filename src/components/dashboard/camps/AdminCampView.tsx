@@ -41,7 +41,7 @@ const AdminCampTable = ({ data, vles, onEdit, onDelete }: { data: Camp[], vles: 
                         <TableRow key={camp.id}>
                             <TableCell className="font-medium">{camp.name}</TableCell>
                             <TableCell>{camp.location}</TableCell>
-                            <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                            <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
                             <TableCell>
                                 <div className="flex flex-wrap gap-1 max-w-xs">
                                     {camp.services?.map((service: string) => <Badge key={service} variant="outline">{service}</Badge>)}
@@ -215,7 +215,7 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
                                         <TableRow key={camp.id}>
                                             <TableCell>{camp.suggestedBy?.name || 'Unknown'}</TableCell>
                                             <TableCell>{camp.location}</TableCell>
-                                            <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                            <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
                                             <TableCell>
                                                 <div className="flex flex-wrap gap-1 max-w-xs">
                                                     {camp.services?.map((service: string) => <Badge key={service} variant="outline">{service}</Badge>)}

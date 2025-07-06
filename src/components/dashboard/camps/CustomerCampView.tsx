@@ -28,9 +28,9 @@ export default function CustomerCampView({ allCamps }: { allCamps: Camp[] }) {
                     <TableBody>
                         {upcomingCamps.length > 0 ? upcomingCamps.map((camp) => (
                             <TableRow key={camp.id}>
-                                <TableCell className="font-medium">{camp.name.startsWith('Suggested by') ? `Goa Sarathi Camp at ${camp.location}` : camp.name}</TableCell>
+                                <TableCell className="font-medium">{camp.type === 'suggested' ? `Goa Sarathi Camp at ${camp.location}` : camp.name}</TableCell>
                                 <TableCell>{camp.location}</TableCell>
-                                <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
                                 <TableCell>
                                     <div className="flex flex-wrap gap-1 max-w-xs">
                                         {camp.services?.map((service: string) => <Badge key={service} variant="outline">{service}</Badge>)}

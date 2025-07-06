@@ -118,7 +118,7 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
                                    <TableRow key={camp.id}>
                                        <TableCell>{camp.name}</TableCell>
                                        <TableCell>{camp.location}</TableCell>
-                                       <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                       <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
                                        <TableCell className="text-right space-x-2">
                                            <Button size="sm" variant="outline" onClick={() => handleVleResponse(camp, 'accepted')}><CheckCircle2 className="mr-2 h-4 w-4"/>Accept</Button>
                                            <Button size="sm" variant="destructive" onClick={() => handleVleResponse(camp, 'rejected')}><XCircle className="mr-2 h-4 w-4"/>Reject</Button>
@@ -151,7 +151,7 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
                                    <TableRow key={camp.id}>
                                        <TableCell>{camp.name}</TableCell>
                                        <TableCell>{camp.location}</TableCell>
-                                       <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                       <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
                                        <TableCell>
                                             <div className="flex flex-wrap gap-1 max-w-xs">
                                                 {camp.services?.map((service: string) => <Badge key={service} variant="outline">{service}</Badge>)}

@@ -6,7 +6,6 @@ export interface BaseProfile {
     mobile: string;
     location: string;
     walletBalance: number;
-    bankAccounts: BankAccount[];
 }
 
 export interface CustomerProfile extends BaseProfile {
@@ -34,14 +33,6 @@ export interface GovernmentProfile extends BaseProfile {
 
 export type UserProfile = CustomerProfile | VLEProfile | AdminProfile | GovernmentProfile;
 
-
-export interface BankAccount {
-    id: string;
-    bankName: string;
-    accountNumber: string;
-    ifscCode: string;
-    upiId?: string;
-}
 
 export interface Service {
     id:string;

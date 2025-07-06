@@ -45,9 +45,9 @@ export default function GovernmentCampView({ allCamps, services, vles, userProfi
                     <TableBody>
                         {upcomingCamps.length > 0 ? upcomingCamps.map((camp) => (
                             <TableRow key={camp.id}>
-                                <TableCell className="font-medium">{camp.name.startsWith('Suggested by') ? `Goa Sarathi Camp at ${camp.location}` : camp.name}</TableCell>
+                                <TableCell className="font-medium">{camp.type === 'suggested' ? `Goa Sarathi Camp at ${camp.location}` : camp.name}</TableCell>
                                 <TableCell>{camp.location}</TableCell>
-                                <TableCell>{format(new Date(camp.date), 'dd/MM/yyyy')}</TableCell>
+                                <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
                                 <TableCell>
                                     <div className="flex flex-col gap-2">
                                         {camp.assignedVles?.filter((vle) => vle.status === 'accepted').map((assignedVle) => {

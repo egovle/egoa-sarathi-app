@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
@@ -12,12 +12,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Wallet, PlusCircle, Edit, Loader2, Banknote, AtSign, Trash, MoreHorizontal } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Wallet, PlusCircle, Edit, Loader2 } from 'lucide-react';
 import { AddBalanceRequestDialog } from './dialogs/AddBalanceRequestDialog';
 
 import { createNotificationForAdmins } from '@/app/actions';
-import type { UserProfile, Service, VLEProfile, BankAccount } from '@/lib/types';
+import type { UserProfile, Service, VLEProfile } from '@/lib/types';
 
 
 export default function ProfileView({ userId, profileData, services }: { userId: string, profileData: UserProfile, services: Service[]}) {
@@ -34,14 +33,6 @@ export default function ProfileView({ userId, profileData, services }: { userId:
     });
     const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
 
-    // Bank Accounts state
-    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>(profileData?.bankAccounts || []);
-    const [isEditingBankAccount, setIsEditingBankAccount] = useState(false);
-    const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
-    const [bankFormState, setBankFormState] = useState<any>({ id: '', bankName: '', accountNumber: '', ifscCode: '', upiId: '' });
-
     // Offered Services state
     const [offeredServices, setOfferedServices] = useState<string[]>((profileData as VLEProfile).offeredServices || []);
     const [isSavingServices, setIsSavingServices] = useState(false);
@@ -49,7 +40,6 @@ export default function ProfileView({ userId, profileData, services }: { userId:
     const userRole = profileData.isAdmin ? 'admin' : profileData.role;
 
     useEffect(() => {
-        setBankAccounts(profileData.bankAccounts || []);
         if (profileData.role === 'vle') {
             setOfferedServices((profileData as VLEProfile).offeredServices || []);
         }
@@ -130,67 +120,6 @@ export default function ProfileView({ userId, profileData, services }: { userId:
         setIsCancelAlertOpen(false);
     };
 
-
-    const handleBankInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { id, value } = e.target;
-        setBankFormState(prevState => ({ ...prevState, [id]: value }));
-    };
-
-    const handleAddBankClick = () => {
-        setEditingAccount(null);
-        setBankFormState({ id: '', bankName: '', accountNumber: '', ifscCode: '', upiId: '' });
-        setIsEditingBankAccount(true);
-    };
-
-    const handleEditBankClick = (account: BankAccount) => {
-        setEditingAccount(account);
-        setBankFormState(account);
-        setIsEditingBankAccount(true);
-    };
-
-    const handleSaveBank = async (e: React.FormEvent) => {
-        e.preventDefault();
-        let updatedAccounts;
-        if (editingAccount) {
-            updatedAccounts = bankAccounts.map(acc => acc.id === editingAccount.id ? bankFormState : acc);
-            toast({ title: "Bank Details Updated", description: "Your bank account has been updated."});
-        } else {
-            const newAccount = { ...bankFormState, id: Date.now().toString() };
-            updatedAccounts = [...bankAccounts, newAccount];
-            toast({ title: "Bank Account Added", description: "Your new bank account has been added."});
-        }
-        
-        const collectionName = userRole === 'vle' ? 'vles' : 'users';
-        const docRef = doc(db, collectionName, userId);
-        await updateDoc(docRef, { bankAccounts: updatedAccounts });
-        setBankAccounts(updatedAccounts);
-        setIsEditingBankAccount(false);
-        setEditingAccount(null);
-    };
-
-    const handleDeleteBankClick = (accountId: string) => {
-        setAccountToDelete(accountId);
-        setIsDeleteDialogOpen(true);
-    }
-    
-    const confirmDeleteBank = async () => {
-        if (accountToDelete) {
-            const updatedAccounts = bankAccounts.filter(acc => acc.id !== accountToDelete);
-            const collectionName = userRole === 'vle' ? 'vles' : 'users';
-            const docRef = doc(db, collectionName, userId);
-            await updateDoc(docRef, { bankAccounts: updatedAccounts });
-            setBankAccounts(updatedAccounts);
-            toast({ title: "Bank Account Removed", description: "The bank account has been removed."});
-        }
-        setIsDeleteDialogOpen(false);
-        setAccountToDelete(null);
-    }
-
-    const handleCancelEditBank = () => {
-        setIsEditingBankAccount(false);
-        setEditingAccount(null);
-    }
-    
     const handleServiceSelectionChange = (serviceId: string, checked: boolean) => {
         setOfferedServices(prev => 
             checked ? [...prev, serviceId] : prev.filter(id => id !== serviceId)
@@ -220,7 +149,7 @@ export default function ProfileView({ userId, profileData, services }: { userId:
         }
     }
 
-    const serviceCategories = useMemo(() => {
+    const serviceCategories = React.useMemo(() => {
         const parents = services.filter(s => !s.parentId);
         return parents.map(parent => ({
             ...parent,
@@ -234,21 +163,6 @@ export default function ProfileView({ userId, profileData, services }: { userId:
 
     return (
     <div className="space-y-6">
-        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete this bank account from your profile.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={confirmDeleteBank}>Delete</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
         <AlertDialog open={isCancelAlertOpen} onOpenChange={setIsCancelAlertOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -322,83 +236,27 @@ export default function ProfileView({ userId, profileData, services }: { userId:
                     )}
                 </Card>
 
-                {userRole === 'vle' && (
-                    <Card>
-                        <CardHeader><CardTitle>My Services</CardTitle><CardDescription>Select the services you are qualified to offer.</CardDescription></CardHeader>
-                        <CardContent className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                            {serviceCategories.map(category => (
-                                <div key={category.id} className="space-y-3">
-                                    <h4 className="font-semibold text-base">{category.name}</h4>
-                                    <div className="pl-4 space-y-2">
-                                        {category.children.map(service => (
-                                            <div key={service.id} className="flex items-center space-x-2">
-                                                <Checkbox id={`service-offer-${service.id}`} checked={offeredServices.includes(service.id)} onCheckedChange={(checked) => handleServiceSelectionChange(service.id, !!checked)} />
-                                                <Label htmlFor={`service-offer-${service.id}`} className="font-normal cursor-pointer">{service.name}</Label>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ))}
-                        </CardContent>
-                        <CardFooter><Button onClick={handleSaveOfferedServices} disabled={isSavingServices || offeredServices.length === 0}>{isSavingServices && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save My Services</Button></CardFooter>
-                    </Card>
-                )}
             </div>
             
-            {(userRole === 'customer' || userRole === 'vle') && (
+            {userRole === 'vle' && (
                 <Card>
-                    <CardHeader><div className="flex justify-between items-start"><div><CardTitle>Bank Details</CardTitle><CardDescription>Manage your bank accounts for transactions.</CardDescription></div></div></CardHeader>
-                    {isEditingBankAccount ? (
-                        <form onSubmit={handleSaveBank}>
-                            <CardContent className="space-y-4">
-                                <h4 className="text-base font-semibold leading-none tracking-tight">{editingAccount ? 'Edit' : 'Add'} Bank Account</h4>
-                                <div className="space-y-2 pt-2"><Label htmlFor="bankName">Bank Name</Label><Input id="bankName" placeholder="e.g., State Bank of India" value={bankFormState.bankName} onChange={handleBankInputChange} required /></div>
-                                <div className="space-y-2"><Label htmlFor="accountNumber">Account Number</Label><Input id="accountNumber" placeholder="Enter your account number" value={bankFormState.accountNumber} onChange={handleBankInputChange} required /></div>
-                                <div className="space-y-2"><Label htmlFor="ifscCode">IFSC Code</Label><Input id="ifscCode" placeholder="Enter IFSC Code" value={bankFormState.ifscCode} onChange={handleBankInputChange} required /></div>
-                                <div className="space-y-2"><Label htmlFor="upiId">UPI ID (Optional)</Label><div className="relative"><AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input id="upiId" placeholder="your-name@okbank" className="pl-10" value={bankFormState.upiId} onChange={handleBankInputChange} /></div></div>
-                            </CardContent>
-                            <CardFooter className="justify-end gap-2"><Button type="button" variant="outline" onClick={handleCancelEditBank}>Cancel</Button><Button type="submit">Save Changes</Button></CardFooter>
-                        </form>
-                    ) : (
-                        <>
-                            <CardContent className="space-y-4">
-                                {bankAccounts.length > 0 ? (
-                                    <div className="space-y-4">
-                                    {bankAccounts.map((account) => (
-                                        <div key={account.id} className="p-4 border rounded-lg relative bg-muted/50">
-                                            <div className="absolute top-1 right-1">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={() => handleEditBankClick(account)}>
-                                                            <Edit className="mr-2 h-4 w-4" />
-                                                            <span>Edit</span>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleDeleteBankClick(account.id)} className="text-destructive focus:text-destructive">
-                                                            <Trash className="mr-2 h-4 w-4" />
-                                                            <span>Delete</span>
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </div>
-                                            <div className="space-y-2 text-sm pr-10">
-                                                <p className="font-semibold">{account.bankName}</p>
-                                                <p className="text-muted-foreground">A/C: {account.accountNumber}</p>
-                                                <p className="text-muted-foreground">IFSC: {account.ifscCode}</p>
-                                                {account.upiId && <p className="text-muted-foreground">UPI: {account.upiId}</p>}
-                                            </div>
+                    <CardHeader><CardTitle>My Services</CardTitle><CardDescription>Select the services you are qualified to offer.</CardDescription></CardHeader>
+                    <CardContent className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                        {serviceCategories.map(category => (
+                            <div key={category.id} className="space-y-3">
+                                <h4 className="font-semibold text-base">{category.name}</h4>
+                                <div className="pl-4 space-y-2">
+                                    {category.children.map(service => (
+                                        <div key={service.id} className="flex items-center space-x-2">
+                                            <Checkbox id={`service-offer-${service.id}`} checked={offeredServices.includes(service.id)} onCheckedChange={(checked) => handleServiceSelectionChange(service.id, !!checked)} />
+                                            <Label htmlFor={`service-offer-${service.id}`} className="font-normal cursor-pointer">{service.name}</Label>
                                         </div>
                                     ))}
-                                    </div>
-                                ) : <div className="flex flex-col items-center justify-center text-center p-8 border-2 border-dashed rounded-lg bg-muted/50"><Banknote className="h-8 w-8 text-muted-foreground mb-2" /><p className="mb-4 text-muted-foreground">No bank account added yet.</p></div>}
-                            </CardContent>
-                            <CardFooter><Button onClick={handleAddBankClick} variant={bankAccounts.length > 0 ? 'default' : 'default'}><PlusCircle className="mr-2 h-4 w-4"/> {bankAccounts.length > 0 ? 'Add Another Account' : 'Add Bank Account'}</Button></CardFooter>
-                        </>
-                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </CardContent>
+                    <CardFooter><Button onClick={handleSaveOfferedServices} disabled={isSavingServices || offeredServices.length === 0}>{isSavingServices && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save My Services</Button></CardFooter>
                 </Card>
             )}
         </div>

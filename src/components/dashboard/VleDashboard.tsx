@@ -216,7 +216,7 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
                                 <TableCell>{task.service}</TableCell>
                                 <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                                 <TableCell>{task.customer}</TableCell>
-                                <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
+                                <TableCell>{format(new Date(task.date), 'dd MMM yyyy')}</TableCell>
                                 <TableCell className="text-right">
                                     <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
                                 </TableCell>
@@ -266,7 +266,7 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
                                 <TableCell>{task.service}</TableCell>
                                 <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                                 <TableCell>{task.customer}</TableCell>
-                                <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
+                                <TableCell>{format(new Date(task.date), 'dd MMM yyyy')}</TableCell>
                                 <TableCell className="text-right">
                                     <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
                                 </TableCell>
@@ -279,5 +279,3 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
         </TabsContent>
     </Tabs>
 )};
-
-    

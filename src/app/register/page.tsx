@@ -190,7 +190,6 @@ export default function RegisterPage() {
         location: fullLocation,
         role: role,
         walletBalance: 0,
-        bankAccounts: [],
         ...(role === 'vle' ? { status: 'Pending', available: false, isAdmin: false } : { isAdmin: false }),
       };
 

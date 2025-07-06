@@ -121,7 +121,7 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
                                     <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
                                     <TableCell>{task.service}</TableCell>
                                     <TableCell><Badge variant="outline">{displayStatus}</Badge></TableCell>
-                                    <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
+                                    <TableCell>{format(new Date(task.date), 'dd MMM yyyy')}</TableCell>
                                     <TableCell className="text-right">
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
@@ -201,5 +201,3 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
         </Tabs>
     );
 }
-
-    

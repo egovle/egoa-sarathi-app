@@ -344,18 +344,6 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                         </CardContent>
                     </Card>
                 </div>
-                <Card className="mt-6 border-destructive/50">
-                    <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5"/>Danger Zone</CardTitle><CardDescription>This action is permanent and cannot be undone.</CardDescription></CardHeader>
-                    <CardContent>
-                         <AlertDialog>
-                            <AlertDialogTrigger asChild><Button variant="destructive"><Trash2 className="mr-2 h-4 w-4" /> Reset Application Data</Button></AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete all tasks, camps, notifications, and payment requests. It will also re-seed the services list and reset all user/VLE wallets to zero.</AlertDialogDescription></AlertDialogHeader>
-                                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleResetData} className="bg-destructive hover:bg-destructive/90">Yes, Reset Everything</AlertDialogAction></AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    </CardContent>
-                </Card>
             </TabsContent>
 
             <TabsContent value="vle-management" className="mt-4">
@@ -413,7 +401,7 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                             <TableHeader><TableRow><TableHead>Task ID</TableHead><TableHead>Customer</TableHead><TableHead>Service</TableHead><TableHead>Status</TableHead><TableHead>Assigned VLE</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                             <TableBody>
                                 {filteredTasks.map(task => {
-                                    const availableVles = vles.filter(vle => vle.status === 'Approved' && vle.available && vle.id !== task.creatorId);
+                                    const availableVles = vles.filter(vle => vle.status === 'Approved' && vle.available);
                                     return (
                                         <TableRow key={task.id}>
                                             <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
@@ -421,7 +409,7 @@ export default function AdminDashboard({ allTasks, vles, customers, paymentReque
                                             <TableCell>{task.service}</TableCell>
                                             <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
                                             <TableCell>{task.assignedVleName || 'N/A'}</TableCell>
-                                            <TableCell>{format(new Date(task.date), 'dd/MM/yyyy')}</TableCell>
+                                            <TableCell>{format(new Date(task.date), 'dd MMM yyyy')}</TableCell>
                                             <TableCell className="text-right">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
