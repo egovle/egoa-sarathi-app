@@ -22,7 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { TaskCreatorDialog } from './shared';
 import { calculateVleEarnings } from '@/lib/utils';
-import type { Task, Service, VLEProfile } from '@/lib/types';
+import type { Task, Service, VLEProfile, Camp } from '@/lib/types';
 
 
 const PendingApprovalView = () => (
@@ -35,12 +35,11 @@ const PendingApprovalView = () => (
     </Alert>
 );
 
-export default function VleDashboard({ assignedTasks, myLeads, services }: { assignedTasks: Task[], myLeads: Task[], services: Service[] }) {
+export default function VleDashboard({ assignedTasks, myLeads, services, camps }: { assignedTasks: Task[], myLeads: Task[], services: Service[], camps: Camp[] }) {
     const { toast } = useToast();
     const { user, userProfile } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     
-    // Logic handlers moved from parent page.tsx
     const onVleAvailabilityChange = async (vleId: string, available: boolean) => {
         const vleRef = doc(db, "vles", vleId);
         await updateDoc(vleRef, { available: available });
@@ -112,8 +111,18 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
         }
     };
 
+    const taskInvitations = useMemo(() => assignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), [assignedTasks]);
+    
+    const todayStr = new Date().toLocaleDateString('en-CA');
+    const campInvitations = useMemo(() => {
+        if (!camps || !userProfile) return [];
+        return camps.filter(camp => {
+            if (camp.date.substring(0, 10) < todayStr) return false;
+            const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
+            return myAssignment?.status === 'pending';
+        })
+    }, [camps, userProfile]);
 
-    const invitations = useMemo(() => assignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), [assignedTasks]);
     const activeTasks = useMemo(() => assignedTasks.filter(t => t.status !== 'Pending VLE Acceptance'), [assignedTasks]);
     
     const filteredLeads = useMemo(() => {
@@ -131,11 +140,13 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
         return <PendingApprovalView />;
     }
 
+    const totalInvitations = taskInvitations.length + campInvitations.length;
+
     return (
     <Tabs defaultValue="invitations" className="w-full">
         <div className="flex items-center">
             <TabsList>
-                <TabsTrigger value="invitations">Invitations <Badge className="ml-2">{invitations.length}</Badge></TabsTrigger>
+                <TabsTrigger value="invitations">Invitations <Badge className="ml-2">{totalInvitations}</Badge></TabsTrigger>
                 <TabsTrigger value="active">Active Tasks</TabsTrigger>
                 <TabsTrigger value="leads">My Generated Leads</TabsTrigger>
             </TabsList>
@@ -143,7 +154,40 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
                 <TaskCreatorDialog services={services} type="VLE Lead" creatorId={user.uid} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
             </div>
         </div>
-        <TabsContent value="invitations" className="mt-4">
+        <TabsContent value="invitations" className="mt-4 space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>New Camp Invitations</CardTitle>
+                    <CardDescription>You have been invited to join these camps. Please respond on the Camp Management page.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Camp Name</TableHead>
+                                <TableHead>Location</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead className="text-right">Action</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {campInvitations.length > 0 ? campInvitations.map(camp => (
+                                <TableRow key={camp.id}>
+                                    <TableCell>{camp.name}</TableCell>
+                                    <TableCell>{camp.location}</TableCell>
+                                    <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
+                                    <TableCell className="text-right">
+                                        <Button asChild variant="outline" size="sm">
+                                            <Link href="/dashboard/camps">View & Respond</Link>
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new camp invitations.</TableCell></TableRow>}
+                        </TableBody>
+                    </Table>
+                </CardContent>
+            </Card>
+
              <Card>
                 <CardHeader>
                     <CardTitle>New Task Invitations</CardTitle>
@@ -160,7 +204,7 @@ export default function VleDashboard({ assignedTasks, myLeads, services }: { ass
                            </TableRow>
                        </TableHeader>
                        <TableBody>
-                           {invitations.length > 0 ? invitations.map(task => {
+                           {taskInvitations.length > 0 ? taskInvitations.map(task => {
                                const { governmentFee, vleCommission } = calculateVleEarnings(task);
                                return (
                                    <TableRow key={task.id}>

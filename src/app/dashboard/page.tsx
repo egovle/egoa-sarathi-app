@@ -14,7 +14,7 @@ import CustomerDashboard from '@/components/dashboard/CustomerDashboard';
 import GovernmentDashboard from '@/components/dashboard/GovernmentDashboard';
 import ProfileView from '@/components/dashboard/ProfileView';
 
-import type { Task, Service, UserProfile, VLEProfile, CustomerProfile, PaymentRequest } from '@/lib/types';
+import type { Task, Service, UserProfile, VLEProfile, CustomerProfile, PaymentRequest, Camp } from '@/lib/types';
 
 
 export default function DashboardPage() {
@@ -24,6 +24,7 @@ export default function DashboardPage() {
     
     const [tasks, setTasks] = useState<Task[]>([]);
     const [services, setServices] = useState<Service[]>([]);
+    const [camps, setCamps] = useState<Camp[]>([]);
     
     const activeTab = useMemo(() => {
         const tabFromUrl = searchParams.get('tab');
@@ -55,7 +56,6 @@ export default function DashboardPage() {
             const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
             const myLeadsQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
 
-            // Use Promise.all to wait for both queries, preventing UI pop-in
             const unsubAssigned = onSnapshot(assignedTasksQuery, assignedSnapshot => {
                 const assignedTasks = assignedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
                 
@@ -78,6 +78,11 @@ export default function DashboardPage() {
                 unsubscribers.push(unsubLeads);
             });
             unsubscribers.push(unsubAssigned);
+
+            const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
+            unsubscribers.push(onSnapshot(campsQuery, (snapshot) => {
+                setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp));
+            }));
         
         } else if (userProfile.role === 'customer') {
             const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
@@ -113,7 +118,7 @@ export default function DashboardPage() {
             case 'vle':
                 const assignedTasks = tasks.filter(t => t.assignedVleId === user.uid);
                 const myLeads = tasks.filter(t => t.creatorId === user.uid);
-                return <VleDashboard assignedTasks={assignedTasks} myLeads={myLeads} services={services} />;
+                return <VleDashboard assignedTasks={assignedTasks} myLeads={myLeads} services={services} camps={camps} />;
             case 'customer':
                 return <CustomerDashboard tasks={tasks} services={services} />;
             case 'government':
