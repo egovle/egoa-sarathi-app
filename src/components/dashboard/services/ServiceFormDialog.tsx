@@ -20,9 +20,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 const fileTypes: AllowedFileTypes[] = ['pdf', 'png', 'jpg'];
 
+// Predefined labels for dropdowns
 const PREDEFINED_GROUP_LABELS = ['Identity Proof', 'Address Proof', 'Birth Proof', 'Residence Proof'];
 const PREDEFINED_FIELD_LABELS = ['Aadhaar Card', 'PAN Card', 'Passport', 'Voter ID', 'Driving License', 'Birth Certificate', 'Electricity Bill', 'Ration Card'];
 
+// Helper to generate a key from a label string
 const generateKey = (label: string) => {
     if (!label) return '';
     return label.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
@@ -51,6 +53,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
             setIsVariable(service.isVariable || false);
             setDocumentGroups(service.documentGroups || []);
         } else {
+            // Reset for new service or new sub-service
             setName('');
             setCustomerRate('');
             setVleRate('');
@@ -72,9 +75,11 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
             currentGroup.key = generateKey(value);
         } else if (field === 'type') {
             currentGroup.type = value;
+            // Reset options when type changes to maintain consistency
             currentGroup.options = [{ key: '', label: '', type: value === 'documents' ? 'document' : 'text', isOptional: false, allowedFileTypes: ['pdf', 'png', 'jpg'] }];
         } else if (field === 'isOptional') {
             currentGroup.isOptional = value;
+            // If group is optional, it doesn't make sense to have a min required number of docs
             if (value) {
                 currentGroup.minRequired = 0;
             }
@@ -262,7 +267,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                         <div className="col-span-3 space-y-4">
                             {documentGroups.map((group, groupIndex) => {
                                 const isCustomGroupLabel = !PREDEFINED_GROUP_LABELS.includes(group.label) || group.label === '';
-
+                                
                                 return (
                                 <Card key={groupIndex} className="p-4 bg-muted/50">
                                     <CardContent className="p-0 space-y-4">
