@@ -20,6 +20,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 const fileTypes: AllowedFileTypes[] = ['pdf', 'png', 'jpg'];
 
+const PREDEFINED_GROUP_LABELS = ['Identity Proof', 'Address Proof', 'Birth Proof', 'Residence Proof'];
+const PREDEFINED_FIELD_LABELS = ['Aadhaar Card', 'PAN Card', 'Passport', 'Voter ID', 'Driving License', 'Birth Certificate', 'Electricity Bill', 'Ration Card'];
+
+const generateKey = (label: string) => {
+    if (!label) return '';
+    return label.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+};
+
+
 export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, onFinished }: { service?: Service | null, parentServices: Service[], prefilledParentId?: string | null, onFinished: () => void }) => {
     const { toast } = useToast();
     const [name, setName] = useState('');
@@ -60,15 +69,14 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
         const newGroups = [...documentGroups];
         const currentGroup = { ...newGroups[index] };
     
-        if (field === 'key') {
-            currentGroup.key = (value as string).toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+        if (field === 'label') {
+            currentGroup.label = value;
+            currentGroup.key = generateKey(value);
         } else if (field === 'type') {
             currentGroup.type = value;
-            // Reset options when type changes
             currentGroup.options = [{ key: '', label: '', type: value === 'documents' ? 'document' : 'text', isOptional: false, allowedFileTypes: ['pdf', 'png', 'jpg'] }];
         } else if (field === 'isOptional') {
             currentGroup.isOptional = value;
-            // If group is optional, min required is irrelevant
             if (value) {
                 currentGroup.minRequired = 0;
             }
@@ -96,8 +104,9 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
         const newOptions = [...group.options];
         const currentOption = { ...newOptions[optionIndex] };
 
-        if (field === 'key') {
-            currentOption.key = (value as string).toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
+        if (field === 'label') {
+            currentOption.label = value;
+            currentOption.key = generateKey(value);
         } else {
             (currentOption as any)[field] = value;
         }
@@ -253,7 +262,10 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                     <div className="grid grid-cols-4 items-start gap-4 pt-2">
                         <Label className="text-right pt-2">Form Fields</Label>
                         <div className="col-span-3 space-y-4">
-                            {documentGroups.map((group, groupIndex) => (
+                            {documentGroups.map((group, groupIndex) => {
+                                const isCustomGroupLabel = !PREDEFINED_GROUP_LABELS.includes(group.label) || group.label === '';
+
+                                return (
                                 <Card key={groupIndex} className="p-4 bg-muted/50">
                                     <CardContent className="p-0 space-y-4">
                                         <div className="flex justify-between items-center">
@@ -263,8 +275,34 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                                             </Button>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-1"><Label>Group Label</Label><Input placeholder="e.g. Identity Proof" value={group.label} onChange={e => handleGroupChange(groupIndex, 'label', e.target.value)} required /></div>
-                                            <div className="space-y-1"><Label>Group Key</Label><Input placeholder="e.g. identity_proof" value={group.key} onChange={e => handleGroupChange(groupIndex, 'key', e.target.value)} required /></div>
+                                            <div className="space-y-1">
+                                                <Label>Group Label</Label>
+                                                <Select
+                                                    value={isCustomGroupLabel ? 'other' : group.label}
+                                                    onValueChange={(value) => {
+                                                        handleGroupChange(groupIndex, 'label', value === 'other' ? '' : value);
+                                                    }}
+                                                >
+                                                    <SelectTrigger><SelectValue placeholder="Select a label..." /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {PREDEFINED_GROUP_LABELS.map(label => <SelectItem key={label} value={label}>{label}</SelectItem>)}
+                                                        <SelectItem value="other">Other...</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                                {isCustomGroupLabel && (
+                                                    <Input
+                                                        placeholder="Enter custom group label"
+                                                        value={group.label}
+                                                        onChange={(e) => handleGroupChange(groupIndex, 'label', e.target.value)}
+                                                        className="mt-2"
+                                                        required
+                                                    />
+                                                )}
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label>Group Key</Label>
+                                                <Input placeholder="auto-generated" value={group.key} readOnly disabled />
+                                            </div>
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Group Rules</Label>
@@ -299,12 +337,40 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
 
                                         <div className="space-y-2">
                                             <Label className="font-medium">Fields in this group</Label>
-                                            {group.options.map((option, optionIndex) => (
+                                            {group.options.map((option, optionIndex) => {
+                                                const isCustomFieldLabel = !PREDEFINED_FIELD_LABELS.includes(option.label) || option.label === '';
+                                                return (
                                                 <div key={optionIndex} className="flex items-start gap-2 p-2 border rounded-md">
                                                     <div className="flex-1 space-y-3">
                                                         <div className="grid grid-cols-2 gap-2">
-                                                            <div className="space-y-1"><Label className="text-xs">Field Label</Label><Input placeholder="e.g. Aadhaar Card" value={option.label} onChange={e => handleOptionChange(groupIndex, optionIndex, 'label', e.target.value)} required /></div>
-                                                            <div className="space-y-1"><Label className="text-xs">Field Key</Label><Input placeholder="e.g. aadhar_card" value={option.key} onChange={e => handleOptionChange(groupIndex, optionIndex, 'key', e.target.value)} required /></div>
+                                                            <div className="space-y-1">
+                                                                <Label className="text-xs">Field Label</Label>
+                                                                <Select
+                                                                    value={isCustomFieldLabel ? 'other' : option.label}
+                                                                    onValueChange={(value) => {
+                                                                        handleOptionChange(groupIndex, optionIndex, 'label', value === 'other' ? '' : value);
+                                                                    }}
+                                                                >
+                                                                    <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select a field..." /></SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {PREDEFINED_FIELD_LABELS.map(label => <SelectItem key={label} value={label}>{label}</SelectItem>)}
+                                                                        <SelectItem value="other">Other...</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                                {isCustomFieldLabel && (
+                                                                    <Input
+                                                                        placeholder="Enter custom field label"
+                                                                        value={option.label}
+                                                                        onChange={(e) => handleOptionChange(groupIndex, optionIndex, 'label', e.target.value)}
+                                                                        className="mt-2 h-9 text-xs"
+                                                                        required
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <Label className="text-xs">Field Key</Label>
+                                                                <Input placeholder="auto-generated" value={option.key} className="h-9 text-xs" readOnly disabled />
+                                                            </div>
                                                         </div>
                                                          <div className="flex items-center space-x-2 pt-1">
                                                             <Switch id={`option-optional-${groupIndex}-${optionIndex}`} checked={option.isOptional} onCheckedChange={checked => handleOptionChange(groupIndex, optionIndex, 'isOptional', checked)} />
@@ -328,12 +394,12 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                                                     </div>
                                                     <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(groupIndex, optionIndex)}><Trash className="h-4 w-4" /></Button>
                                                 </div>
-                                            ))}
+                                            )})}
                                             <Button type="button" size="sm" variant="link" onClick={() => addOption(groupIndex)}><PlusCircle className="mr-2 h-4 w-4" /> Add Field</Button>
                                         </div>
                                     </CardContent>
                                 </Card>
-                            ))}
+                            )})}
                             <Button type="button" variant="outline" size="sm" onClick={addGroup}>
                                 <PlusCircle className="mr-2 h-4 w-4" /> Add Field Group
                             </Button>
