@@ -266,7 +266,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                         <Label className="text-right pt-2">Form Fields</Label>
                         <div className="col-span-3 space-y-4">
                             {documentGroups.map((group, groupIndex) => {
-                                const isCustomGroupLabel = !PREDEFINED_GROUP_LABELS.includes(group.label) || group.label === '';
+                                const isCustomGroupLabel = !PREDEFINED_GROUP_LABELS.includes(group.label);
                                 
                                 return (
                                 <Card key={groupIndex} className="p-4 bg-muted/50">
@@ -292,7 +292,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                                                         <SelectItem value="other">Other...</SelectItem>
                                                     </SelectContent>
                                                 </Select>
-                                                {isCustomGroupLabel && (
+                                                { (isCustomGroupLabel || group.label === '') && PREDEFINED_GROUP_LABELS.indexOf(group.label) === -1 && (
                                                     <Input
                                                         placeholder="Enter custom group label"
                                                         value={group.label}
@@ -341,7 +341,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                                         <div className="space-y-2">
                                             <Label className="font-medium">Fields in this group</Label>
                                             {group.options.map((option, optionIndex) => {
-                                                const isCustomFieldLabel = !PREDEFINED_FIELD_LABELS.includes(option.label) || option.label === '';
+                                                const isCustomFieldLabel = !PREDEFINED_FIELD_LABELS.includes(option.label);
                                                 return (
                                                 <div key={optionIndex} className="flex items-start gap-2 p-2 border rounded-md">
                                                     <div className="flex-1 space-y-3">
@@ -360,7 +360,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                                                                         <SelectItem value="other">Other...</SelectItem>
                                                                     </SelectContent>
                                                                 </Select>
-                                                                {isCustomFieldLabel && (
+                                                                { (isCustomFieldLabel || option.label === '') && PREDEFINED_FIELD_LABELS.indexOf(option.label) === -1 && (
                                                                     <Input
                                                                         placeholder="Enter custom field label"
                                                                         value={option.label}
