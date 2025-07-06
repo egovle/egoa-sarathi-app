@@ -3,7 +3,7 @@
 
 import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch, getDocs, query, where, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { services as seedServices } from '@/lib/seed';
+
 import type { Service } from '@/lib/types';
 
 export async function addService(data: Omit<Service, 'id'>) {
@@ -46,28 +46,6 @@ export async function deleteService(id: string) {
         return { success: false, error: error.message };
     }
 }
-
-export async function seedDatabase() {
-    try {
-        const servicesCollectionRef = collection(db, 'services');
-        const existingServicesSnapshot = await getDocs(query(servicesCollectionRef));
-
-        const batch = writeBatch(db);
-        existingServicesSnapshot.docs.forEach(doc => batch.delete(doc.ref));
-
-        seedServices.forEach(service => {
-            const { id, ...serviceData } = service;
-            const docRef = id ? doc(db, "services", id) : doc(collection(db, "services"));
-            batch.set(docRef, serviceData);
-        });
-        await batch.commit();
-        
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error seeding database:", error);
-        return { success: false, error: error.message };
-    }
-};
 
 export async function resetApplicationData() {
     const processInBatches = async (
@@ -123,15 +101,6 @@ export async function resetApplicationData() {
                 await updateDoc(adminRef, { walletBalance: 0 });
             }
         }
-
-
-        let seedBatch = writeBatch(db);
-        seedServices.forEach(service => {
-            const docRef = service.id ? doc(db, "services", service.id) : doc(collection(db, "services"));
-            const { id, ...serviceData } = service;
-            seedBatch.set(docRef, serviceData);
-        });
-        await seedBatch.commit();
         
         return { success: true };
     } catch (error: any) {
