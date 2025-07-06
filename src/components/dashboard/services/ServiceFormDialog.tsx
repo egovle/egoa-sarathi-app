@@ -33,24 +33,15 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
     const [documentGroups, setDocumentGroups] = useState<DocumentGroup[]>([]);
     
     useEffect(() => {
-        if (service || prefilledParentId) {
-            setName(service?.name || '');
-            setCustomerRate(service?.customerRate?.toString() || '');
-            setVleRate(service?.vleRate?.toString() || '');
-            setGovernmentFee(service?.governmentFee?.toString() || '');
-            setParentId(service?.parentId || prefilledParentId || 'none');
-            setIsVariable(service?.isVariable || false);
-            setDocumentGroups(service?.documentGroups || []);
-        } else {
-            // Reset for "Add New Service"
-            setName('');
-            setCustomerRate('');
-            setVleRate('');
-            setGovernmentFee('');
-            setParentId('none');
-            setIsVariable(false);
-            setDocumentGroups([]);
-        }
+        // This effect runs when the dialog is opened or the props change.
+        // It correctly sets the state based on whether we are editing, adding a sub-category, or adding a new main category.
+        setName(service?.name || '');
+        setCustomerRate(service?.customerRate?.toString() || '');
+        setVleRate(service?.vleRate?.toString() || '');
+        setGovernmentFee(service?.governmentFee?.toString() || '');
+        setParentId(service?.parentId || prefilledParentId || 'none');
+        setIsVariable(service?.isVariable || false);
+        setDocumentGroups(service?.documentGroups || []);
     }, [service, prefilledParentId]);
     
     const isSubCategory = parentId !== 'none';
