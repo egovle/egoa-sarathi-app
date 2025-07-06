@@ -42,7 +42,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
     const [documentGroups, setDocumentGroups] = useState<DocumentGroup[]>([]);
     
     useEffect(() => {
-        if (service) { // Editing an existing service
+        if (service) {
             setName(service.name || '');
             setCustomerRate(service.customerRate?.toString() || '');
             setVleRate(service.vleRate?.toString() || '');
@@ -50,15 +50,13 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
             setParentId(service.parentId || 'none');
             setIsVariable(service.isVariable || false);
             setDocumentGroups(service.documentGroups || []);
-        } else { // Creating a NEW service (main or sub)
-            // Reset all fields to default first
+        } else {
             setName('');
             setCustomerRate('');
             setVleRate('');
             setGovernmentFee('');
             setIsVariable(false);
             setDocumentGroups([]);
-            // Then, if a parent is pre-selected, apply it.
             setParentId(prefilledParentId || 'none');
         }
     }, [service, prefilledParentId]);
