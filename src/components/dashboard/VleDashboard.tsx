@@ -10,17 +10,15 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import { createNotificationForAdmins } from '@/app/actions';
 
-import { FilePlus, Search, ToggleRight, CheckCircle2, XCircle, Info } from 'lucide-react';
+import { ToggleRight, CheckCircle2, XCircle, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { TaskCreatorDialog } from './shared';
 import { calculateVleEarnings } from '@/lib/utils';
 import type { Task, Service, VLEProfile, Camp } from '@/lib/types';
 
@@ -35,10 +33,9 @@ const PendingApprovalView = () => (
     </Alert>
 );
 
-export default function VleDashboard({ assignedTasks, myLeads, services, camps }: { assignedTasks: Task[], myLeads: Task[], services: Service[], camps: Camp[] }) {
+export default function VleDashboard({ assignedTasks, services, camps }: { assignedTasks: Task[], services: Service[], camps: Camp[] }) {
     const { toast } = useToast();
     const { user, userProfile } = useAuth();
-    const [searchQuery, setSearchQuery] = useState('');
     
     const onVleAvailabilityChange = async (vleId: string, available: boolean) => {
         const vleRef = doc(db, "vles", vleId);
@@ -123,17 +120,6 @@ export default function VleDashboard({ assignedTasks, myLeads, services, camps }
         })
     }, [camps, userProfile]);
 
-    const activeTasks = useMemo(() => assignedTasks.filter(t => t.status !== 'Pending VLE Acceptance'), [assignedTasks]);
-    
-    const filteredLeads = useMemo(() => {
-        if (!searchQuery) return myLeads;
-        return myLeads.filter(task => 
-            task.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            task.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            task.customer.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-    }, [myLeads, searchQuery]);
-
     if (!user || !userProfile) return null;
     
     if ((userProfile as VLEProfile).status === 'Pending') {
@@ -141,200 +127,110 @@ export default function VleDashboard({ assignedTasks, myLeads, services, camps }
     }
 
     return (
-    <Tabs defaultValue="camp-invitations" className="w-full">
-        <div className="flex items-center">
-            <TabsList>
-                <TabsTrigger value="camp-invitations">Camp Invitations <Badge className="ml-2">{campInvitations.length}</Badge></TabsTrigger>
-                <TabsTrigger value="task-invitations">Task Invitations <Badge className="ml-2">{taskInvitations.length}</Badge></TabsTrigger>
-                <TabsTrigger value="active">Active Tasks <Badge className="ml-2">{activeTasks.length}</Badge></TabsTrigger>
-                <TabsTrigger value="leads">My Generated Leads <Badge className="ml-2">{myLeads.length}</Badge></TabsTrigger>
-            </TabsList>
-            <div className="ml-auto flex items-center gap-2">
-                <TaskCreatorDialog services={services} type="VLE Lead" creatorId={user.uid} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />
+    <div className="space-y-6">
+         <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base font-medium">Availability</CardTitle>
+                <ToggleRight className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="pt-2">
+                {userProfile && (userProfile as VLEProfile).status === 'Approved' ? (
+                    <div className="flex items-center space-x-2 pt-2">
+                        <Switch 
+                            id="availability-mode" 
+                            checked={(userProfile as VLEProfile).available} 
+                            onCheckedChange={(checked) => onVleAvailabilityChange(user.uid, checked)}
+                        />
+                        <Label htmlFor="availability-mode">{(userProfile as VLEProfile).available ? 'Available' : 'Unavailable'} for Tasks</Label>
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>
+                )}
+            </CardContent>
+        </Card>
+        <Tabs defaultValue="camp-invitations" className="w-full">
+            <div className="flex items-center">
+                <TabsList>
+                    <TabsTrigger value="camp-invitations">Camp Invitations <Badge className="ml-2">{campInvitations.length}</Badge></TabsTrigger>
+                    <TabsTrigger value="task-invitations">Task Invitations <Badge className="ml-2">{taskInvitations.length}</Badge></TabsTrigger>
+                </TabsList>
             </div>
-        </div>
-        <TabsContent value="camp-invitations" className="mt-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle>New Camp Invitations</CardTitle>
-                    <CardDescription>You have been invited to join these camps. Please respond on the Camp Management page.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Camp Name</TableHead>
-                                <TableHead>Location</TableHead>
-                                <TableHead>Date</TableHead>
-                                <TableHead className="text-right">Action</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {campInvitations.length > 0 ? campInvitations.map(camp => (
-                                <TableRow key={camp.id}>
-                                    <TableCell>{camp.name}</TableCell>
-                                    <TableCell>{camp.location}</TableCell>
-                                    <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
-                                    <TableCell className="text-right">
-                                        <Button asChild variant="outline" size="sm">
-                                            <Link href="/dashboard/camps">View & Respond</Link>
-                                        </Button>
-                                    </TableCell>
+            <TabsContent value="camp-invitations" className="mt-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>New Camp Invitations</CardTitle>
+                        <CardDescription>You have been invited to join these camps. Please respond on the Camp Management page.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Camp Name</TableHead>
+                                    <TableHead>Location</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
                                 </TableRow>
-                            )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new camp invitations.</TableCell></TableRow>}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-        </TabsContent>
-        <TabsContent value="task-invitations" className="mt-4">
-             <Card>
-                <CardHeader>
-                    <CardTitle>New Task Invitations</CardTitle>
-                    <CardDescription>Please review and respond to these new task assignments.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                   <Table>
-                       <TableHeader>
-                           <TableRow>
-                               <TableHead>Service</TableHead>
-                               <TableHead>Customer</TableHead>
-                               <TableHead>Your Earnings</TableHead>
-                               <TableHead className="text-right">Actions</TableHead>
-                           </TableRow>
-                       </TableHeader>
-                       <TableBody>
-                           {taskInvitations.length > 0 ? taskInvitations.map(task => {
-                               const { governmentFee, vleCommission } = calculateVleEarnings(task);
-                               return (
-                                   <TableRow key={task.id}>
-                                       <TableCell className="font-medium">{task.service}</TableCell>
-                                       <TableCell>{task.customer}</TableCell>
-                                       <TableCell>
-                                           <div className='text-sm'>
-                                               <p>Commission: <span className='font-semibold'>₹{vleCommission.toFixed(2)}</span></p>
-                                               <p className='text-xs text-muted-foreground'>+ ₹{governmentFee.toFixed(2)} for Govt. Fee</p>
-                                           </div>
-                                       </TableCell>
-                                       <TableCell className="text-right space-x-2">
-                                           <Button size="sm" variant="outline" onClick={() => onTaskAccept(task.id)}><CheckCircle2 className="mr-2 h-4 w-4"/>Accept</Button>
-                                           <Button size="sm" variant="destructive" onClick={() => onTaskReject(task.id)}><XCircle className="mr-2 h-4 w-4"/>Reject</Button>
-                                       </TableCell>
-                                   </TableRow>
-                               )
-                           }) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No pending task invitations.</TableCell></TableRow>}
-                       </TableBody>
-                   </Table>
-                </CardContent>
-            </Card>
-        </TabsContent>
-        <TabsContent value="active" className="mt-4">
-            <div className="space-y-6">
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-base font-medium">Availability</CardTitle>
-                        <ToggleRight className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent className="pt-2">
-                        {userProfile && (userProfile as VLEProfile).status === 'Approved' ? (
-                            <div className="flex items-center space-x-2 pt-2">
-                                <Switch 
-                                    id="availability-mode" 
-                                    checked={(userProfile as VLEProfile).available} 
-                                    onCheckedChange={(checked) => onVleAvailabilityChange(user.uid, checked)}
-                                />
-                                <Label htmlFor="availability-mode">{(userProfile as VLEProfile).available ? 'Available' : 'Unavailable'} for Tasks</Label>
-                            </div>
-                        ) : (
-                            <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>
-                        )}
-                    </CardContent>
-                </Card>
-                
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Your Active Tasks</CardTitle>
-                        <CardDescription>Tasks you have accepted and are currently working on.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                        <TableHeader>
-                            <TableRow>
-                            <TableHead>Task ID</TableHead>
-                            <TableHead>Service</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Customer</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {activeTasks.length > 0 ? activeTasks.map(task => (
-                            <TableRow key={task.id}>
-                                <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
-                                <TableCell>{task.service}</TableCell>
-                                <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                                <TableCell>{task.customer}</TableCell>
-                                <TableCell>{format(new Date(task.date), 'dd MMM yyyy')}</TableCell>
-                                <TableCell className="text-right">
-                                    <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
-                                </TableCell>
-                            </TableRow>
-                            )) : <TableRow><TableCell colSpan={6} className="h-24 text-center">No active tasks.</TableCell></TableRow>}
-                        </TableBody>
+                            </TableHeader>
+                            <TableBody>
+                                {campInvitations.length > 0 ? campInvitations.map(camp => (
+                                    <TableRow key={camp.id}>
+                                        <TableCell>{camp.name}</TableCell>
+                                        <TableCell>{camp.location}</TableCell>
+                                        <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href="/dashboard/camps">View & Respond</Link>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new camp invitations.</TableCell></TableRow>}
+                            </TableBody>
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
-        </TabsContent>
-        <TabsContent value="leads" className="mt-4">
-             <Card>
+            </TabsContent>
+            <TabsContent value="task-invitations" className="mt-4">
+                 <Card>
                     <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div>
-                               <CardTitle>My Generated Leads</CardTitle>
-                               <CardDescription>Track the status of tasks you created for customers.</CardDescription>
-                            </div>
-                             <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input 
-                                    placeholder="Search by ID, service, or customer..." 
-                                    className="pl-8 w-72"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
-                            </div>
-                        </div>
+                        <CardTitle>New Task Invitations</CardTitle>
+                        <CardDescription>Please review and respond to these new task assignments.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Table>
-                        <TableHeader>
-                            <TableRow>
-                            <TableHead>Task ID</TableHead>
-                            <TableHead>Service</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Customer</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredLeads.length > 0 ? filteredLeads.map(task => (
-                            <TableRow key={task.id}>
-                                <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>
-                                <TableCell>{task.service}</TableCell>
-                                <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                                <TableCell>{task.customer}</TableCell>
-                                <TableCell>{format(new Date(task.date), 'dd MMM yyyy')}</TableCell>
-                                <TableCell className="text-right">
-                                    <Button asChild variant="outline" size="sm"><Link href={`/dashboard/task/${task.id}`}>View Details</Link></Button>
-                                </TableCell>
-                            </TableRow>
-                            )) : <TableRow><TableCell colSpan={6} className="h-24 text-center">You have not generated any leads.</TableCell></TableRow>}
-                        </TableBody>
-                        </Table>
+                       <Table>
+                           <TableHeader>
+                               <TableRow>
+                                   <TableHead>Service</TableHead>
+                                   <TableHead>Customer</TableHead>
+                                   <TableHead>Your Earnings</TableHead>
+                                   <TableHead className="text-right">Actions</TableHead>
+                               </TableRow>
+                           </TableHeader>
+                           <TableBody>
+                               {taskInvitations.length > 0 ? taskInvitations.map(task => {
+                                   const { governmentFee, vleCommission } = calculateVleEarnings(task);
+                                   return (
+                                       <TableRow key={task.id}>
+                                           <TableCell className="font-medium">{task.service}</TableCell>
+                                           <TableCell>{task.customer}</TableCell>
+                                           <TableCell>
+                                               <div className='text-sm'>
+                                                   <p>Commission: <span className='font-semibold'>₹{vleCommission.toFixed(2)}</span></p>
+                                                   <p className='text-xs text-muted-foreground'>+ ₹{governmentFee.toFixed(2)} for Govt. Fee</p>
+                                               </div>
+                                           </TableCell>
+                                           <TableCell className="text-right space-x-2">
+                                               <Button size="sm" variant="outline" onClick={() => onTaskAccept(task.id)}><CheckCircle2 className="mr-2 h-4 w-4"/>Accept</Button>
+                                               <Button size="sm" variant="destructive" onClick={() => onTaskReject(task.id)}><XCircle className="mr-2 h-4 w-4"/>Reject</Button>
+                                           </TableCell>
+                                       </TableRow>
+                                   )
+                               }) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No pending task invitations.</TableCell></TableRow>}
+                           </TableBody>
+                       </Table>
                     </CardContent>
                 </Card>
-        </TabsContent>
-    </Tabs>
+            </TabsContent>
+        </Tabs>
+    </div>
 )
+}

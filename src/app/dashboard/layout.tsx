@@ -19,7 +19,9 @@ import {
   BarChart,
   Tent,
   ArrowLeft,
-  X
+  X,
+  Briefcase,
+  FilePlus,
 } from "lucide-react"
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch, getDocs, deleteDoc } from "firebase/firestore";
@@ -50,6 +52,8 @@ import { SupportContent } from '@/components/dashboard/SupportContent';
 
 const ALL_NAV_ITEMS = [
     { href: "/dashboard", icon: Home, label: "Dashboard", roles: ['admin', 'vle', 'customer', 'government'] },
+    { href: "/dashboard/task-management", icon: Briefcase, label: "Task Management", roles: ['vle'] },
+    { href: "/dashboard/lead-management", icon: FilePlus, label: "Lead Management", roles: ['vle'] },
     { href: "/dashboard/reports", icon: BarChart, label: "Reports", roles: ['admin', 'vle'] },
     { href: "/dashboard/camps", icon: Tent, label: "Camps", roles: ['admin', 'vle', 'customer', 'government'] },
     { href: "/dashboard/services", icon: ListPlus, label: "Service Management", roles: ['admin'] },
@@ -98,6 +102,8 @@ export default function DashboardLayout({
     '/dashboard/services': 'Service Management',
     '/dashboard/reports': 'Reports & Analytics',
     '/dashboard/camps': 'Camp Management',
+    '/dashboard/task-management': 'Task Management',
+    '/dashboard/lead-management': 'Lead Management',
   };
 
   const getPageTitle = (path: string) => {
@@ -234,7 +240,7 @@ export default function DashboardLayout({
       <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
         <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
           {navItems.map(item => (
-            <NavLink key={item.href} {...item} isActive={pathname === item.href || (item.href === '/dashboard' && pathname.startsWith('/dashboard/task'))} />
+            <NavLink key={item.href} {...item} isActive={pathname === item.href || (item.href === '/dashboard' && pathname.startsWith('/dashboard/task/'))} />
           ))}
         </nav>
         <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
@@ -405,5 +411,3 @@ export default function DashboardLayout({
     </div>
   )
 }
-
-    

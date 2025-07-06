@@ -54,30 +54,9 @@ export default function DashboardPage() {
              // Admin data is now fetched inside the AdminDashboard component for scalability.
         } else if (userProfile.role === 'vle') {
             const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
-            const myLeadsQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
-
-            const unsubAssigned = onSnapshot(assignedTasksQuery, assignedSnapshot => {
-                const assignedTasks = assignedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-                
-                const unsubLeads = onSnapshot(myLeadsQuery, leadsSnapshot => {
-                    const myLeads = leadsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-                    
-                    const allTaskIds = new Set<string>();
-                    const combinedTasks: Task[] = [];
-                    
-                    [...assignedTasks, ...myLeads].forEach(task => {
-                        if (!allTaskIds.has(task.id)) {
-                            allTaskIds.add(task.id);
-                            combinedTasks.push(task);
-                        }
-                    });
-                    
-                    combinedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                    setTasks(combinedTasks);
-                });
-                unsubscribers.push(unsubLeads);
-            });
-            unsubscribers.push(unsubAssigned);
+            unsubscribers.push(onSnapshot(assignedTasksQuery, snapshot => {
+                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task));
+            }));
 
             const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
             unsubscribers.push(onSnapshot(campsQuery, (snapshot) => {
@@ -116,9 +95,7 @@ export default function DashboardPage() {
 
         switch (userProfile.role) {
             case 'vle':
-                const assignedTasks = tasks.filter(t => t.assignedVleId === user.uid);
-                const myLeads = tasks.filter(t => t.creatorId === user.uid);
-                return <VleDashboard assignedTasks={assignedTasks} myLeads={myLeads} services={services} camps={camps} />;
+                return <VleDashboard assignedTasks={tasks} services={services} camps={camps} />;
             case 'customer':
                 return <CustomerDashboard tasks={tasks} services={services} />;
             case 'government':
