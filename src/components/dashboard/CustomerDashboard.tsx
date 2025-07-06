@@ -78,8 +78,8 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
       <Tabs defaultValue="tasks" className="w-full">
           <div className='flex items-center justify-between'>
             <TabsList>
-                <TabsTrigger value="tasks">My Bookings</TabsTrigger>
-                <TabsTrigger value="complaints">My Complaints</TabsTrigger>
+                <TabsTrigger value="tasks">My Bookings <Badge className="ml-2">{tasks.length}</Badge></TabsTrigger>
+                <TabsTrigger value="complaints">My Complaints <Badge className="ml-2">{customerComplaints.length}</Badge></TabsTrigger>
             </TabsList>
              <TaskCreatorDialog services={services} creatorId={user.uid} creatorProfile={userProfile} type="Customer Request" buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />Create New Booking</Button>} />
           </div>

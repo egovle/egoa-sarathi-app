@@ -282,27 +282,18 @@ export default function AdminDashboard() {
     const complaints = allTasks.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
     const payoutTasks = allTasks.filter(t => t.status === 'Completed');
     
-    const pendingVleCount = pendingVles.length;
-    const unassignedTaskCount = allTasks.filter(t => t.status === 'Unassigned' || t.status === 'Pending Price Approval').length;
     const openComplaintsCount = complaints.filter(c => c.status === 'Open').length;
     const payoutTaskCount = payoutTasks.length;
-
-    const TabTriggerWithBadge = ({ value, label, count }: { value: string, label: string, count: number }) => (
-        <TabsTrigger value={value} className="relative">
-            {label}
-            {count > 0 && <Badge className="absolute -top-2 -right-2 h-5 w-5 justify-center rounded-full p-0">{count}</Badge>}
-        </TabsTrigger>
-    );
 
     return (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabTriggerWithBadge value="vle-management" label="VLEs" count={pendingVleCount} />
-                <TabTriggerWithBadge value="customer-management" label="Customers" count={0} />
-                <TabTriggerWithBadge value="all-tasks" label="Tasks" count={unassignedTaskCount} />
-                <TabTriggerWithBadge value="payouts" label="Payouts" count={payoutTaskCount} />
-                <TabTriggerWithBadge value="complaints" label="Complaints" count={openComplaintsCount} />
+                <TabsTrigger value="vle-management">VLEs <Badge className="ml-2">{vles.length}</Badge></TabsTrigger>
+                <TabsTrigger value="customer-management">Customers <Badge className="ml-2">{customers.length}</Badge></TabsTrigger>
+                <TabsTrigger value="all-tasks">Tasks <Badge className="ml-2">{allTasks.length}</Badge></TabsTrigger>
+                <TabsTrigger value="payouts">Payouts <Badge className="ml-2">{payoutTaskCount}</Badge></TabsTrigger>
+                <TabsTrigger value="complaints">Complaints <Badge className="ml-2">{complaints.length}</Badge></TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="mt-4 space-y-4">

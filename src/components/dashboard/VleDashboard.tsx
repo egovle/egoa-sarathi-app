@@ -146,8 +146,8 @@ export default function VleDashboard({ assignedTasks, myLeads, services, camps }
             <TabsList>
                 <TabsTrigger value="camp-invitations">Camp Invitations <Badge className="ml-2">{campInvitations.length}</Badge></TabsTrigger>
                 <TabsTrigger value="task-invitations">Task Invitations <Badge className="ml-2">{taskInvitations.length}</Badge></TabsTrigger>
-                <TabsTrigger value="active">Active Tasks</TabsTrigger>
-                <TabsTrigger value="leads">My Generated Leads</TabsTrigger>
+                <TabsTrigger value="active">Active Tasks <Badge className="ml-2">{activeTasks.length}</Badge></TabsTrigger>
+                <TabsTrigger value="leads">My Generated Leads <Badge className="ml-2">{myLeads.length}</Badge></TabsTrigger>
             </TabsList>
             <div className="ml-auto flex items-center gap-2">
                 <TaskCreatorDialog services={services} type="VLE Lead" creatorId={user.uid} creatorProfile={userProfile} buttonTrigger={<Button size="sm" className="h-8 gap-1"><FilePlus className="h-3.5 w-3.5" />Generate Lead</Button>} />

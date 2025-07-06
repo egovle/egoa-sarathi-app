@@ -211,9 +211,9 @@ export default function AdminCampView({ allCamps, suggestions, vles, userProfile
             
             <Tabs defaultValue='upcoming' className="w-full">
                 <TabsList>
-                    <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                    <TabsTrigger value="upcoming">Upcoming <Badge className="ml-2">{upcomingCamps.length}</Badge></TabsTrigger>
                     <TabsTrigger value="suggestions">VLE Suggestions <Badge className="ml-2">{suggestions.length}</Badge></TabsTrigger>
-                    <TabsTrigger value="past">Past</TabsTrigger>
+                    <TabsTrigger value="past">Past <Badge className="ml-2">{pastCamps.length}</Badge></TabsTrigger>
                 </TabsList>
                 <TabsContent value="upcoming" className="mt-4">
                     <AdminCampTable data={upcomingCamps} vles={vles} onEdit={handleEdit} onDelete={handleDelete} onPayout={handlePayout} />

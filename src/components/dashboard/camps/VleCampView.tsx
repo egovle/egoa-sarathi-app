@@ -95,7 +95,7 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
          <Tabs defaultValue="invitations">
             <TabsList>
                 <TabsTrigger value="invitations">Invitations <Badge className="ml-2">{myInvitations.length}</Badge></TabsTrigger>
-                <TabsTrigger value="confirmed">Confirmed Camps</TabsTrigger>
+                <TabsTrigger value="confirmed">Confirmed Camps <Badge className="ml-2">{myConfirmedCamps.length}</Badge></TabsTrigger>
             </TabsList>
             <TabsContent value="invitations" className="mt-4">
                  <Card>
