@@ -78,6 +78,18 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
         const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
         return myAssignment?.status === 'accepted';
     });
+
+    const myRejectedCamps = allCamps.filter(camp => {
+        if (camp.date.substring(0, 10) < todayStr) return false; // Still upcoming
+        const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
+        return myAssignment?.status === 'rejected';
+    });
+
+    const myPastCamps = allCamps.filter(camp => {
+        if (camp.date.substring(0, 10) >= todayStr) return false; // Past date
+        const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
+        return myAssignment?.status === 'accepted'; // Show past confirmed camps
+    }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     return (
      <div className="space-y-6">
@@ -95,7 +107,9 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
          <Tabs defaultValue="invitations">
             <TabsList>
                 <TabsTrigger value="invitations">Invitations <Badge className="ml-2">{myInvitations.length}</Badge></TabsTrigger>
-                <TabsTrigger value="confirmed">Confirmed Camps</TabsTrigger>
+                <TabsTrigger value="confirmed">Confirmed Camps <Badge className="ml-2">{myConfirmedCamps.length}</Badge></TabsTrigger>
+                <TabsTrigger value="rejected">Rejected <Badge className="ml-2">{myRejectedCamps.length}</Badge></TabsTrigger>
+                <TabsTrigger value="past">Past Camps <Badge className="ml-2">{myPastCamps.length}</Badge></TabsTrigger>
             </TabsList>
             <TabsContent value="invitations" className="mt-4">
                  <Card>
@@ -160,6 +174,64 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
                                        </TableCell>
                                    </TableRow>
                                )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">You have not confirmed attendance for any camps.</TableCell></TableRow>}
+                           </TableBody>
+                       </Table>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+             <TabsContent value="rejected" className="mt-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Your Rejected Invitations</CardTitle>
+                        <CardDescription>These are upcoming camp invitations that you have rejected.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <Table>
+                           <TableHeader>
+                               <TableRow>
+                                   <TableHead>Camp Name</TableHead>
+                                   <TableHead>Location</TableHead>
+                                   <TableHead>Date</TableHead>
+                               </TableRow>
+                           </TableHeader>
+                           <TableBody>
+                               {myRejectedCamps.length > 0 ? myRejectedCamps.map(camp => (
+                                   <TableRow key={camp.id}>
+                                       <TableCell>{camp.name}</TableCell>
+                                       <TableCell>{camp.location}</TableCell>
+                                       <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
+                                   </TableRow>
+                               )) : <TableRow><TableCell colSpan={3} className="h-24 text-center">You have not rejected any camp invitations.</TableCell></TableRow>}
+                           </TableBody>
+                       </Table>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="past" className="mt-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Past Camps</CardTitle>
+                        <CardDescription>A history of camps you have attended.</CardDescription>
+                    </CardHeader>
+                     <CardContent>
+                       <Table>
+                           <TableHeader>
+                               <TableRow>
+                                   <TableHead>Camp Name</TableHead>
+                                   <TableHead>Location</TableHead>
+                                   <TableHead>Date</TableHead>
+                                   <TableHead>Status</TableHead>
+                               </TableRow>
+                           </TableHeader>
+                           <TableBody>
+                               {myPastCamps.length > 0 ? myPastCamps.map(camp => (
+                                   <TableRow key={camp.id}>
+                                       <TableCell>{camp.name}</TableCell>
+                                       <TableCell>{camp.location}</TableCell>
+                                       <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
+                                       <TableCell><Badge variant={camp.status === 'Paid Out' ? 'default' : 'secondary'}>{camp.status}</Badge></TableCell>
+                                   </TableRow>
+                               )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">You have no past camps to display.</TableCell></TableRow>}
                            </TableBody>
                        </Table>
                     </CardContent>
