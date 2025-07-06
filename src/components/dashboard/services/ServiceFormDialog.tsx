@@ -33,25 +33,24 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
     const [documentGroups, setDocumentGroups] = useState<DocumentGroup[]>([]);
     
     useEffect(() => {
-        const initialParentId = service?.parentId || prefilledParentId || 'none';
-        setParentId(initialParentId);
-
-        if (!service) {
-            // This is for creating a new service (either main or sub-category)
+        if (service) { // Editing an existing service
+            setName(service.name || '');
+            setCustomerRate(service.customerRate?.toString() || '');
+            setVleRate(service.vleRate?.toString() || '');
+            setGovernmentFee(service.governmentFee?.toString() || '');
+            setParentId(service.parentId || 'none');
+            setIsVariable(service.isVariable || false);
+            setDocumentGroups(service.documentGroups || []);
+        } else { // Creating a NEW service (main or sub)
+            // Reset all fields to default first
             setName('');
             setCustomerRate('');
             setVleRate('');
             setGovernmentFee('');
             setIsVariable(false);
             setDocumentGroups([]);
-        } else {
-            // This is for editing an existing service
-            setName(service.name || '');
-            setCustomerRate(service.customerRate?.toString() || '');
-            setVleRate(service.vleRate?.toString() || '');
-            setGovernmentFee(service.governmentFee?.toString() || '');
-            setIsVariable(service.isVariable || false);
-            setDocumentGroups(service.documentGroups || []);
+            // Then, if a parent is pre-selected, apply it.
+            setParentId(prefilledParentId || 'none');
         }
     }, [service, prefilledParentId]);
     
