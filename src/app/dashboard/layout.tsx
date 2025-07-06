@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link"
@@ -21,7 +22,7 @@ import {
   X
 } from "lucide-react"
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, where, doc, writeBatch, getDocs, deleteDoc, orderBy } from "firebase/firestore";
+import { collection, onSnapshot, query, where, doc, writeBatch, getDocs, deleteDoc } from "firebase/firestore";
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
@@ -77,12 +78,13 @@ export default function DashboardLayout({
 
     const q = query(
       collection(db, "notifications"),
-      where("userId", "==", user.uid),
-      orderBy("date", "desc")
+      where("userId", "==", user.uid)
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Sort on the client to avoid needing a composite index
+      notifs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setNotifications(notifs);
     });
 
@@ -403,3 +405,5 @@ export default function DashboardLayout({
     </div>
   )
 }
+
+    
