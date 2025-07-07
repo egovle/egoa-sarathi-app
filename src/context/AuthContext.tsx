@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -53,11 +52,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(user);
           setUserProfile(profileData);
         } else {
-            console.error("Authenticated user not found in any known collection. Logging out.");
+            console.error(`Authenticated user with UID ${user.uid} not found in 'users', 'vles', or 'government' collections. Logging out.`);
             toast({
-                title: "Profile Error",
-                description: "Your user profile could not be loaded. Please contact support.",
-                variant: "destructive"
+                title: "Profile Not Found",
+                description: "Your account exists, but we couldn't load your profile data. Please contact support or try re-registering.",
+                variant: "destructive",
+                duration: 9000
             });
             await auth.signOut();
             setUserProfile(null);
