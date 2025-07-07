@@ -12,7 +12,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import type { Service, DocumentGroup, DocumentOption, AllowedFileTypes } from '@/lib/types';
-import { addService, updateService } from './actions';
+import { addService, updateService } from '@/app/dashboard/services/actions';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
