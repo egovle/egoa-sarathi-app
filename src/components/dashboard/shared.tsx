@@ -118,22 +118,23 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
         for (const group of selectedService.documentGroups) {
             if (group.isOptional) continue;
 
-            const minRequired = group.minRequired || 0;
-            if (minRequired > 0) {
-                let suppliedCount = 0;
-                for (const option of group.options) {
-                     if (group.type === 'documents') {
-                        const fileKey = `${group.key}:${option.key}`;
-                        if (uploadedFiles[fileKey]) suppliedCount++;
-                    } else if (group.type === 'text') {
-                        const fieldKey = `text_${group.key}:${option.key}`;
-                        if ((formData.get(fieldKey) as string)?.trim()) suppliedCount++;
-                    }
+            const suppliedCount = group.options.reduce((count, option) => {
+                let isSupplied = false;
+                if (group.type === 'documents') {
+                    const fileKey = `${group.key}:${option.key}`;
+                    if (uploadedFiles[fileKey]) isSupplied = true;
+                } else if (group.type === 'text') {
+                    const fieldKey = `text_${group.key}:${option.key}`;
+                    if ((formData.get(fieldKey) as string)?.trim()) isSupplied = true;
                 }
-                if (suppliedCount < minRequired) {
+                return isSupplied ? count + 1 : count;
+            }, 0);
+    
+            if ((group.minRequired || 0) > 0) {
+                if (suppliedCount < group.minRequired) {
                     toast({
                         title: `More Information Required`,
-                        description: `Please provide at least ${minRequired} item(s) for the "${group.label}" section.`,
+                        description: `Please provide at least ${group.minRequired} item(s) for the "${group.label}" section.`,
                         variant: 'destructive',
                     });
                     setIsSubmitting(false);
@@ -312,7 +313,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                               <CardContent className="p-0 space-y-2">
                                 {group.options.map(option => {
                                   const fileKey = `${group.key}:${option.key}`;
-                                  const isMandatory = !group.isOptional && !option.isOptional && !group.minRequired;
+                                  const isMandatory = !group.isOptional && !option.isOptional && (group.minRequired || 0) === 0;
                                   const uploadedFile = uploadedFiles[fileKey];
                                   if (group.type === 'documents') {
                                       return (
@@ -321,7 +322,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                                 <Label htmlFor={fileKey} className="flex-1">
                                                     {option.label}
                                                     {isMandatory && <span className="text-destructive ml-1">*</span>}
-                                                    {option.isOptional && !group.isOptional && !group.minRequired && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
+                                                    {option.isOptional && !group.isOptional && (group.minRequired || 0) === 0 && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
                                                 </Label>
                                               </div>
                                               {uploadedFile ? (
@@ -350,7 +351,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                               <Label htmlFor={`text_${group.key}:${option.key}`}>
                                                 {option.label}
                                                 {isMandatory && <span className="text-destructive ml-1">*</span>}
-                                                {option.isOptional && !group.isOptional && !group.minRequired && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
+                                                {option.isOptional && !group.isOptional && (group.minRequired || 0) === 0 && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
                                               </Label>
                                               <Input 
                                                 id={`text_${group.key}:${option.key}`}

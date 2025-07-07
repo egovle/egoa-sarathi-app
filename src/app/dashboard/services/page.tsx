@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { Service } from '@/lib/types';
 import { deleteService, seedDatabase } from './actions';
-import { ServiceFormDialog } from './ServiceFormDialog';
+import { ServiceFormDialog } from '@/components/dashboard/services/ServiceFormDialog';
 
 export default function ServiceManagementPage() {
     const { userProfile, loading: authLoading } = useAuth();
@@ -311,5 +311,3 @@ export default function ServiceManagementPage() {
         </div>
     );
 }
-
-    

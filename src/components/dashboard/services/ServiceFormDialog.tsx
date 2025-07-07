@@ -84,7 +84,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
             setGovernmentFee(service.governmentFee?.toString() || '');
             setParentId(service.parentId || 'none');
             setIsVariable(service.isVariable || false);
-            setDocumentGroups(service.documentGroups || []);
+            setDocumentGroups(JSON.parse(JSON.stringify(service.documentGroups || [])));
         } else {
             setName('');
             setCustomerRate('');
