@@ -10,23 +10,27 @@ export function cn(...inputs: ClassValue[]) {
 
 export const fileValidationConfig = {
     // Stricter default, can be overridden
-    allowedTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
-    maxSize: 1 * 1024 * 1024, // 1 MB
+    allowedTypes: ['application/pdf', 'image/png', 'image/jpeg'],
+    maxPdfSize: 1 * 1024 * 1024, // 1 MB
+    maxImageSize: 100 * 1024, // 100 KB
 };
 
-export const validateFiles = (files: File[], allowedTypes?: string[]): { isValid: boolean, message?: string } => {
-    const validTypes = allowedTypes && allowedTypes.length > 0 
-        ? allowedTypes.map(t => `image/${t.replace('jpg', 'jpeg')}`).concat(allowedTypes.map(t => `application/${t}`))
+export const validateFiles = (files: File[], allowedMimeTypes?: string[]): { isValid: boolean, message?: string } => {
+    const validMimeTypes = allowedMimeTypes && allowedMimeTypes.length > 0 
+        ? allowedMimeTypes 
         : fileValidationConfig.allowedTypes;
     
-    const friendlyTypeList = (allowedTypes && allowedTypes.length > 0 ? allowedTypes : ['PNG', 'JPG', 'PDF']).join(', ').toUpperCase();
+    const friendlyTypeList = ['PDF', 'PNG', 'JPG'].join(', ');
 
     for (const file of files) {
-        if (!validTypes.includes(file.type)) {
+        if (!validMimeTypes.includes(file.type)) {
             return { isValid: false, message: `Invalid file type: ${file.name}. Only ${friendlyTypeList} are allowed.` };
         }
-        if (file.size > fileValidationConfig.maxSize) {
-            return { isValid: false, message: `File is too large: ${file.name}. Maximum size is 1MB.` };
+        if (file.type === 'application/pdf' && file.size > fileValidationConfig.maxPdfSize) {
+            return { isValid: false, message: `File is too large: ${file.name}. PDFs must be under 1MB.` };
+        }
+        if ((file.type === 'image/jpeg' || file.type === 'image/png') && file.size > fileValidationConfig.maxImageSize) {
+             return { isValid: false, message: `File is too large: ${file.name}. Images (PNG, JPG) must be under 100KB.` };
         }
     }
     return { isValid: true };

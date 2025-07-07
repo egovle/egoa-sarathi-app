@@ -20,7 +20,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 const fileTypes: AllowedFileTypes[] = ['pdf', 'png', 'jpg'];
 
-// Predefined labels based on user's data
 const PREDEFINED_GROUP_LABELS = [
     'Additional Document',
     'Age Proof',
@@ -59,8 +58,6 @@ const PREDEFINED_FIELD_LABELS = [
     'Water Connection'
 ].sort();
 
-
-// Helper to generate a key from a label string
 const generateKey = (label: string) => {
     if (!label) return '';
     return label.toLowerCase().replace(/\s+/g, '_').replace(/[^\w-]/g, '');
@@ -89,7 +86,6 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
             setIsVariable(service.isVariable || false);
             setDocumentGroups(service.documentGroups || []);
         } else {
-            // Reset for new service or new sub-service
             setName('');
             setCustomerRate('');
             setVleRate('');
@@ -111,11 +107,9 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
             currentGroup.key = generateKey(value);
         } else if (field === 'type') {
             currentGroup.type = value;
-            // Reset options when type changes to maintain consistency
             currentGroup.options = [{ key: '', label: '', type: value === 'documents' ? 'document' : 'text', isOptional: false, allowedFileTypes: ['pdf', 'png', 'jpg'] }];
         } else if (field === 'isOptional') {
             currentGroup.isOptional = value;
-            // If group is optional, it doesn't make sense to have a min required number of docs
             if (value) {
                 currentGroup.minRequired = 0;
             }
@@ -328,7 +322,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                                                         <SelectItem value="other">Other...</SelectItem>
                                                     </SelectContent>
                                                 </Select>
-                                                { (isCustomGroupLabel || group.label === '') && PREDEFINED_GROUP_LABELS.indexOf(group.label) === -1 && (
+                                                {isCustomGroupLabel && (
                                                     <Input
                                                         placeholder="Enter custom group label"
                                                         value={group.label}
@@ -396,7 +390,7 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
                                                                         <SelectItem value="other">Other...</SelectItem>
                                                                     </SelectContent>
                                                                 </Select>
-                                                                { (isCustomFieldLabel || option.label === '') && PREDEFINED_FIELD_LABELS.indexOf(option.label) === -1 && (
+                                                                {isCustomFieldLabel && (
                                                                     <Input
                                                                         placeholder="Enter custom field label"
                                                                         value={option.label}

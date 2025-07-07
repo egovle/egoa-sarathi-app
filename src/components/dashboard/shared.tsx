@@ -69,10 +69,10 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
       setUploadedFiles({});
   }, [selectedCategory])
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, groupKey: string, optionKey: string, allowedFileTypes?: string[]) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>, groupKey: string, optionKey: string) => {
     if (e.target.files && e.target.files[0]) {
         const file = e.target.files[0];
-        const validation = validateFiles([file], allowedFileTypes);
+        const validation = validateFiles([file]);
         if (!validation.isValid) {
             toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
             if(e.target) e.target.value = ''; // Reset file input
@@ -298,11 +298,14 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                   if (group.type === 'documents') {
                                       return (
                                           <div key={option.key} className="flex items-center justify-between gap-2 text-sm p-2 border-b last:border-b-0">
-                                              <Label htmlFor={fileKey} className="flex-1">
-                                                {option.label}
-                                                {isMandatory && <span className="text-destructive ml-1">*</span>}
-                                                {option.isOptional && !group.isOptional && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
-                                              </Label>
+                                              <div>
+                                                <Label htmlFor={fileKey} className="flex-1">
+                                                    {option.label}
+                                                    {isMandatory && <span className="text-destructive ml-1">*</span>}
+                                                    {option.isOptional && !group.isOptional && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
+                                                </Label>
+                                                <p className="text-xs text-muted-foreground">(PDF up to 1MB; PNG, JPG up to 100KB)</p>
+                                              </div>
                                               {uploadedFile ? (
                                                   <div className="flex items-center gap-2 text-green-600 font-medium">
                                                     <FileText className="h-4 w-4" />
@@ -318,8 +321,8 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                                   type="file"
                                                   className="hidden"
                                                   ref={el => fileInputRefs.current[fileKey] = el}
-                                                  onChange={(e) => handleFileChange(e, group.key, option.key, option.allowedFileTypes)}
-                                                  accept={option.allowedFileTypes?.map(t => `.${t}`).join(',')}
+                                                  onChange={(e) => handleFileChange(e, group.key, option.key)}
+                                                  accept=".pdf,.png,.jpg,.jpeg"
                                               />
                                           </div>
                                       )
