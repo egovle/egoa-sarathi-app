@@ -20,9 +20,45 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 const fileTypes: AllowedFileTypes[] = ['pdf', 'png', 'jpg'];
 
-// Predefined labels for dropdowns
-const PREDEFINED_GROUP_LABELS = ['Identity Proof', 'Address Proof', 'Birth Proof', 'Residence Proof'];
-const PREDEFINED_FIELD_LABELS = ['Aadhaar Card', 'PAN Card', 'Passport', 'Voter ID', 'Driving License', 'Birth Certificate', 'Electricity Bill', 'Ration Card'];
+// Predefined labels based on user's data
+const PREDEFINED_GROUP_LABELS = [
+    'Additional Document',
+    'Age Proof',
+    'Identity Proof',
+    'Marriage Certificate',
+    'Photograph',
+    'Residence Proof',
+    'Self Declaration Format'
+];
+
+const PREDEFINED_FIELD_LABELS = [
+    'Aadhaar Card',
+    'Any Other Age Proof',
+    'Any Other Identity Proof',
+    'Any Other Residence Proof',
+    'Bank Passbook',
+    'Birth Certificate',
+    'Bonafide Certificate(Latest)',
+    'Driving Licence',
+    'Experience Certificate from a company registered under companies act',
+    'ID cards issued by Govt./Local Authority/Company/ School/Institution',
+    'LPG connection',
+    'Latest House tax receipt/ other ownership/ lease documents',
+    'Marriage Certificate',
+    'PAN card',
+    'Passing Certificate',
+    'Passport Copy',
+    'Pension Payment Order',
+    'Photograph',
+    'Residence Certificate',
+    'School Certificate for each period',
+    'School Leaving Certificate',
+    'Self Declaration',
+    'Social Security Card',
+    'Voter Id card',
+    'Water Connection'
+].sort();
+
 
 // Helper to generate a key from a label string
 const generateKey = (label: string) => {
@@ -419,5 +455,3 @@ export const ServiceFormDialog = ({ service, parentServices, prefilledParentId, 
         </DialogContent>
     );
 };
-
-    
