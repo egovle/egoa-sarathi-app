@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { validateFiles } from '@/lib/utils';
@@ -277,7 +277,10 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                 <>
                   <Separator className="my-2" />
                   <div className="space-y-4">
-                      <p className="text-sm font-medium text-muted-foreground">Required Information</p>
+                      <div className="space-y-1">
+                          <p className="text-sm font-medium text-muted-foreground">Required Information</p>
+                          <p className="text-xs text-muted-foreground">Note file size limits: PDF (1MB), PNG/JPG (100KB).</p>
+                      </div>
                       <div className="space-y-4">
                         {selectedService.documentGroups.map(group => (
                           <Card key={group.key} className="p-4 bg-muted/50">
@@ -304,7 +307,6 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                                     {isMandatory && <span className="text-destructive ml-1">*</span>}
                                                     {option.isOptional && !group.isOptional && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
                                                 </Label>
-                                                <p className="text-xs text-muted-foreground">(PDF up to 1MB; PNG, JPG up to 100KB)</p>
                                               </div>
                                               {uploadedFile ? (
                                                   <div className="flex items-center gap-2 text-green-600 font-medium">
