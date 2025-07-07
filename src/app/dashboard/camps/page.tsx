@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,10 +8,10 @@ import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestor
 import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import type { Camp, CampSuggestion, Service, VLEProfile, UserProfile, GovernmentProfile } from '@/lib/types';
-import AdminCampView from '@/components/dashboard/camps/AdminCampView';
-import VleCampView from '@/components/dashboard/camps/VleCampView';
-import CustomerCampView from '@/components/dashboard/camps/CustomerCampView';
-import GovernmentCampView from '@/components/dashboard/camps/GovernmentCampView';
+import AdminCampView from '@/app/dashboard/camps/AdminCampView';
+import VleCampView from '@/app/dashboard/camps/VleCampView';
+import CustomerCampView from '@/app/dashboard/camps/CustomerCampView';
+import GovernmentCampView from '@/app/dashboard/camps/GovernmentCampView';
 
 export default function CampManagementPage() {
     const { user, userProfile, loading: authLoading } = useAuth();

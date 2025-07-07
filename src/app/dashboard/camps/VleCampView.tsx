@@ -10,18 +10,28 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { PlusCircle, CheckCircle2, XCircle, MoreHorizontal, MessageSquare } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { createNotificationForAdmins } from '@/app/actions';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { SuggestCampDialog } from './CampDialogs';
+import { SuggestCampDialog } from '@/components/dashboard/camps/CampDialogs';
+import { CampDetailsDialog } from '@/components/dashboard/camps/CampDetailsDialog';
 import type { Camp, Service, VLEProfile } from '@/lib/types';
 
 
-export default function VleCampView({ allCamps, services, userProfile }: { allCamps: Camp[], services: Service[], userProfile: VLEProfile }) {
+export default function VleCampView({ allCamps, services, userProfile, vles }: { allCamps: Camp[], services: Service[], userProfile: VLEProfile, vles: VLEProfile[] }) {
     const { toast } = useToast();
+    const { user } = useAuth();
     const [isSuggestFormOpen, setIsSuggestFormOpen] = useState(false);
+    const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+    const [selectedCampForDetails, setSelectedCampForDetails] = useState<Camp | null>(null);
+
+    const handleViewDetails = (camp: Camp) => {
+        setSelectedCampForDetails(camp);
+        setIsDetailsDialogOpen(true);
+    };
 
     const handleVleResponse = async (camp: Camp, newStatus: 'accepted' | 'rejected') => {
         if (!userProfile) return;
@@ -93,6 +103,16 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
     
     return (
      <div className="space-y-6">
+        {user && (
+            <CampDetailsDialog 
+                open={isDetailsDialogOpen}
+                onOpenChange={setIsDetailsDialogOpen}
+                camp={selectedCampForDetails}
+                allVles={vles}
+                user={user}
+                userProfile={userProfile}
+            />
+        )}
         <div className="flex justify-between items-center">
             <h1 className="text-3xl font-bold tracking-tight">Your Camps</h1>
             <Dialog open={isSuggestFormOpen} onOpenChange={setIsSuggestFormOpen}>
@@ -158,6 +178,7 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
                                    <TableHead>Location</TableHead>
                                    <TableHead>Date</TableHead>
                                    <TableHead>Services Offered</TableHead>
+                                   <TableHead className="text-right">Actions</TableHead>
                                </TableRow>
                            </TableHeader>
                            <TableBody>
@@ -172,8 +193,20 @@ export default function VleCampView({ allCamps, services, userProfile }: { allCa
                                                 {camp.otherServices && <Badge key="other" variant="secondary">{camp.otherServices}</Badge>}
                                             </div>
                                        </TableCell>
+                                       <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleViewDetails(camp)}>
+                                                        <MessageSquare className="mr-2 h-4 w-4"/>View Details & Chat
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                       </TableCell>
                                    </TableRow>
-                               )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">You have not confirmed attendance for any camps.</TableCell></TableRow>}
+                               )) : <TableRow><TableCell colSpan={5} className="h-24 text-center">You have not confirmed attendance for any camps.</TableCell></TableRow>}
                            </TableBody>
                        </Table>
                     </CardContent>

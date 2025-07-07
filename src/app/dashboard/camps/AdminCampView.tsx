@@ -4,25 +4,26 @@
 import { useState } from 'react';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Trash, MoreHorizontal, UserCog, UserPlus } from 'lucide-react';
+import { PlusCircle, Trash, MoreHorizontal, UserCog, UserPlus, CircleDollarSign } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { createNotification } from '@/app/actions';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CampFormDialog } from './CampDialogs';
-import type { Camp, CampSuggestion, VLEProfile } from '@/lib/types';
+import { CampFormDialog, CampPayoutDialog } from '@/components/dashboard/camps/CampDialogs';
+import type { Camp, CampSuggestion, VLEProfile, UserProfile } from '@/lib/types';
 
 
-const AdminCampTable = ({ data, vles, onEdit, onDelete }: { data: Camp[], vles: VLEProfile[], onEdit: (camp: Camp) => void, onDelete: (camp: Camp) => void }) => (
+const AdminCampTable = ({ data, vles, onEdit, onDelete, onPayout }: { data: Camp[], vles: VLEProfile[], onEdit: (camp: Camp) => void, onDelete: (camp: Camp) => void, onPayout: (camp: Camp) => void }) => {
+    
+    return (
     <Card>
         <CardContent className="pt-6">
             <Table>
@@ -31,23 +32,22 @@ const AdminCampTable = ({ data, vles, onEdit, onDelete }: { data: Camp[], vles: 
                         <TableHead>Name</TableHead>
                         <TableHead>Location</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Services</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Assigned VLEs</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {data.length > 0 ? data.map((camp) => (
+                    {data.length > 0 ? data.map((camp) => {
+                        const isPastCamp = new Date(camp.date) < new Date();
+                        const canPayout = isPastCamp && camp.status !== 'Paid Out' && camp.status !== 'Cancelled';
+
+                        return (
                         <TableRow key={camp.id}>
-                            <TableCell className="font-medium">{camp.name}</TableCell>
+                            <TableCell className="font-medium">{camp.type === 'suggested' ? `Goa Sarathi Camp at ${camp.location}` : camp.name}</TableCell>
                             <TableCell>{camp.location}</TableCell>
                             <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
-                            <TableCell>
-                                <div className="flex flex-wrap gap-1 max-w-xs">
-                                    {camp.services?.map((service: string) => <Badge key={service} variant="outline">{service}</Badge>)}
-                                    {camp.otherServices && <Badge key="other" variant="secondary">{camp.otherServices}</Badge>}
-                                </div>
-                            </TableCell>
+                            <TableCell><Badge variant={camp.status === 'Paid Out' ? 'default' : 'secondary'}>{camp.status}</Badge></TableCell>
                             <TableCell>
                                 <div className="flex items-center -space-x-2">
                                     {camp.assignedVles?.slice(0, 3).map((assignedVle) => {
@@ -82,12 +82,13 @@ const AdminCampTable = ({ data, vles, onEdit, onDelete }: { data: Camp[], vles: 
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuItem onClick={() => onEdit(camp)}><UserCog className="mr-2 h-4 w-4"/>Manage VLEs / Edit</DropdownMenuItem>
+                                        {canPayout && <DropdownMenuItem onClick={() => onPayout(camp)}><CircleDollarSign className="mr-2 h-4 w-4"/>Process Payouts</DropdownMenuItem>}
                                         <DropdownMenuItem onClick={() => onDelete(camp)} className="text-destructive focus:text-destructive"><Trash className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </TableCell>
                         </TableRow>
-                    )) : (
+                    )}) : (
                         <TableRow>
                             <TableCell colSpan={6} className="h-24 text-center">No camps to display.</TableCell>
                         </TableRow>
@@ -96,14 +97,15 @@ const AdminCampTable = ({ data, vles, onEdit, onDelete }: { data: Camp[], vles: 
             </Table>
         </CardContent>
     </Card>
-);
+    )
+};
 
 
-export default function AdminCampView({ allCamps, suggestions, vles }: { allCamps: Camp[], suggestions: CampSuggestion[], vles: VLEProfile[] }) {
+export default function AdminCampView({ allCamps, suggestions, vles, userProfile }: { allCamps: Camp[], suggestions: CampSuggestion[], vles: VLEProfile[], userProfile: UserProfile | null }) {
     const { toast } = useToast();
-    const { userProfile } = useAuth();
     
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isPayoutFormOpen, setIsPayoutFormOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const [selectedCamp, setSelectedCamp] = useState<Camp | null>(null);
     const [selectedSuggestion, setSelectedSuggestion] = useState<CampSuggestion | null>(null);
@@ -113,6 +115,11 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
         setSelectedSuggestion(null);
         setIsFormOpen(true);
     };
+
+    const handlePayout = (camp: Camp) => {
+        setSelectedCamp(camp);
+        setIsPayoutFormOpen(true);
+    }
 
     const handleDelete = (camp: Camp) => {
         setSelectedCamp(camp);
@@ -143,6 +150,7 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
 
     const handleFormFinished = () => {
         setIsFormOpen(false);
+        setIsPayoutFormOpen(false);
         setSelectedCamp(null);
         setSelectedSuggestion(null);
     }
@@ -180,6 +188,20 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
                 />
             </Dialog>
 
+            <Dialog open={isPayoutFormOpen} onOpenChange={(open) => {
+                if (!open) handleFormFinished();
+                else setIsPayoutFormOpen(open);
+            }}>
+                {selectedCamp && userProfile && (
+                     <CampPayoutDialog
+                        camp={selectedCamp}
+                        vles={vles}
+                        adminProfile={userProfile}
+                        onFinished={handleFormFinished}
+                    />
+                )}
+            </Dialog>
+
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold tracking-tight">Camp Management</h1>
                 <Button onClick={() => { setSelectedCamp(null); setSelectedSuggestion(null); setIsFormOpen(true); }}>
@@ -189,12 +211,12 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
             
             <Tabs defaultValue='upcoming' className="w-full">
                 <TabsList>
-                    <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                    <TabsTrigger value="upcoming">Upcoming <Badge className="ml-2">{upcomingCamps.length}</Badge></TabsTrigger>
                     <TabsTrigger value="suggestions">VLE Suggestions <Badge className="ml-2">{suggestions.length}</Badge></TabsTrigger>
-                    <TabsTrigger value="past">Past</TabsTrigger>
+                    <TabsTrigger value="past">Past <Badge className="ml-2">{pastCamps.length}</Badge></TabsTrigger>
                 </TabsList>
                 <TabsContent value="upcoming" className="mt-4">
-                    <AdminCampTable data={upcomingCamps} vles={vles} onEdit={handleEdit} onDelete={handleDelete} />
+                    <AdminCampTable data={upcomingCamps} vles={vles} onEdit={handleEdit} onDelete={handleDelete} onPayout={handlePayout} />
                 </TabsContent>
                 <TabsContent value="suggestions" className="mt-4">
                     <Card>
@@ -234,7 +256,7 @@ export default function AdminCampView({ allCamps, suggestions, vles }: { allCamp
                     </Card>
                 </TabsContent>
                 <TabsContent value="past" className="mt-4">
-                     <AdminCampTable data={pastCamps} vles={vles} onEdit={handleEdit} onDelete={handleDelete} />
+                     <AdminCampTable data={pastCamps} vles={vles} onEdit={handleEdit} onDelete={handleDelete} onPayout={handlePayout} />
                 </TabsContent>
             </Tabs>
         </div>
