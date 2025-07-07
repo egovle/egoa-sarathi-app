@@ -9,7 +9,6 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export const fileValidationConfig = {
-    // Stricter default, can be overridden
     allowedTypes: ['application/pdf', 'image/png', 'image/jpeg'],
     maxPdfSize: 1 * 1024 * 1024, // 1 MB
     maxImageSize: 100 * 1024, // 100 KB
