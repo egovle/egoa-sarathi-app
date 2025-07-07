@@ -182,6 +182,8 @@ export default function RegisterPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      
+      const isAdminUser = role === 'vle' && email === 'admin@egoasarthi.com';
 
       const userProfile = {
         name: fullName,
@@ -190,7 +192,9 @@ export default function RegisterPage() {
         location: fullLocation,
         role: role,
         walletBalance: 0,
-        ...(role === 'vle' ? { status: 'Pending', available: false, isAdmin: false } : { isAdmin: false }),
+        ...(role === 'vle' 
+            ? { status: isAdminUser ? 'Approved' : 'Pending', available: isAdminUser, isAdmin: isAdminUser } 
+            : { isAdmin: false }),
       };
 
       const collectionName = role === 'vle' ? 'vles' : 'users';
