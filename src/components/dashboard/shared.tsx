@@ -119,32 +119,48 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
             if (group.isOptional) continue;
 
             const minRequired = group.minRequired || 0;
-            if (minRequired === 0) continue;
-
-            let suppliedCount = 0;
-            for (const option of group.options) {
-                if (group.type === 'documents') {
-                    const fileKey = `${group.key}:${option.key}`;
-                    if (uploadedFiles[fileKey]) {
-                        suppliedCount++;
-                    }
-                } else if (group.type === 'text') {
-                    const fieldKey = `text_${group.key}:${option.key}`;
-                    const value = formData.get(fieldKey) as string;
-                    if (value && value.trim()) {
-                        suppliedCount++;
+            if (minRequired > 0) {
+                let suppliedCount = 0;
+                for (const option of group.options) {
+                     if (group.type === 'documents') {
+                        const fileKey = `${group.key}:${option.key}`;
+                        if (uploadedFiles[fileKey]) suppliedCount++;
+                    } else if (group.type === 'text') {
+                        const fieldKey = `text_${group.key}:${option.key}`;
+                        if ((formData.get(fieldKey) as string)?.trim()) suppliedCount++;
                     }
                 }
-            }
+                if (suppliedCount < minRequired) {
+                    toast({
+                        title: `More Information Required`,
+                        description: `Please provide at least ${minRequired} item(s) for the "${group.label}" section.`,
+                        variant: 'destructive',
+                    });
+                    setIsSubmitting(false);
+                    return;
+                }
+            } else {
+                 for (const option of group.options) {
+                    if (option.isOptional) continue;
 
-            if (suppliedCount < minRequired) {
-                toast({
-                    title: `More Information Required`,
-                    description: `Please provide at least ${minRequired} item(s) for the "${group.label}" section.`,
-                    variant: 'destructive',
-                });
-                setIsSubmitting(false);
-                return;
+                    let isSupplied = false;
+                     if (group.type === 'documents') {
+                        const fileKey = `${group.key}:${option.key}`;
+                        if (uploadedFiles[fileKey]) isSupplied = true;
+                    } else if (group.type === 'text') {
+                        const fieldKey = `text_${group.key}:${option.key}`;
+                        if ((formData.get(fieldKey) as string)?.trim()) isSupplied = true;
+                    }
+                    if (!isSupplied) {
+                         toast({
+                            title: `Required Field Missing`,
+                            description: `Please provide the required field: "${option.label}".`,
+                            variant: 'destructive',
+                        });
+                        setIsSubmitting(false);
+                        return;
+                    }
+                 }
             }
         }
     }
@@ -296,7 +312,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                               <CardContent className="p-0 space-y-2">
                                 {group.options.map(option => {
                                   const fileKey = `${group.key}:${option.key}`;
-                                  const isMandatory = !group.isOptional && !option.isOptional && (group.minRequired || 0) === 0;
+                                  const isMandatory = !group.isOptional && !option.isOptional && !group.minRequired;
                                   const uploadedFile = uploadedFiles[fileKey];
                                   if (group.type === 'documents') {
                                       return (
@@ -305,7 +321,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                                 <Label htmlFor={fileKey} className="flex-1">
                                                     {option.label}
                                                     {isMandatory && <span className="text-destructive ml-1">*</span>}
-                                                    {option.isOptional && !group.isOptional && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
+                                                    {option.isOptional && !group.isOptional && !group.minRequired && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
                                                 </Label>
                                               </div>
                                               {uploadedFile ? (
@@ -334,7 +350,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                               <Label htmlFor={`text_${group.key}:${option.key}`}>
                                                 {option.label}
                                                 {isMandatory && <span className="text-destructive ml-1">*</span>}
-                                                {option.isOptional && !group.isOptional && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
+                                                {option.isOptional && !group.isOptional && !group.minRequired && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
                                               </Label>
                                               <Input 
                                                 id={`text_${group.key}:${option.key}`}
