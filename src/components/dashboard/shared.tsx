@@ -3,7 +3,7 @@
 
 import { useState, useRef, useEffect, type ChangeEvent, type FormEvent, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, FileUp, FileText, Wallet, PlusCircle } from 'lucide-react';
+import { Loader2, FileUp, FileText, Wallet, PlusCircle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -79,6 +79,17 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
             return;
         }
         setUploadedFiles(prev => ({ ...prev, [`${groupKey}:${optionKey}`]: file }));
+    }
+  };
+  
+  const handleRemoveFile = (fileKey: string) => {
+    setUploadedFiles(prev => {
+        const newFiles = { ...prev };
+        delete newFiles[fileKey];
+        return newFiles;
+    });
+    if (fileInputRefs.current[fileKey]) {
+        fileInputRefs.current[fileKey]!.value = '';
     }
   };
 
@@ -333,10 +344,21 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                                 </Label>
                                               </div>
                                               {uploadedFile ? (
-                                                  <div className="flex items-center gap-2 text-green-600 font-medium">
-                                                    <FileText className="h-4 w-4" />
-                                                    <span className="truncate max-w-xs">{uploadedFile.name}</span>
-                                                  </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-2 text-green-600 font-medium">
+                                                        <FileText className="h-4 w-4" />
+                                                        <span className="truncate max-w-[150px]">{uploadedFile.name}</span>
+                                                    </div>
+                                                    <Button 
+                                                        type="button" 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                                                        onClick={() => handleRemoveFile(fileKey)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                               ) : (
                                                 <Button type="button" size="sm" variant="outline" onClick={() => fileInputRefs.current[fileKey]?.click()}>
                                                     <FileUp className="h-4 w-4 mr-2"/>Upload
