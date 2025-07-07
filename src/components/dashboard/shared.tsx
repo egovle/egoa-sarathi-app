@@ -114,10 +114,12 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
         return;
     }
 
-    if(selectedService?.documentGroups) {
+    if (selectedService?.documentGroups) {
         for (const group of selectedService.documentGroups) {
-            if (group.isOptional) continue;
-
+            if (group.isOptional) {
+                continue;
+            }
+    
             const suppliedCount = group.options.reduce((count, option) => {
                 let isSupplied = false;
                 if (group.type === 'documents') {
@@ -130,38 +132,41 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                 return isSupplied ? count + 1 : count;
             }, 0);
     
-            if ((group.minRequired || 0) > 0) {
-                if (suppliedCount < group.minRequired) {
+            // Rule 1: Check if the number of supplied documents meets the minimum required for the group.
+            if (suppliedCount < (group.minRequired || 0)) {
+                toast({
+                    title: `More Information Required`,
+                    description: `Please provide at least ${group.minRequired} item(s) for the "${group.label}" section.`,
+                    variant: 'destructive',
+                });
+                setIsSubmitting(false);
+                return;
+            }
+    
+            // Rule 2: Check if every individually mandatory field has been supplied.
+            for (const option of group.options) {
+                if (option.isOptional) {
+                    continue;
+                }
+    
+                let isSupplied = false;
+                if (group.type === 'documents') {
+                    const fileKey = `${group.key}:${option.key}`;
+                    if (uploadedFiles[fileKey]) isSupplied = true;
+                } else if (group.type === 'text') {
+                    const fieldKey = `text_${group.key}:${option.key}`;
+                    if ((formData.get(fieldKey) as string)?.trim()) isSupplied = true;
+                }
+    
+                if (!isSupplied) {
                     toast({
-                        title: `More Information Required`,
-                        description: `Please provide at least ${group.minRequired} item(s) for the "${group.label}" section.`,
+                        title: `Required Field Missing`,
+                        description: `Please provide the required field: "${option.label}".`,
                         variant: 'destructive',
                     });
                     setIsSubmitting(false);
                     return;
                 }
-            } else {
-                 for (const option of group.options) {
-                    if (option.isOptional) continue;
-
-                    let isSupplied = false;
-                     if (group.type === 'documents') {
-                        const fileKey = `${group.key}:${option.key}`;
-                        if (uploadedFiles[fileKey]) isSupplied = true;
-                    } else if (group.type === 'text') {
-                        const fieldKey = `text_${group.key}:${option.key}`;
-                        if ((formData.get(fieldKey) as string)?.trim()) isSupplied = true;
-                    }
-                    if (!isSupplied) {
-                         toast({
-                            title: `Required Field Missing`,
-                            description: `Please provide the required field: "${option.label}".`,
-                            variant: 'destructive',
-                        });
-                        setIsSubmitting(false);
-                        return;
-                    }
-                 }
             }
         }
     }
@@ -313,7 +318,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                               <CardContent className="p-0 space-y-2">
                                 {group.options.map(option => {
                                   const fileKey = `${group.key}:${option.key}`;
-                                  const isMandatory = !group.isOptional && !option.isOptional && (group.minRequired || 0) === 0;
+                                  const isMandatory = !group.isOptional && !option.isOptional;
                                   const uploadedFile = uploadedFiles[fileKey];
                                   if (group.type === 'documents') {
                                       return (
@@ -322,7 +327,9 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                                 <Label htmlFor={fileKey} className="flex-1">
                                                     {option.label}
                                                     {isMandatory && <span className="text-destructive ml-1">*</span>}
-                                                    {option.isOptional && !group.isOptional && (group.minRequired || 0) === 0 && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
+                                                    {option.isOptional && !group.isOptional && (
+                                                        <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>
+                                                    )}
                                                 </Label>
                                               </div>
                                               {uploadedFile ? (
@@ -346,18 +353,21 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                           </div>
                                       )
                                   } else { // group.type === 'text'
+                                      const isTextMandatory = !group.isOptional && !option.isOptional;
                                       return (
                                           <div key={option.key} className="space-y-2 p-2">
                                               <Label htmlFor={`text_${group.key}:${option.key}`}>
                                                 {option.label}
-                                                {isMandatory && <span className="text-destructive ml-1">*</span>}
-                                                {option.isOptional && !group.isOptional && (group.minRequired || 0) === 0 && <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>}
+                                                {isTextMandatory && <span className="text-destructive ml-1">*</span>}
+                                                {option.isOptional && !group.isOptional && (
+                                                    <Badge variant="outline" className="ml-2 text-xs">Optional</Badge>
+                                                )}
                                               </Label>
                                               <Input 
                                                 id={`text_${group.key}:${option.key}`}
                                                 name={`text_${group.key}:${option.key}`}
                                                 placeholder={option.placeholder || ''}
-                                                required={isMandatory}
+                                                required={isTextMandatory}
                                               />
                                           </div>
                                       )
