@@ -2,10 +2,6 @@
 
 This is a NextJS starter in Firebase Studio.
 
-## Getting Started
-
-To get started, take a look at `src/app/page.tsx`.
-
 ## IMPORTANT: Fixing Login on Your Live Website
 
 If your login works in the local preview but fails on your live URL (the one ending in `.hosted.app`), it means your deployed app is missing its API keys.
