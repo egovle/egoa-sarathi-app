@@ -1,26 +1,29 @@
-# Firebase Studio
+# Firebase Studio - IMPORTANT LOGIN FIX
 
 This is a NextJS starter in Firebase Studio.
 
-## IMPORTANT: Fixing Login on Your Live Website
+## Fixing Login on Your Live Website (The Definitive Guide)
 
-If your login works in the local preview but fails on your live URL (the one ending in `.hosted.app`), it means your deployed app is missing its API keys.
+If your login works in the local preview but fails on your live URL, it means your deployed app is using the wrong API keys. This guide will fix it permanently.
 
-Please follow these steps exactly:
+### Step 1: Find Your CORRECT Firebase Credentials
 
-1.  **Open the `apphosting.yaml` File:** This file is in the main directory of your project (not inside `src`).
+The API key at the top of your Project Settings is a **placeholder**. You need the keys from your specific **Web App**.
 
-2.  **Get Your Firebase Credentials:**
-    *   Go to the [Firebase Console](https://console.firebase.google.com/) and select your `egoasarthi` project.
-    *   Click the **gear icon ⚙️** > **Project settings**.
-    *   Under the "Your apps" card, find your web app and look at the **SDK setup and configuration**.
-    *   You will see your keys (`apiKey`, `authDomain`, `projectId`, etc.).
+1.  Go to the [Firebase Console](https://console.firebase.google.com/) and select your `egoasarthi` project.
+2.  Click the **gear icon ⚙️** > **Project settings**.
+3.  On the "General" tab, **scroll down** to the **"Your apps"** card.
+4.  Find your web app and select the **"Config"** option under "SDK setup and configuration".
+5.  You will now see the `firebaseConfig` object. These are your **real, active credentials**.
 
-3.  **Update `apphosting.yaml`:**
-    *   Copy your real credentials from the Firebase Console.
-    *   Paste them into the `apphosting.yaml` file, replacing the placeholder values.
+### Step 2: Update the `apphosting.yaml` File
 
-    **Example:**
+Now, you will put these real credentials into the configuration file for your live website.
+
+1.  In the Studio file explorer on the left, open the `apphosting.yaml` file. (It is in the root of your project, not in the `src` folder).
+2.  Carefully copy and paste **each value** from the `firebaseConfig` object in the Firebase Console into the matching field in `apphosting.yaml`.
+
+    **Example `apphosting.yaml`:**
     ```yaml
     # In apphosting.yaml
 
@@ -36,7 +39,12 @@ Please follow these steps exactly:
         NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "PASTE_YOUR_MEASUREMENT_ID_HERE"
     ```
 
-4.  **Commit Your Changes:** After you have pasted your real keys into `apphosting.yaml`, commit the changes in the source control panel on the left. This will trigger a new deployment with the correct keys, and your login will start working on the live URL.
+### Step 3: Save and Deploy
+
+*   After you have pasted all your real keys into `apphosting.yaml`, **save the file**.
+*   This will trigger a new deployment. Once it's complete, your login will work on the live URL.
+
+---
 
 ## Environment Variables for Local Development
 
