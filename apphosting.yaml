@@ -7,10 +7,12 @@ runConfig:
   maxInstances: 1
   # These environment variables are NOT stored in source control when you manage
   # them from the Firebase console. However, if you add them here, they WILL be.
-  # For security, replace the placeholder values below with your actual keys.
   # A new deployment is required for these changes to take effect.
   environmentVariables:
     NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyAVWezupcCQhE6FhdxSgsD1SVPxtjDK72w"
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "egoasarthi.firebaseapp.com"
     NEXT_PUBLIC_FIREBASE_PROJECT_ID: "egoasarthi"
     NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "egoasarthi.firebasestorage.app"
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "582450828090"
+    NEXT_PUBLIC_FIREBASE_APP_ID: "1:582450828090:web:a0ed05ea1a74710230f603"
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-9ZGSFH8X1F"

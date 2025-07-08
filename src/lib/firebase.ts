@@ -10,10 +10,13 @@ const firebaseConfig = {
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Check if the Firebase API key is provided. If not, the app cannot connect to Firebase.
-if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'your_api_key_here') {
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('your_api_key_here')) {
     throw new Error("CRITICAL: Firebase configuration is missing. Please follow these steps: 1. Create a file named .env.local in the root of your project. 2. Copy the contents of .env.local.example into it. 3. Replace the placeholder values with your actual Firebase project credentials. You can find these in your Firebase project settings.");
 }
 
