@@ -10,7 +10,7 @@ runConfig:
   # For security, replace the placeholder values below with your actual keys.
   # A new deployment is required for these changes to take effect.
   environmentVariables:
-    NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyAVWezupcCQhE6FhdxSgsD1SVPxtjDK72w"
+    NEXT_PUBLIC_FIREBASE_API_KEY: "PASTE_YOUR_REAL_API_KEY_HERE"
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "egoasarthi.firebaseapp.com"
     NEXT_PUBLIC_FIREBASE_PROJECT_ID: "egoasarthi"
     NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "egoasarthi.firebasestorage.app"
