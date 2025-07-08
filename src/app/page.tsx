@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -26,8 +25,12 @@ export default function LoginPage() {
   const [isConfigMissing, setIsConfigMissing] = useState(false);
 
   useEffect(() => {
+    // This log will help diagnose if the environment variables are loaded correctly on the hosted page.
+    console.log("DIAGNOSTIC - Loaded API Key:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
+    console.log("DIAGNOSTIC - Loaded Project ID:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!apiKey || apiKey === 'your_api_key_here') {
+    if (!apiKey || apiKey.startsWith('AIzaSyAVWezupcCQhE6FhdxSgsD1SVPxtjDK72w')) { // Using a known incorrect value as placeholder
       setIsConfigMissing(true);
     }
   }, []);
@@ -63,13 +66,7 @@ export default function LoginPage() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Configuration Error</AlertTitle>
             <AlertDescription>
-              Your Firebase API Key is missing. The app cannot connect to Firebase.
-              <ol className="list-decimal list-inside mt-2 space-y-1">
-                <li>Create a file named <strong>.env.local</strong> in your project's root folder.</li>
-                <li>Copy the content from <strong>.env.local.example</strong> into it.</li>
-                <li>Replace the placeholder values with your real Firebase credentials.</li>
-                <li><strong>Important:</strong> Restart the development server after creating the file.</li>
-              </ol>
+              Your Firebase API Key is missing or incorrect. The app cannot connect to Firebase. Please check the `apphosting.yaml` file and ensure the correct credentials from your Firebase project are set.
             </AlertDescription>
           </Alert>
         )}
