@@ -25,12 +25,10 @@ export default function LoginPage() {
   const [isConfigMissing, setIsConfigMissing] = useState(false);
 
   useEffect(() => {
-    // This log will help diagnose if the environment variables are loaded correctly on the hosted page.
-    console.log("DIAGNOSTIC - Loaded API Key:", process.env.NEXT_PUBLIC_FIREBASE_API_KEY);
-    console.log("DIAGNOSTIC - Loaded Project ID:", process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
-
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!apiKey || apiKey.startsWith('AIzaSyAVWezupcCQhE6FhdxSgsD1SVPxtjDK72w')) { // Using a known incorrect value as placeholder
+    // This checks for the specific placeholder API key from the initial project setup.
+    // If it's present, it means the user hasn't added their own real keys to apphosting.yaml
+    if (!apiKey || apiKey.startsWith('AIzaSyAVWezupcCQhE6FhdxSgsD1SVPxtjDK72w')) {
       setIsConfigMissing(true);
     }
   }, []);
