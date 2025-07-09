@@ -42,8 +42,7 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  };
-
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
@@ -63,7 +62,7 @@ export default function LoginPage() {
                 Login to Your Portal
             </CardTitle>
             <CardDescription>Access services with your credentials</CardDescription>
-          </CardHeader>
+          </Header>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2 text-left">
