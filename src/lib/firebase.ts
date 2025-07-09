@@ -16,8 +16,8 @@ const firebaseConfig = {
 
 // A basic check to catch missing configuration during development.
 // The main, user-facing check is now on the LoginPage.
-if (!firebaseConfig.apiKey || firebaseConfig.apiKey === 'PASTE_YOUR_REAL_API_KEY_HERE') {
-    console.error("CRITICAL: Firebase configuration is missing. The app will not function correctly. Check your .env.local file or App Hosting environment variables.");
+if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('PASTE_YOUR')) {
+    console.error("CRITICAL: Firebase configuration is missing or incomplete. The app will not function correctly. Check your .env or apphosting.yaml file.");
 }
 
 // Initialize Firebase

@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -61,7 +60,7 @@ export default function RegisterPage() {
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!apiKey || apiKey === 'your_api_key_here') {
+    if (!apiKey || apiKey.startsWith('PASTE_YOUR')) {
       setIsConfigMissing(true);
     }
   }, []);

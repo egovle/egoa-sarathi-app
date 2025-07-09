@@ -27,7 +27,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!key || key.includes('PASTE_YOUR_REAL_API_KEY')) {
+    if (!key || key.startsWith('PASTE_YOUR')) {
       setIsConfigMissing(true);
     }
   }, []);
@@ -71,7 +71,7 @@ export default function LoginPage() {
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Configuration Error!</AlertTitle>
                 <AlertDescription>
-                    Your app's API keys are not set correctly. Please follow the instructions in the README.md file to fix this.
+                    Your app's API keys are not set correctly. Please follow the setup instructions to fix this.
                 </AlertDescription>
             </Alert>
         )}
