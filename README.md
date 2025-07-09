@@ -46,6 +46,21 @@ Now, you will put these real credentials into the configuration file for your li
 
 ---
 
+## Troubleshooting: What to do if Login STILL Fails
+
+If you have followed all the steps above and login still fails, the last thing to check is **API Key Restrictions**.
+
+1. Go to the [Google Cloud Credentials page](https://console.cloud.google.com/apis/credentials).
+2. Make sure your project `egoasarthi` is selected at the top.
+3. Find the API key that matches the one from your `firebaseConfig` (it usually contains "Browser key"). Click on its name.
+4. On the key's configuration page, look for the **Application restrictions** section.
+5. For the simplest and most reliable setup, select **"None"**. This removes any website-based restrictions that might be blocking your live app.
+6. Click **Save**.
+
+It may take a minute or two for this change to take effect.
+
+---
+
 ## Environment Variables for Local Development
 
 For the application to connect to your Firebase project locally, you need to provide your Firebase project's configuration in a `.env.local` file.

@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { ShieldCheck, LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { useState, type FormEvent, useEffect } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -21,6 +22,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
+  
+  const [isConfigMissing, setIsConfigMissing] = useState(false);
+  const [apiKeyForDisplay, setApiKeyForDisplay] = useState('');
+
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+    if (!key || key.includes('PASTE_YOUR_REAL_API_KEY')) {
+      setIsConfigMissing(true);
+    }
+    setApiKeyForDisplay(key || 'UNDEFINED');
+  }, []);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -32,7 +44,8 @@ export default function LoginPage() {
         description: 'Redirecting to your dashboard...',
       });
       router.push('/dashboard');
-    } catch (error: any) {
+    } catch (error: any)
+      {
       console.error('Login failed:', error);
       toast({
         title: 'Login Failed',
@@ -42,7 +55,7 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
@@ -54,6 +67,16 @@ export default function LoginPage() {
           <h1 className="text-5xl font-bold tracking-tight text-foreground">eGoa Sarathi</h1>
           <p className="text-lg text-muted-foreground mt-2">Streamlined Citizen Services</p>
         </div>
+        
+        {isConfigMissing && (
+            <Alert variant="destructive" className="mb-4 max-w-sm w-full">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Configuration Error!</AlertTitle>
+                <AlertDescription>
+                    Your app's API keys are not set correctly. Please follow the instructions in the README.md file to fix this.
+                </AlertDescription>
+            </Alert>
+        )}
 
         <Card className="w-full max-w-sm">
           <CardHeader>
@@ -105,19 +128,25 @@ export default function LoginPage() {
                     </Button>
                 </div>
               </div>
-              <Button type="submit" disabled={loading} className="w-full mt-4">
+              <Button type="submit" disabled={loading || isConfigMissing} className="w-full mt-4">
                 {loading ? <Loader2 className="animate-spin" /> : 'Secure Sign In'}
               </Button>
             </form>
 
               <div className="mt-6 text-center text-sm">
                   <span className="text-muted-foreground">Don't have an account?{' '}</span>
-                  <Link href="/register" className={cn("underline font-semibold text-primary hover:text-primary/80 transition-colors")} prefetch={false}>
+                  <Link href="/register" className={cn("underline font-semibold text-primary hover:text-primary/80 transition-colors", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>
                       Register here
                   </Link>
               </div>
           </CardContent>
         </Card>
+        
+        <div className="mt-4 p-2 border rounded-md bg-muted text-muted-foreground text-xs max-w-sm w-full break-all">
+          <p className="font-bold">Diagnostic Info:</p>
+          <p>API Key Used: {apiKeyForDisplay}</p>
+        </div>
+
       </main>
 
       <footer className="mt-10 flex items-center gap-4 z-10 text-muted-foreground">
