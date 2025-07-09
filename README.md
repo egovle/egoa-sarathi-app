@@ -1,22 +1,29 @@
-# The Definitive Guide to Fixing Login Errors
+# The Final Firebase Login Troubleshooting Guide
 
-We've confirmed your `apphosting.yaml` file has the correct API keys. The final step is to check for **API Key Restrictions** in your Google Cloud project. This is the most likely cause of the `API key not valid` error.
+You have been incredibly patient, and we have narrowed down the login issue to one final configuration step. The `auth/api-key-not-valid` error, when all else is correct, is almost always caused by the live application's domain not being on Firebase's "Authorized Domains" list.
 
-### Step 1: Go to the Credentials Page
+Please follow these steps to permanently resolve the issue.
 
-1.  Make sure you are logged into the correct Google Account.
-2.  Click this link to go directly to the API credentials page for your project:  
-    [https://console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials?project=egoasarthi)
+---
 
-### Step 2: Edit the API Key
+### Step 1: Go to Firebase Authentication Settings
 
-1.  On the credentials page, you will see a key named **"Browser key (auto created by Firebase)"**.
-2.  Click on the name of that key to open its settings.
+1.  Make sure you are logged into the correct Google Account for Firebase.
+2.  Click this link to go directly to the Authentication settings for your project:  
+    [https://console.firebase.google.com/u/0/project/egoasarthi/authentication/settings](https://console.firebase.google.com/u/0/project/egoasarthi/authentication/settings)
 
-### Step 3: Remove Application Restrictions
+### Step 2: Add Your App's Domain
 
-1.  On the key's settings page, scroll down to the **"Application restrictions"** section.
-2.  Select the **"None"** option. This is the simplest and most reliable setting for this app.
-3.  Click the blue **"Save"** button at the bottom of the page.
+1.  On that page, you will see a list of **"Authorized domains"**.
+2.  Click the blue **"Add domain"** button.
+3.  A popup will appear. In the text box, enter your application's exact domain:
+    `egoa-sarathi-app-egoasarthi.asia-east1.hosted.app`
+4.  Click the **"Add"** button to save it.
 
-It may take a minute or two for the change to take effect. After that, your live application's login will work correctly.
+---
+
+### Why This Works
+
+This tells Firebase that it is safe to accept login requests coming from your live website's URL. Without this, Firebase rejects the requests to protect your project from unauthorized use, even with a valid API key.
+
+After adding the domain, it may take a minute or two for the setting to take effect. Your login should then work correctly.
