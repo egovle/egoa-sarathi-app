@@ -1,29 +1,38 @@
-# The Final Firebase Login Troubleshooting Guide
+# egoasarthi
 
-You have been incredibly patient, and we have narrowed down the login issue to one final configuration step. The `auth/api-key-not-valid` error, when all else is correct, is almost always caused by the live application's domain not being on Firebase's "Authorized Domains" list.
+This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
-Please follow these steps to permanently resolve the issue.
+## Getting Started
 
----
+First, run the development server:
 
-### Step 1: Go to Firebase Authentication Settings
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-1.  Make sure you are logged into the correct Google Account for Firebase.
-2.  Click this link to go directly to the Authentication settings for your project:  
-    [https://console.firebase.google.com/u/0/project/egoasarthi/authentication/settings](https://console.firebase.google.com/u/0/project/egoasarthi/authentication/settings)
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### Step 2: Add Your App's Domain
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-1.  On that page, you will see a list of **"Authorized domains"**.
-2.  Click the blue **"Add domain"** button.
-3.  A popup will appear. In the text box, enter your application's exact domain:
-    `egoa-sarathi-app-egoasarthi.asia-east1.hosted.app`
-4.  Click the **"Add"** button to save it.
+This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
 
----
+## Learn More
 
-### Why This Works
+To learn more about Next.js, take a look at the following resources:
 
-This tells Firebase that it is safe to accept login requests coming from your live website's URL. Without this, Firebase rejects the requests to protect your project from unauthorized use, even with a valid API key.
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-After adding the domain, it may take a minute or two for the setting to take effect. Your login should then work correctly.
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
