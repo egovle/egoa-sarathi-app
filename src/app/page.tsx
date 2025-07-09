@@ -28,7 +28,7 @@ export default function LoginPage() {
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     // This checks for the specific placeholder API key from the initial project setup.
     // If it's present, it means the user hasn't added their own real keys to apphosting.yaml
-    if (!apiKey || apiKey.startsWith('AIzaSyAVWezupcCQhE6FhdxSgsD1SVPxtjDK72w')) {
+    if (!apiKey || apiKey === 'PASTE_YOUR_REAL_API_KEY_HERE') {
       setIsConfigMissing(true);
     }
   }, []);
@@ -64,7 +64,7 @@ export default function LoginPage() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Configuration Error</AlertTitle>
             <AlertDescription>
-              Your Firebase API Key is missing or incorrect. The app cannot connect to Firebase. Please check the `apphosting.yaml` file and ensure the correct credentials from your Firebase project are set.
+              Your Firebase API Key is missing or incorrect. The app cannot connect to Firebase. Please open the `README.md` file and follow the instructions to fix this.
             </AlertDescription>
           </Alert>
         )}
