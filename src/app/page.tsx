@@ -4,14 +4,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
-import { useState, type FormEvent, useEffect } from 'react';
+import { ShieldCheck, LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
 
@@ -22,16 +21,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-  const [isConfigMissing, setIsConfigMissing] = useState(false);
-
-  useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    // This checks for the specific placeholder API key from the initial project setup.
-    // If it's present, it means the user hasn't added their own real keys to apphosting.yaml
-    if (!apiKey || apiKey === 'PASTE_YOUR_REAL_API_KEY_HERE') {
-      setIsConfigMissing(true);
-    }
-  }, []);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -59,15 +48,6 @@ export default function LoginPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
       <main className="flex flex-col items-center justify-center w-full flex-1 z-10">
-        {isConfigMissing && (
-          <Alert variant="destructive" className="max-w-md mb-8">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Configuration Error</AlertTitle>
-            <AlertDescription>
-              Your Firebase API Key is missing or incorrect. The app cannot connect to Firebase. Please open the `README.md` file and follow the instructions to fix this.
-            </AlertDescription>
-          </Alert>
-        )}
         <div className="text-center mb-10">
           <div className="inline-block p-4 bg-primary/20 rounded-full mb-4">
             <ShieldCheck className="h-12 w-12 text-primary" />
@@ -98,7 +78,6 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    disabled={isConfigMissing}
                   />
                 </div>
               </div>
@@ -114,7 +93,6 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    disabled={isConfigMissing}
                   />
                    <Button
                         type="button"
@@ -128,14 +106,14 @@ export default function LoginPage() {
                     </Button>
                 </div>
               </div>
-              <Button type="submit" disabled={loading || isConfigMissing} className="w-full mt-4">
+              <Button type="submit" disabled={loading} className="w-full mt-4">
                 {loading ? <Loader2 className="animate-spin" /> : 'Secure Sign In'}
               </Button>
             </form>
 
               <div className="mt-6 text-center text-sm">
                   <span className="text-muted-foreground">Don't have an account?{' '}</span>
-                  <Link href="/register" className={cn("underline font-semibold text-primary hover:text-primary/80 transition-colors", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>
+                  <Link href="/register" className={cn("underline font-semibold text-primary hover:text-primary/80 transition-colors")} prefetch={false}>
                       Register here
                   </Link>
               </div>
