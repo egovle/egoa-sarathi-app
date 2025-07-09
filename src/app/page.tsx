@@ -24,14 +24,12 @@ export default function LoginPage() {
   const { toast } = useToast();
   
   const [isConfigMissing, setIsConfigMissing] = useState(false);
-  const [apiKeyForDisplay, setApiKeyForDisplay] = useState('');
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (!key || key.includes('PASTE_YOUR_REAL_API_KEY')) {
       setIsConfigMissing(true);
     }
-    setApiKeyForDisplay(key || 'UNDEFINED');
   }, []);
 
   const handleLogin = async (e: FormEvent) => {
@@ -142,11 +140,6 @@ export default function LoginPage() {
           </CardContent>
         </Card>
         
-        <div className="mt-4 p-2 border rounded-md bg-muted text-muted-foreground text-xs max-w-sm w-full break-all">
-          <p className="font-bold">Diagnostic Info:</p>
-          <p>API Key Used: {apiKeyForDisplay}</p>
-        </div>
-
       </main>
 
       <footer className="mt-10 flex items-center gap-4 z-10 text-muted-foreground">
