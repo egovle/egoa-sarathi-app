@@ -1,38 +1,37 @@
-# egoasarthi
+# How to Fix the API Key Login Error
 
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+The application is failing because the API credentials in `apphosting.yaml` are incorrect. To fix this, you must copy the correct credentials from your Firebase project settings and paste them into the `apphosting.yaml` file.
 
-## Getting Started
+This is the final step to make your application work.
 
-First, run the development server:
+### Step 1: Get Your Credentials
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1.  **[Click here to open your Firebase Project Settings](https://console.firebase.google.com/project/egoasarthi/settings/general)**.
+    *   *(If the link doesn't work, go to the [Firebase Console](https://console.firebase.google.com/), select the `egoasarthi` project, click the ⚙️ gear icon, and select "Project settings").*
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2.  In the "Your apps" section, find your "Web app".
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3.  In the "Firebase SDK snippet" box, select **Config**.
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+4.  You will see your credentials, which look like this:
+    ```javascript
+    const firebaseConfig = {
+      apiKey: "AIz...w",
+      authDomain: "ego...com",
+      projectId: "ego...i",
+      // ...and so on
+    };
+    ```
 
-## Learn More
+### Step 2: Update the `apphosting.yaml` File
 
-To learn more about Next.js, take a look at the following resources:
+1.  Open the `apphosting.yaml` file in the editor on the left.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2.  Carefully copy each value from the `firebaseConfig` object (from Step 1) and paste it into the matching line in `apphosting.yaml`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+    **Example:**
+    *   Copy the `apiKey` value and paste it over `"PASTE_YOUR_REAL_API_KEY_HERE"`.
+    *   Copy the `authDomain` value and paste it over `"PASTE_YOUR_AUTH_DOMAIN_HERE"`.
+    *   Do this for all the keys.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+Once you have replaced all the placeholders with your real values, the error will be resolved. The application will automatically redeploy with the correct keys.
