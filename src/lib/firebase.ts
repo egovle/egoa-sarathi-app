@@ -14,12 +14,6 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-// A basic check to catch missing configuration during development.
-// The main, user-facing check is now on the LoginPage.
-if (!firebaseConfig.apiKey || firebaseConfig.apiKey.startsWith('PASTE_YOUR')) {
-    console.error("CRITICAL: Firebase configuration is missing or incomplete. The app will not function correctly. Check your .env or apphosting.yaml file.");
-}
-
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
