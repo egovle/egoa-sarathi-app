@@ -249,7 +249,7 @@ export default function RegisterPage() {
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Configuration Error</AlertTitle>
                 <AlertDescription>
-                Your Firebase API Key is missing. Please ask the administrator to configure the application before you can register.
+                The app is not configured correctly. Please follow the instructions in the README file.
                 </AlertDescription>
             </Alert>
           )}

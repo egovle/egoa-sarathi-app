@@ -71,7 +71,7 @@ export default function LoginPage() {
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Configuration Error!</AlertTitle>
                 <AlertDescription>
-                    Your app's API keys are not set correctly. Please follow the setup instructions to fix this.
+                    Your app's API keys are not set correctly. Please follow the setup instructions in the README file to fix this.
                 </AlertDescription>
             </Alert>
         )}
@@ -83,7 +83,7 @@ export default function LoginPage() {
                 Login to Your Portal
             </CardTitle>
             <CardDescription>Access services with your credentials</CardDescription>
-          </CardHeader>
+          </Header>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2 text-left">
