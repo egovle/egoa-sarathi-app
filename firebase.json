@@ -21,6 +21,28 @@
         "firebase-debug.*.log",
         "functions"
       ]
+    },
+    {
+      "backendId": "egoa-sarathi-app",
+      "rootDir": "https://studio.firebase.google.com/studio-7814630521",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "functions"
+      ]
+    },
+    {
+      "backendId": "egoa-sarathi-app",
+      "rootDir": "/",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "functions"
+      ]
     }
   ]
 }
