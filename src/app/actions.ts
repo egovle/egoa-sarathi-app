@@ -1,11 +1,12 @@
 
 'use server';
 
-import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc } from "firebase/firestore";
+import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc, writeBatch, deleteDoc } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Task, UserProfile, Service, CampPayout, TaskDocument } from "@/lib/types";
 import { calculateVleEarnings } from "@/lib/utils";
+import { defaultServices } from "@/lib/seedData";
 
 // --- NOTIFICATION HELPERS ---
 export async function createNotification(userId: string, title: string, description: string, link?: string) {
@@ -376,5 +377,51 @@ export async function processCampPayout(campId: string, payoutData: { vleId: str
     } catch (error: any) {
         console.error("Camp payout transaction failed:", error);
         return { success: false, error: error.message || 'An unknown error occurred during camp payout.' };
+    }
+}
+
+
+// --- Admin Data Actions ---
+async function clearCollection(collectionName: string) {
+    const q = query(collection(db, collectionName));
+    const snapshot = await getDocs(q);
+    const batch = writeBatch(db);
+    snapshot.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+}
+
+async function seedServices() {
+    const servicesCollection = collection(db, "services");
+    for (const service of defaultServices) {
+        const docRef = doc(servicesCollection, service.id);
+        await setDoc(docRef, service);
+    }
+}
+
+export async function resetApplicationData() {
+    try {
+        await clearCollection("tasks");
+        await clearCollection("camps");
+        await clearCollection("notifications");
+
+        const usersSnapshot = await getDocs(collection(db, "users"));
+        const vlesSnapshot = await getDocs(collection(db, "vles"));
+        
+        const resetBatch = writeBatch(db);
+        usersSnapshot.forEach(userDoc => {
+            resetBatch.update(userDoc.ref, { walletBalance: 0 });
+        });
+        vlesSnapshot.forEach(vleDoc => {
+            resetBatch.update(vleDoc.ref, { walletBalance: 0 });
+        });
+        await resetBatch.commit();
+
+        await clearCollection("services");
+        await seedServices();
+
+        return { success: true, message: "Application data has been reset." };
+    } catch (error: any) {
+        console.error("Error resetting application data:", error);
+        return { success: false, error: error.message };
     }
 }

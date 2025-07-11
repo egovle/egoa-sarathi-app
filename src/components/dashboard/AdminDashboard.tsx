@@ -9,8 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { doc, updateDoc, writeBatch, query, arrayUnion, getDoc, runTransaction, getDocs, where, collection, onSnapshot, orderBy, startAt, endAt, startAfter, endBefore, limit, Query, DocumentData,getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { createNotification, processPayout } from '@/app/actions';
-import { resetApplicationData } from '@/app/dashboard/services/actions';
+import { createNotification, processPayout, resetApplicationData } from '@/app/actions';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -301,7 +300,7 @@ export default function AdminDashboard() {
         const result = await resetApplicationData();
 
         if (result.success) {
-            toast({ title: 'Application Reset', description: 'All data has been cleared and default services have been seeded.' });
+            toast({ title: 'Application Reset', description: result.message });
         } else {
             console.error("Error resetting data:", result.error);
             toast({ title: 'Reset Failed', description: result.error || 'Could not reset the application data.', variant: 'destructive' });
