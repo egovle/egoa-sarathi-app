@@ -1,3 +1,4 @@
+
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
@@ -20,19 +21,20 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
-  // This is the SAFEGUARD for local development.
-  // We hardcode the debug token you've added to the Firebase Console.
-  // This will be ignored in production.
-  if (process.env.NODE_ENV !== 'production') {
-    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = "10268d83-b4fc-4a24-ac74-5f621e7d19fa";
-  }
+  const isDevelopment = window.location.hostname.includes('firebase-studio.workstations.dev') || window.location.hostname === 'localhost';
 
+  if (isDevelopment) {
+    // For local development, use the debug token.
+    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = "10268d83-b4fc-4a24-ac74-5f621e7d19fa";
+    console.log("App Check: Initializing with debug token for development environment.");
+  }
+  
   try {
     initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"),
       isTokenAutoRefreshEnabled: true
     });
-    console.log("App Check initialized.");
+    console.log("App Check initialized successfully.");
   } catch (error) {
     console.error("Error initializing App Check:", error);
   }
