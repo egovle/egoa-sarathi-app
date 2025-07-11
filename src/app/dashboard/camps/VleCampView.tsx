@@ -7,21 +7,29 @@ import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, CheckCircle2, XCircle, MoreHorizontal, MessageSquare } from 'lucide-react';
+import { PlusCircle, CheckCircle2, XCircle, MoreHorizontal, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { createNotificationForAdmins } from '@/app/actions';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { SuggestCampDialog } from '@/components/dashboard/camps/CampDialogs';
-import { CampDetailsDialog } from '@/components/dashboard/camps/CampDetailsDialog';
+import { SuggestCampDialog } from './CampDialogs';
+import { CampDetailsDialog } from './CampDetailsDialog';
 import type { Camp, Service, VLEProfile } from '@/lib/types';
 
 
-export default function VleCampView({ allCamps, services, userProfile, vles }: { allCamps: Camp[], services: Service[], userProfile: VLEProfile, vles: VLEProfile[] }) {
+export default function VleCampView({ 
+    allCamps, services, userProfile, vles,
+    onNextPage, onPrevPage, isFirstPage, isLastPage
+}: { 
+    allCamps: { invitations: Camp[], confirmed: Camp[], rejected: Camp[], past: Camp[] },
+    services: Service[], userProfile: VLEProfile, vles: VLEProfile[],
+    onNextPage: (tab: string) => void, onPrevPage: (tab: string) => void,
+    isFirstPage: { [key:string]: boolean }, isLastPage: { [key:string]: boolean }
+}) {
     const { toast } = useToast();
     const { user } = useAuth();
     const [isSuggestFormOpen, setIsSuggestFormOpen] = useState(false);
@@ -75,31 +83,7 @@ export default function VleCampView({ allCamps, services, userProfile, vles }: {
         }
     };
     
-    const todayStr = new Date().toLocaleDateString('en-CA'); // Timezone-proof
-
-    const myInvitations = allCamps.filter(camp => {
-        if (camp.date.substring(0, 10) < todayStr) return false;
-        const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
-        return myAssignment?.status === 'pending';
-    });
-    
-    const myConfirmedCamps = allCamps.filter(camp => {
-        if (camp.date.substring(0, 10) < todayStr) return false;
-        const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
-        return myAssignment?.status === 'accepted';
-    });
-
-    const myRejectedCamps = allCamps.filter(camp => {
-        if (camp.date.substring(0, 10) < todayStr) return false; // Still upcoming
-        const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
-        return myAssignment?.status === 'rejected';
-    });
-
-    const myPastCamps = allCamps.filter(camp => {
-        if (camp.date.substring(0, 10) >= todayStr) return false; // Past date
-        const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
-        return myAssignment?.status === 'accepted'; // Show past confirmed camps
-    }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const { invitations, confirmed, rejected, past } = allCamps;
     
     return (
      <div className="space-y-6">
@@ -126,10 +110,10 @@ export default function VleCampView({ allCamps, services, userProfile, vles }: {
         </div>
          <Tabs defaultValue="invitations">
             <TabsList>
-                <TabsTrigger value="invitations">Invitations <Badge className="ml-2">{myInvitations.length}</Badge></TabsTrigger>
-                <TabsTrigger value="confirmed">Confirmed Camps <Badge className="ml-2">{myConfirmedCamps.length}</Badge></TabsTrigger>
-                <TabsTrigger value="rejected">Rejected <Badge className="ml-2">{myRejectedCamps.length}</Badge></TabsTrigger>
-                <TabsTrigger value="past">Past Camps <Badge className="ml-2">{myPastCamps.length}</Badge></TabsTrigger>
+                <TabsTrigger value="invitations">Invitations <Badge className="ml-2">{invitations.length}</Badge></TabsTrigger>
+                <TabsTrigger value="confirmed">Confirmed Camps <Badge className="ml-2">{confirmed.length}</Badge></TabsTrigger>
+                <TabsTrigger value="rejected">Rejected <Badge className="ml-2">{rejected.length}</Badge></TabsTrigger>
+                <TabsTrigger value="past">Past Camps <Badge className="ml-2">{past.length}</Badge></TabsTrigger>
             </TabsList>
             <TabsContent value="invitations" className="mt-4">
                  <Card>
@@ -148,7 +132,7 @@ export default function VleCampView({ allCamps, services, userProfile, vles }: {
                                </TableRow>
                            </TableHeader>
                            <TableBody>
-                               {myInvitations.length > 0 ? myInvitations.map(camp => (
+                               {invitations.length > 0 ? invitations.map(camp => (
                                    <TableRow key={camp.id}>
                                        <TableCell>{camp.name}</TableCell>
                                        <TableCell>{camp.location}</TableCell>
@@ -182,7 +166,7 @@ export default function VleCampView({ allCamps, services, userProfile, vles }: {
                                </TableRow>
                            </TableHeader>
                            <TableBody>
-                               {myConfirmedCamps.length > 0 ? myConfirmedCamps.map(camp => (
+                               {confirmed.length > 0 ? confirmed.map(camp => (
                                    <TableRow key={camp.id}>
                                        <TableCell>{camp.name}</TableCell>
                                        <TableCell>{camp.location}</TableCell>
@@ -228,7 +212,7 @@ export default function VleCampView({ allCamps, services, userProfile, vles }: {
                                </TableRow>
                            </TableHeader>
                            <TableBody>
-                               {myRejectedCamps.length > 0 ? myRejectedCamps.map(camp => (
+                               {rejected.length > 0 ? rejected.map(camp => (
                                    <TableRow key={camp.id}>
                                        <TableCell>{camp.name}</TableCell>
                                        <TableCell>{camp.location}</TableCell>
@@ -257,7 +241,7 @@ export default function VleCampView({ allCamps, services, userProfile, vles }: {
                                </TableRow>
                            </TableHeader>
                            <TableBody>
-                               {myPastCamps.length > 0 ? myPastCamps.map(camp => (
+                               {past.length > 0 ? past.map(camp => (
                                    <TableRow key={camp.id}>
                                        <TableCell>{camp.name}</TableCell>
                                        <TableCell>{camp.location}</TableCell>
@@ -268,6 +252,10 @@ export default function VleCampView({ allCamps, services, userProfile, vles }: {
                            </TableBody>
                        </Table>
                     </CardContent>
+                     <CardFooter className="flex justify-end gap-2">
+                        <Button variant="outline" size="sm" onClick={() => onPrevPage('past')} disabled={isFirstPage['past']}><ChevronLeft className="mr-2 h-4 w-4"/>Previous</Button>
+                        <Button variant="outline" size="sm" onClick={() => onNextPage('past')} disabled={isLastPage['past']}>Next<ChevronRight className="ml-2 h-4 w-4"/></Button>
+                    </CardFooter>
                 </Card>
             </TabsContent>
          </Tabs>

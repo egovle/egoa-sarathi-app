@@ -1,15 +1,23 @@
 
 'use client';
 
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import type { Camp } from '@/lib/types';
+import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-export default function CustomerCampView({ allCamps }: { allCamps: Camp[] }) {
-    const todayStr = new Date().toLocaleDateString('en-CA'); // Timezone-proof
-    const upcomingCamps = allCamps.filter(camp => camp.date.substring(0, 10) >= todayStr);
+export default function CustomerCampView({ 
+    allCamps, onNextPage, onPrevPage, isFirstPage, isLastPage 
+}: { 
+    allCamps: Camp[],
+    onNextPage: () => void,
+    onPrevPage: () => void,
+    isFirstPage: boolean,
+    isLastPage: boolean
+}) {
 
     return (
      <div className="space-y-6">
@@ -26,7 +34,7 @@ export default function CustomerCampView({ allCamps }: { allCamps: Camp[] }) {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {upcomingCamps.length > 0 ? upcomingCamps.map((camp) => (
+                        {allCamps.length > 0 ? allCamps.map((camp) => (
                             <TableRow key={camp.id}>
                                 <TableCell className="font-medium">{camp.name}</TableCell>
                                 <TableCell>{camp.location}</TableCell>
@@ -46,6 +54,10 @@ export default function CustomerCampView({ allCamps }: { allCamps: Camp[] }) {
                     </TableBody>
                 </Table>
             </CardContent>
+            <CardFooter className="flex justify-end gap-2">
+                 <Button variant="outline" size="sm" onClick={onPrevPage} disabled={isFirstPage}><ChevronLeft className="mr-2 h-4 w-4"/>Previous</Button>
+                 <Button variant="outline" size="sm" onClick={onNextPage} disabled={isLastPage}>Next<ChevronRight className="ml-2 h-4 w-4"/></Button>
+            </CardFooter>
         </Card>
      </div>
     );

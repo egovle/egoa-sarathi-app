@@ -3,21 +3,24 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, PlusCircle, Phone } from 'lucide-react';
+import { Loader2, PlusCircle, Phone, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
-import { SuggestCampDialog } from '@/components/dashboard/camps/CampDialogs';
+import { SuggestCampDialog } from './CampDialogs';
 import type { Camp, Service, GovernmentProfile, VLEProfile } from '@/lib/types';
 
 
-export default function GovernmentCampView({ allCamps, services, vles, userProfile }: { allCamps: Camp[], services: Service[], vles: VLEProfile[], userProfile: GovernmentProfile }) {
+export default function GovernmentCampView({ 
+    allCamps, services, vles, userProfile,
+    onNextPage, onPrevPage, isFirstPage, isLastPage
+}: { 
+    allCamps: Camp[], services: Service[], vles: VLEProfile[], userProfile: GovernmentProfile,
+    onNextPage: () => void, onPrevPage: () => void, isFirstPage: boolean, isLastPage: boolean
+}) {
     const [isSuggestFormOpen, setIsSuggestFormOpen] = useState(false);
     
-    const todayStr = new Date().toLocaleDateString('en-CA');
-    const upcomingCamps = allCamps.filter(camp => camp.date.substring(0, 10) >= todayStr);
-
     return (
      <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -43,9 +46,9 @@ export default function GovernmentCampView({ allCamps, services, vles, userProfi
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {upcomingCamps.length > 0 ? upcomingCamps.map((camp) => (
+                        {allCamps.length > 0 ? allCamps.map((camp) => (
                             <TableRow key={camp.id}>
-                                <TableCell className="font-medium">{camp.type === 'suggested' ? `Goa Sarathi Camp at ${camp.location}` : camp.name}</TableCell>
+                                <TableCell className="font-medium">{camp.name}</TableCell>
                                 <TableCell>{camp.location}</TableCell>
                                 <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
                                 <TableCell>
@@ -71,6 +74,10 @@ export default function GovernmentCampView({ allCamps, services, vles, userProfi
                     </TableBody>
                 </Table>
             </CardContent>
+             <CardFooter className="flex justify-end gap-2">
+                 <Button variant="outline" size="sm" onClick={onPrevPage} disabled={isFirstPage}><ChevronLeft className="mr-2 h-4 w-4"/>Previous</Button>
+                 <Button variant="outline" size="sm" onClick={onNextPage} disabled={isLastPage}>Next<ChevronRight className="ml-2 h-4 w-4"/></Button>
+            </CardFooter>
         </Card>
      </div>
     );

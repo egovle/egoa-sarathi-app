@@ -6,22 +6,32 @@ import { deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Dialog } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Trash, MoreHorizontal, UserCog, UserPlus, CircleDollarSign } from 'lucide-react';
+import { PlusCircle, Trash, MoreHorizontal, UserCog, UserPlus, CircleDollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { createNotification } from '@/app/actions';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CampFormDialog, CampPayoutDialog } from '@/components/dashboard/camps/CampDialogs';
+import { CampFormDialog, CampPayoutDialog } from './CampDialogs';
 import type { Camp, CampSuggestion, VLEProfile, UserProfile } from '@/lib/types';
 
 
-const AdminCampTable = ({ data, vles, onEdit, onDelete, onPayout }: { data: Camp[], vles: VLEProfile[], onEdit: (camp: Camp) => void, onDelete: (camp: Camp) => void, onPayout: (camp: Camp) => void }) => {
+const AdminCampTable = ({ data, vles, onEdit, onDelete, onPayout, onNextPage, onPrevPage, isFirstPage, isLastPage }: { 
+    data: Camp[], 
+    vles: VLEProfile[], 
+    onEdit: (camp: Camp) => void, 
+    onDelete: (camp: Camp) => void, 
+    onPayout: (camp: Camp) => void,
+    onNextPage: () => void,
+    onPrevPage: () => void,
+    isFirstPage: boolean,
+    isLastPage: boolean
+}) => {
     
     return (
     <Card>
@@ -96,12 +106,27 @@ const AdminCampTable = ({ data, vles, onEdit, onDelete, onPayout }: { data: Camp
                 </TableBody>
             </Table>
         </CardContent>
+        <CardFooter className="flex justify-end gap-2">
+             <Button variant="outline" size="sm" onClick={onPrevPage} disabled={isFirstPage}><ChevronLeft className="mr-2 h-4 w-4"/>Previous</Button>
+             <Button variant="outline" size="sm" onClick={onNextPage} disabled={isLastPage}>Next<ChevronRight className="ml-2 h-4 w-4"/></Button>
+        </CardFooter>
     </Card>
     )
 };
 
 
-export default function AdminCampView({ allCamps, suggestions, vles, userProfile }: { allCamps: Camp[], suggestions: CampSuggestion[], vles: VLEProfile[], userProfile: UserProfile | null }) {
+export default function AdminCampView({ 
+    allCamps, suggestions, vles, userProfile,
+    onNextPage, onPrevPage, isFirstPage, isLastPage,
+    onNextSuggestionPage, onPrevSuggestionPage, isFirstSuggestionPage, isLastSuggestionPage,
+    onNextPastPage, onPrevPastPage, isFirstPastPage, isLastPastPage
+}: { 
+    allCamps: { upcoming: Camp[], past: Camp[] },
+    suggestions: CampSuggestion[], vles: VLEProfile[], userProfile: UserProfile | null,
+    onNextPage: () => void, onPrevPage: () => void, isFirstPage: boolean, isLastPage: boolean,
+    onNextSuggestionPage: () => void, onPrevSuggestionPage: () => void, isFirstSuggestionPage: boolean, isLastSuggestionPage: boolean,
+    onNextPastPage: () => void, onPrevPastPage: () => void, isFirstPastPage: boolean, isLastPastPage: boolean
+}) {
     const { toast } = useToast();
     
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -154,10 +179,8 @@ export default function AdminCampView({ allCamps, suggestions, vles, userProfile
         setSelectedCamp(null);
         setSelectedSuggestion(null);
     }
-
-    const todayStr = new Date().toLocaleDateString('en-CA');
-    const upcomingCamps = allCamps.filter(camp => camp.date.substring(0, 10) >= todayStr);
-    const pastCamps = allCamps.filter(camp => camp.date.substring(0, 10) < todayStr).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    const { upcoming, past } = allCamps;
 
     return (
         <div className="space-y-4">
@@ -211,12 +234,12 @@ export default function AdminCampView({ allCamps, suggestions, vles, userProfile
             
             <Tabs defaultValue='upcoming' className="w-full">
                 <TabsList>
-                    <TabsTrigger value="upcoming">Upcoming <Badge className="ml-2">{upcomingCamps.length}</Badge></TabsTrigger>
+                    <TabsTrigger value="upcoming">Upcoming <Badge className="ml-2">{upcoming.length}</Badge></TabsTrigger>
                     <TabsTrigger value="suggestions">VLE Suggestions <Badge className="ml-2">{suggestions.length}</Badge></TabsTrigger>
-                    <TabsTrigger value="past">Past <Badge className="ml-2">{pastCamps.length}</Badge></TabsTrigger>
+                    <TabsTrigger value="past">Past <Badge className="ml-2">{past.length}</Badge></TabsTrigger>
                 </TabsList>
                 <TabsContent value="upcoming" className="mt-4">
-                    <AdminCampTable data={upcomingCamps} vles={vles} onEdit={handleEdit} onDelete={handleDelete} onPayout={handlePayout} />
+                    <AdminCampTable data={upcoming} vles={vles} onEdit={handleEdit} onDelete={handleDelete} onPayout={handlePayout} onNextPage={onNextPage} onPrevPage={onPrevPage} isFirstPage={isFirstPage} isLastPage={isLastPage} />
                 </TabsContent>
                 <TabsContent value="suggestions" className="mt-4">
                     <Card>
@@ -253,10 +276,14 @@ export default function AdminCampView({ allCamps, suggestions, vles, userProfile
                                 </TableBody>
                             </Table>
                         </CardContent>
+                         <CardFooter className="flex justify-end gap-2">
+                            <Button variant="outline" size="sm" onClick={onPrevSuggestionPage} disabled={isFirstSuggestionPage}><ChevronLeft className="mr-2 h-4 w-4"/>Previous</Button>
+                            <Button variant="outline" size="sm" onClick={onNextSuggestionPage} disabled={isLastSuggestionPage}>Next<ChevronRight className="ml-2 h-4 w-4"/></Button>
+                        </CardFooter>
                     </Card>
                 </TabsContent>
                 <TabsContent value="past" className="mt-4">
-                     <AdminCampTable data={pastCamps} vles={vles} onEdit={handleEdit} onDelete={handleDelete} onPayout={handlePayout} />
+                     <AdminCampTable data={past} vles={vles} onEdit={handleEdit} onDelete={handleDelete} onPayout={handlePayout} onNextPage={onNextPastPage} onPrevPage={onPrevPastPage} isFirstPage={isFirstPastPage} isLastPage={isLastPastPage} />
                 </TabsContent>
             </Tabs>
         </div>
