@@ -23,6 +23,8 @@ export default function DashboardPage() {
     const searchParams = useSearchParams();
     
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [taskInvitations, setTaskInvitations] = useState<Task[]>([]);
+    const [campInvitations, setCampInvitations] = useState<Camp[]>([]);
     const [services, setServices] = useState<Service[]>([]);
     const [camps, setCamps] = useState<Camp[]>([]);
     
@@ -55,12 +57,24 @@ export default function DashboardPage() {
         } else if (userProfile.role === 'vle') {
             const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
             unsubscribers.push(onSnapshot(assignedTasksQuery, snapshot => {
-                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task));
+                const allAssigned = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
+                setTasks(allAssigned.filter(t => t.status !== 'Pending VLE Acceptance'));
+                setTaskInvitations(allAssigned.filter(t => t.status === 'Pending VLE Acceptance'));
             }));
 
             const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
             unsubscribers.push(onSnapshot(campsQuery, (snapshot) => {
-                setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp));
+                const allCampsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp);
+                const todayStr = new Date().toLocaleDateString('en-CA');
+                
+                const myInvitations = allCampsData.filter(camp => {
+                    if (camp.date.substring(0, 10) < todayStr) return false;
+                    const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
+                    return myAssignment?.status === 'pending';
+                });
+
+                setCamps(allCampsData);
+                setCampInvitations(myInvitations);
             }));
         
         } else if (userProfile.role === 'customer') {
@@ -97,7 +111,13 @@ export default function DashboardPage() {
 
         switch (userProfile.role) {
             case 'vle':
-                return <VleDashboard assignedTasks={tasks} services={services} camps={camps} />;
+                return <VleDashboard 
+                    assignedTasks={tasks} 
+                    services={services} 
+                    camps={camps}
+                    taskInvitations={taskInvitations}
+                    campInvitations={campInvitations}
+                 />;
             case 'customer':
                 return <CustomerDashboard tasks={tasks} services={services} />;
             case 'government':

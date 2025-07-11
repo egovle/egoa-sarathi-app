@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -33,7 +33,7 @@ const PendingApprovalView = () => (
     </Alert>
 );
 
-export default function VleDashboard({ assignedTasks, services, camps }: { assignedTasks: Task[], services: Service[], camps: Camp[] }) {
+export default function VleDashboard({ assignedTasks, services, camps, taskInvitations, campInvitations }: { assignedTasks: Task[], services: Service[], camps: Camp[], taskInvitations: Task[], campInvitations: Camp[] }) {
     const { toast } = useToast();
     const { user, userProfile } = useAuth();
     
@@ -107,18 +107,6 @@ export default function VleDashboard({ assignedTasks, services, camps }: { assig
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
         }
     };
-
-    const taskInvitations = useMemo(() => assignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), [assignedTasks]);
-    
-    const todayStr = new Date().toLocaleDateString('en-CA');
-    const campInvitations = useMemo(() => {
-        if (!camps || !userProfile) return [];
-        return camps.filter(camp => {
-            if (camp.date.substring(0, 10) < todayStr) return false;
-            const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
-            return myAssignment?.status === 'pending';
-        })
-    }, [camps, userProfile]);
 
     if (!user || !userProfile) return null;
     

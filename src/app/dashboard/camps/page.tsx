@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import type { Camp, CampSuggestion, Service, VLEProfile, GovernmentProfile, UserProfile } from '@/lib/types';
 import AdminCampView from '@/app/dashboard/camps/AdminCampView';
-import VleCampView from '@/app/dashboard/camps/VleCampView';
+import VleCampView from './VleCampView';
 import CustomerCampView from '@/app/dashboard/camps/CustomerCampView';
 import GovernmentCampView from '@/app/dashboard/camps/GovernmentCampView';
 
@@ -49,6 +49,13 @@ export default function CampManagementPage() {
             baseQuery = query(collection(db, collectionName), where('date', '>=', todayTimestamp.toDate().toISOString()), orderBy('date', 'asc'));
         } else if (category === 'past') {
             baseQuery = query(collection(db, collectionName), where('date', '<', todayTimestamp.toDate().toISOString()), orderBy('date', 'desc'));
+        } else if (category.startsWith('vle_past')) {
+            const vleId = userProfile?.id;
+            baseQuery = query(collection(db, 'camps'), 
+                where('date', '<', todayTimestamp.toDate().toISOString()), 
+                where('assignedVles', 'array-contains', {vleId: vleId, status: 'accepted'}), 
+                orderBy('date', 'desc')
+            );
         } else { // suggestions or other general queries
             baseQuery = query(collection(db, collectionName), orderBy('date', 'asc'));
         }
@@ -72,6 +79,8 @@ export default function CampManagementPage() {
         
         if (category === 'suggestions') {
             setCampSuggestions(data as CampSuggestion[]);
+        } else if (category.startsWith('vle_past')) {
+            setAllCamps((prev: any) => ({ ...prev, past: data }));
         } else {
             setAllCamps((prev: any) => ({ ...prev, [category]: data }));
         }
@@ -83,7 +92,7 @@ export default function CampManagementPage() {
         if (!userProfile) return;
 
         const initialFetch = async () => {
-             setPageIndex({ upcoming: 1, past: 1, suggestions: 1 });
+             setPageIndex({ upcoming: 1, past: 1, suggestions: 1, vle_past: 1 });
             if (userProfile.isAdmin) {
                 await fetchPaginatedData('upcoming', 'initial');
                 await fetchPaginatedData('past', 'initial');
@@ -91,7 +100,7 @@ export default function CampManagementPage() {
             } else if (userProfile.role === 'customer' || userProfile.role === 'government') {
                  await fetchPaginatedData('upcoming', 'initial');
             } else if (userProfile.role === 'vle') {
-                 // VLE view combines multiple statuses, so a single listener is more efficient here.
+                 await fetchPaginatedData('vle_past', 'initial');
                  const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
                  const unsubscribe = onSnapshot(campsQuery, (snapshot) => {
                      const allCampsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp);
@@ -99,8 +108,7 @@ export default function CampManagementPage() {
                      const myInvitations = allCampsData.filter(camp => camp.date.substring(0, 10) >= todayStr && camp.assignedVles?.some(v => v.vleId === userProfile.id && v.status === 'pending'));
                      const myConfirmed = allCampsData.filter(camp => camp.date.substring(0, 10) >= todayStr && camp.assignedVles?.some(v => v.vleId === userProfile.id && v.status === 'accepted'));
                      const myRejected = allCampsData.filter(camp => camp.date.substring(0, 10) >= todayStr && camp.assignedVles?.some(v => v.vleId === userProfile.id && v.status === 'rejected'));
-                     const myPast = allCampsData.filter(camp => camp.date.substring(0, 10) < todayStr && camp.assignedVles?.some(v => v.vleId === userProfile.id && v.status === 'accepted')).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                     setAllCamps({ invitations: myInvitations, confirmed: myConfirmed, rejected: myRejected, past: myPast.slice(0, PAGE_SIZE) }); // Initial page for past camps
+                     setAllCamps((prev : any) => ({ ...prev, invitations: myInvitations, confirmed: myConfirmed, rejected: myRejected }));
                      setLoadingData(false);
                  });
                  return () => unsubscribe();
@@ -139,7 +147,11 @@ export default function CampManagementPage() {
     }
     
     const isFirstPage = (category: string) => pageIndex[category] === 1;
-    const isLastPage = (category: string) => (allCamps[category]?.length ?? campSuggestions.length) < PAGE_SIZE;
+    const isLastPage = (category: string) => {
+      const dataSet = category === 'suggestions' ? campSuggestions : allCamps[category];
+      return (dataSet?.length ?? 0) < PAGE_SIZE;
+    }
+    
 
     const renderView = () => {
         if (userProfile.isAdmin) {
@@ -170,8 +182,11 @@ export default function CampManagementPage() {
                     allCamps={allCamps}
                     services={services} 
                     userProfile={userProfile as VLEProfile} 
-                    vles={vles} 
-                    // Note: VLE pagination for past camps can be added here if needed
+                    vles={vles}
+                    onNextPage={() => handleNext('vle_past')}
+                    onPrevPage={() => handlePrev('vle_past')}
+                    isFirstPage={isFirstPage('vle_past')}
+                    isLastPage={isLastPage('vle_past')}
                 />
             );
         }

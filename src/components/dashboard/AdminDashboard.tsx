@@ -64,14 +64,12 @@ export default function AdminDashboard() {
         tasks: [], vles: [], customers: [], paymentRequests: [], complaints: [], payoutTasks: [], allVles: [], allCustomers: []
     });
     const [counts, setCounts] = useState<Record<string, number>>({});
-    const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
     
     // Pagination State
     const [lastVisible, setLastVisible] = useState<Record<string, DocumentData | null>>({});
     const [page, setPage] = useState<Record<string, number>>({ tasks: 1, vles: 1, customers: 1 });
 
     const fetchData = useCallback(async (collectionName: string, searchField: string, searchTerm: string, pageNum: number, lastDoc: DocumentData | null) => {
-        setIsLoading(prev => ({ ...prev, [collectionName]: true }));
         let q: Query<DocumentData>;
         const baseQuery = collection(db, collectionName);
         
@@ -89,7 +87,6 @@ export default function AdminDashboard() {
 
         setData(prev => ({ ...prev, [collectionName]: newData }));
         setLastVisible(prev => ({ ...prev, [collectionName]: snapshot.docs[snapshot.docs.length - 1] ?? null }));
-        setIsLoading(prev => ({ ...prev, [collectionName]: false }));
     }, []);
 
     useEffect(() => {
@@ -443,7 +440,7 @@ export default function AdminDashboard() {
                         <Table>
                             <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead>Balance</TableHead><TableHead>Status</TableHead><TableHead>Availability</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {isLoading.vles ? <TableRow><TableCell colSpan={6} className="h-24 text-center"><Loader2 className="animate-spin" /></TableCell></TableRow> : data.vles.map(vle => (
+                                {data.vles.map(vle => (
                                 <TableRow key={vle.id}>
                                     <TableCell>{vle.name}</TableCell>
                                     <TableCell>{vle.location}</TableCell>
@@ -481,7 +478,7 @@ export default function AdminDashboard() {
                     <CardContent>
                         <Table>
                             <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Mobile</TableHead><TableHead>Location</TableHead></TableRow></TableHeader>
-                            <TableBody>{isLoading.customers ? <TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="animate-spin" /></TableCell></TableRow> : data.customers.map(user => (<TableRow key={user.id}><TableCell>{user.name}</TableCell><TableCell>{user.email}</TableCell><TableCell>{user.mobile}</TableCell><TableCell>{user.location}</TableCell></TableRow>))}</TableBody>
+                            <TableBody>{data.customers.map(user => (<TableRow key={user.id}><TableCell>{user.name}</TableCell><TableCell>{user.email}</TableCell><TableCell>{user.mobile}</TableCell><TableCell>{user.location}</TableCell></TableRow>))}</TableBody>
                         </Table>
                     </CardContent>
                      <CardFooter className="flex justify-end gap-2">
@@ -498,7 +495,7 @@ export default function AdminDashboard() {
                         <Table>
                             <TableHeader><TableRow><TableHead>Task ID</TableHead><TableHead>Customer</TableHead><TableHead>Service</TableHead><TableHead>Status</TableHead><TableHead>Assigned VLE</TableHead><TableHead>Date</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                             <TableBody>
-                                {isLoading.tasks ? <TableRow><TableCell colSpan={7} className="h-24 text-center"><Loader2 className="animate-spin" /></TableCell></TableRow> : data.tasks.map(task => {
+                                {data.tasks.map(task => {
                                     const availableVles = (data.allVles || []).filter(vle => {
                                         if (vle.status !== 'Approved' || !vle.available) return false;
                                         if (task.type === 'VLE Lead' && vle.id === task.creatorId) return false;

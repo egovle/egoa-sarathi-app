@@ -27,8 +27,8 @@ export default function VleCampView({
 }: { 
     allCamps: { invitations: Camp[], confirmed: Camp[], rejected: Camp[], past: Camp[] },
     services: Service[], userProfile: VLEProfile, vles: VLEProfile[],
-    onNextPage: (tab: string) => void, onPrevPage: (tab: string) => void,
-    isFirstPage: { [key:string]: boolean }, isLastPage: { [key:string]: boolean }
+    onNextPage: () => void, onPrevPage: () => void,
+    isFirstPage: boolean, isLastPage: boolean
 }) {
     const { toast } = useToast();
     const { user } = useAuth();
@@ -253,8 +253,8 @@ export default function VleCampView({
                        </Table>
                     </CardContent>
                      <CardFooter className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => onPrevPage('past')} disabled={isFirstPage['past']}><ChevronLeft className="mr-2 h-4 w-4"/>Previous</Button>
-                        <Button variant="outline" size="sm" onClick={() => onNextPage('past')} disabled={isLastPage['past']}>Next<ChevronRight className="ml-2 h-4 w-4"/></Button>
+                        <Button variant="outline" size="sm" onClick={onPrevPage} disabled={isFirstPage}><ChevronLeft className="mr-2 h-4 w-4"/>Previous</Button>
+                        <Button variant="outline" size="sm" onClick={onNextPage} disabled={isLastPage}>Next<ChevronRight className="ml-2 h-4 w-4"/></Button>
                     </CardFooter>
                 </Card>
             </TabsContent>
