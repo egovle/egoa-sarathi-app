@@ -23,21 +23,18 @@ if (typeof window !== 'undefined') {
   // This is the SAFEGUARD for local development.
   // We hardcode the debug token you've added to the Firebase Console.
   // This will be ignored in production.
-  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = "10268d83-b4fc-4a24-ac74-5f621e7d19fa";
+  if (process.env.NODE_ENV !== 'production') {
+    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = "10268d83-b4fc-4a24-ac74-5f621e7d19fa";
+  }
 
-  const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-  if (siteKey) {
-    try {
-      initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider(siteKey),
-        isTokenAutoRefreshEnabled: true
-      });
-      console.log("App Check with reCAPTCHA initialized.");
-    } catch (error) {
-      console.error("Error initializing App Check:", error);
-    }
-  } else {
-    console.warn("reCAPTCHA Site Key is not set. App Check will not be initialized on the live site.");
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"),
+      isTokenAutoRefreshEnabled: true
+    });
+    console.log("App Check initialized.");
+  } catch (error) {
+    console.error("Error initializing App Check:", error);
   }
 }
 
