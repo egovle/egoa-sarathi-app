@@ -1,4 +1,3 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
@@ -21,10 +20,9 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
-  // This is the key change to force the debug token to be logged.
-  // It tells App Check that we want to debug, even in a production-like environment.
-  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-  
+  // Pass the debug token if it exists.
+  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN === "true" || process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN;
+
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   if (siteKey) {
     try {
