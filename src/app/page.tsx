@@ -138,6 +138,11 @@ export default function LoginPage() {
                       Register here
                   </Link>
               </div>
+              <p className="text-xs text-muted-foreground text-center mt-4">
+                This site is protected by reCAPTCHA and the Google{' '}
+                <a href="https://policies.google.com/privacy" className="underline">Privacy Policy</a> and{' '}
+                <a href="https://policies.google.com/terms" className="underline">Terms of Service</a> apply.
+              </p>
           </CardContent>
         </Card>
         
