@@ -21,17 +21,21 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
-  // Pass the debug token if the host is localhost.
-  if (window.location.hostname === "localhost") {
-    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN || true;
-  }
+  // This is the key change to force the debug token to be logged.
+  // It tells App Check that we want to debug, even in a production-like environment.
+  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
   
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   if (siteKey) {
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(siteKey),
-      isTokenAutoRefreshEnabled: true
-    });
+    try {
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(siteKey),
+        isTokenAutoRefreshEnabled: true
+      });
+      console.log("App Check with reCAPTCHA initialized.");
+    } catch (error) {
+      console.error("Error initializing App Check:", error);
+    }
   } else {
     console.warn("reCAPTCHA Site Key is not set. App Check will not be initialized.");
   }
