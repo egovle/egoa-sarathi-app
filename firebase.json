@@ -1,38 +1,6 @@
+
 {
   "apphosting": [
-    {
-      "backendId": "egoasarthi1",
-      "rootDir": "https://github.com/egovle/egoa-sarathi-app",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "functions"
-      ]
-    },
-    {
-      "backendId": "egoasarthi1",
-      "rootDir": "https://github.com/egovle/egoa-sarathi-app",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "functions"
-      ]
-    },
-    {
-      "backendId": "egoa-sarathi-app",
-      "rootDir": "https://studio.firebase.google.com/studio-7814630521",
-      "ignore": [
-        "node_modules",
-        ".git",
-        "firebase-debug.log",
-        "firebase-debug.*.log",
-        "functions"
-      ]
-    },
     {
       "backendId": "egoa-sarathi-app",
       "rootDir": "/",
