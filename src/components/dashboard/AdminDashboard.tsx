@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Loader2, UserPlus, MoreHorizontal, Eye, GitFork, AlertTriangle, Mail, Phone, Search, Trash2, CircleDollarSign, Briefcase, Users, Users2, Wallet, Send, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { doc, updateDoc, writeBatch, query, arrayUnion, getDoc, runTransaction, getDocs, where, collection, onSnapshot, orderBy, startAt, endAt, startAfter, endBefore, limit, Query, DocumentData } from 'firebase/firestore';
+import { doc, updateDoc, writeBatch, query, arrayUnion, getDoc, runTransaction, getDocs, where, collection, onSnapshot, orderBy, startAt, endAt, startAfter, endBefore, limit, Query, DocumentData,getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { createNotification, processPayout } from '@/app/actions';
 import { resetApplicationData } from '@/app/dashboard/services/actions';
@@ -62,8 +62,9 @@ export default function AdminDashboard() {
     
     // Data State
     const [data, setData] = useState<Record<string, any[]>>({
-        tasks: [], vles: [], customers: [], paymentRequests: [], complaints: [], payoutTasks: []
+        tasks: [], vles: [], customers: [], paymentRequests: [], complaints: [], payoutTasks: [], allVles: [], allCustomers: []
     });
+    const [counts, setCounts] = useState<Record<string, number>>({});
     const [isLoading, setIsLoading] = useState<Record<string, boolean>>({});
     
     // Pagination State
@@ -78,9 +79,9 @@ export default function AdminDashboard() {
         if (searchTerm) {
             q = query(baseQuery, orderBy(searchField), startAt(searchTerm), endAt(searchTerm + '\uf8ff'), limit(PAGE_SIZE));
         } else {
-            q = query(baseQuery, orderBy('date', 'desc'), limit(PAGE_SIZE));
+            q = query(baseQuery, orderBy(searchField), limit(PAGE_SIZE)); // Assuming default sort, adjust as needed
             if (pageNum > 1 && lastDoc) {
-                q = query(baseQuery, orderBy('date', 'desc'), startAfter(lastDoc), limit(PAGE_SIZE));
+                q = query(baseQuery, orderBy(searchField), startAfter(lastDoc), limit(PAGE_SIZE));
             }
         }
         
@@ -103,9 +104,28 @@ export default function AdminDashboard() {
     useEffect(() => {
         fetchData('users', 'name', debouncedCustomerSearch, page.customers, lastVisible.customers);
     }, [debouncedCustomerSearch, page.customers, fetchData]);
-
-    // Fetch static/overview data
+    
+    // Fetch overview data and counts
     useEffect(() => {
+        const fetchCounts = async () => {
+            const tasksCol = collection(db, "tasks");
+            const vlesCol = collection(db, "vles");
+            const usersCol = collection(db, "users");
+
+            const [tasksSnap, vlesSnap, usersSnap] = await Promise.all([
+                getCountFromServer(tasksCol),
+                getCountFromServer(vlesCol),
+                getCountFromServer(usersCol),
+            ]);
+
+            setCounts({
+                tasks: tasksSnap.data().count,
+                vles: vlesSnap.data().count,
+                customers: usersSnap.data().count,
+            });
+        };
+        fetchCounts();
+
         const paymentReqQuery = query(collection(db, "paymentRequests"), where("status", "==", "pending"));
         const unsubPayment = onSnapshot(paymentReqQuery, (s) => setData(prev => ({...prev, paymentRequests: s.docs.map(d => ({ id: d.id, ...d.data() }) as PaymentRequest)})));
         
@@ -114,18 +134,18 @@ export default function AdminDashboard() {
             const allTasksData = s.docs.map(d => ({ id: d.id, ...d.data()}) as Task);
             const complaintsData = allTasksData.filter(t => t.complaint).map(t => ({...t.complaint, taskId: t.id, customer: t.customer, service: t.service, date: t.date, customerId: t.creatorId}));
             const payoutTasksData = allTasksData.filter(t => t.status === 'Completed');
-            setData(prev => ({ ...prev, complaints: complaintsData, payoutTasks: payoutTasksData }));
+            const pendingVlesData = (data.allVles || []).filter(v => v.status === 'Pending');
+            const pricingTasksData = allTasksData.filter(t => t.status === 'Pending Price Approval');
+
+            setData(prev => ({ ...prev, complaints: complaintsData, payoutTasks: payoutTasksData, pendingVles: pendingVlesData, pricingTasks: pricingTasksData }));
         });
 
         const vlesQuery = query(collection(db, "vles"));
         const unsubVles = onSnapshot(vlesQuery, s => setData(prev => ({...prev, allVles: s.docs.map(d => ({id: d.id, ...d.data()}) as VLEProfile)})));
 
-        const usersQuery = query(collection(db, "users"));
-        const unsubUsers = onSnapshot(usersQuery, s => setData(prev => ({...prev, allCustomers: s.docs.map(d => ({id: d.id, ...d.data()}) as CustomerProfile)})));
 
-
-        return () => { unsubPayment(); unsubTasks(); unsubVles(); unsubUsers() };
-    }, []);
+        return () => { unsubPayment(); unsubTasks(); unsubVles(); };
+    }, [data.allVles]);
 
 
     const handleSearchChange = (type: string, value: string) => {
@@ -305,42 +325,36 @@ export default function AdminDashboard() {
         setProcessingPayoutTaskId(null);
     };
 
-    const allTasksCount = (data.tasks || []).length;
-    const allVlesCount = (data.allVles || []).length;
-    const allCustomersCount = (data.allCustomers || []).length;
     const openComplaintsCount = (data.complaints || []).filter(c => c.status === 'Open').length;
-    const payoutTaskCount = (data.payoutTasks || []).length;
-    const pendingVles = (data.allVles || []).filter(v => v.status === 'Pending');
-    const pricingTasks = (data.tasks || []).filter(t => t.status === 'Pending Price Approval');
 
     return (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="vle-management">VLEs <Badge className="ml-2">{allVlesCount}</Badge></TabsTrigger>
-                <TabsTrigger value="customer-management">Customers <Badge className="ml-2">{allCustomersCount}</Badge></TabsTrigger>
+                <TabsTrigger value="vle-management">VLEs <Badge className="ml-2">{counts.vles || 0}</Badge></TabsTrigger>
+                <TabsTrigger value="customer-management">Customers <Badge className="ml-2">{counts.customers || 0}</Badge></TabsTrigger>
                 <TabsTrigger value="all-tasks">Tasks</TabsTrigger>
-                <TabsTrigger value="payouts">Payouts <Badge className="ml-2">{payoutTaskCount}</Badge></TabsTrigger>
+                <TabsTrigger value="payouts">Payouts <Badge className="ml-2">{data.payoutTasks.length}</Badge></TabsTrigger>
                 <TabsTrigger value="complaints">Complaints <Badge className="ml-2">{openComplaintsCount}</Badge></TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="mt-4 space-y-4">
                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                    <StatCard title="Total Tasks" value={allTasksCount.toString()} icon={Briefcase} description="All tasks in the system" />
-                    <StatCard title="Total VLEs" value={allVlesCount.toString()} icon={Users} description="Registered VLEs" />
-                    <StatCard title="Total Customers" value={allCustomersCount.toString()} icon={Users2} description="Registered customers" />
+                    <StatCard title="Total Tasks" value={(counts.tasks || 0).toString()} icon={Briefcase} description="All tasks in the system" />
+                    <StatCard title="Total VLEs" value={(counts.vles || 0).toString()} icon={Users} description="Registered VLEs" />
+                    <StatCard title="Total Customers" value={(counts.customers || 0).toString()} icon={Users2} description="Registered customers" />
                     <StatCard title="Open Complaints" value={openComplaintsCount.toString()} icon={AlertTriangle} description="Awaiting admin response" />
-                    <StatCard title="Pending Payouts" value={payoutTaskCount.toString()} icon={Wallet} description="Tasks needing payout approval" />
+                    <StatCard title="Pending Payouts" value={data.payoutTasks.length.toString()} icon={Wallet} description="Tasks needing payout approval" />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     <Card>
                         <CardHeader><CardTitle>VLEs Pending Approval</CardTitle></CardHeader>
                         <CardContent>
-                            {pendingVles.length > 0 ? (
+                            {data.pendingVles && data.pendingVles.length > 0 ? (
                                 <Table>
                                     <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Location</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                                     <TableBody>
-                                        {pendingVles.map(vle => (
+                                        {data.pendingVles.map(vle => (
                                             <TableRow key={vle.id}>
                                                 <TableCell>{vle.name}</TableCell>
                                                 <TableCell>{vle.location}</TableCell>
@@ -355,11 +369,11 @@ export default function AdminDashboard() {
                      <Card>
                         <CardHeader><CardTitle>Tasks Pending Price Approval</CardTitle></CardHeader>
                         <CardContent>
-                            {pricingTasks.length > 0 ? (
+                            {data.pricingTasks && data.pricingTasks.length > 0 ? (
                                 <Table>
                                     <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead>Service</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
                                     <TableBody>
-                                        {pricingTasks.map(task => (
+                                        {data.pricingTasks.map(task => (
                                             <TableRow key={task.id}>
                                                 <TableCell>{task.customer}</TableCell>
                                                 <TableCell>{task.service}</TableCell>

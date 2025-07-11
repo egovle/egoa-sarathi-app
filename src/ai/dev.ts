@@ -1,5 +1,1 @@
-import { config } from 'dotenv';
-config();
-
-// Intentionally left blank after removing AI flows.
-// This is a placeholder file.
+// This file is not currently used and can be safely deleted to streamline the project.
