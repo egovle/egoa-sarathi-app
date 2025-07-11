@@ -20,8 +20,11 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
+  const debugToken = process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN;
   // Pass the debug token if it exists.
-  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN === "true" || process.env.NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN;
+  if (debugToken) {
+    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+  }
 
   const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   if (siteKey) {

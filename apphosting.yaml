@@ -23,4 +23,4 @@ env:
   - variable: NEXT_PUBLIC_RECAPTCHA_SITE_KEY
     value: "6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"
   - variable: NEXT_PUBLIC_APPCHECK_DEBUG_TOKEN
-    value: "PASTE_YOUR_DEBUG_TOKEN_HERE"
+    value: "10268d83-b4fc-4a24-ac74-5f621e7d19fa"
