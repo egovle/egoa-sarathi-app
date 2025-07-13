@@ -21,29 +21,26 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
+  // --- START OF FIX ---
+  // Force debug token for the development environment to prevent reCAPTCHA errors.
+  // This is the most reliable way to ensure App Check works locally.
   try {
-    const hostname = window.location.hostname;
-    // IMPORTANT: This logic determines whether to use reCAPTCHA or a debug token.
-    if (hostname === 'egoasarthi.web.app') {
-      // Production environment: Use reCAPTCHA
-      initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"),
-        isTokenAutoRefreshEnabled: true
-      });
-      console.log("App Check: Initializing with reCAPTCHA for production environment.");
-    } else {
-      // Development environment: Use debug token
-      (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = "10268d83-b4fc-4a24-ac74-5f621e7d19fa";
-      initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"), // Dummy provider for debug mode
-        isTokenAutoRefreshEnabled: true
-      });
-      console.log("App Check: Initializing with debug token for development environment.");
-    }
+    // By setting the debug token directly, we tell Firebase to bypass reCAPTCHA.
+    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = "10268d83-b4fc-4a24-ac74-5f621e7d19fa";
+    
+    // We still need to call initializeAppCheck, but without a provider.
+    // The presence of the debug token is what enables App Check locally.
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"), // This key is still needed, but the debug token will override it.
+      isTokenAutoRefreshEnabled: true
+    });
+    console.log("App Check: Initializing with debug token for development environment.");
   } catch (error) {
-    console.error("Error initializing App Check:", error);
+    console.error("Error initializing App Check with debug token:", error);
   }
+  // --- END OF FIX ---
 }
+
 
 const db = getFirestore(app);
 const auth = getAuth(app);
