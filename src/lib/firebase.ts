@@ -26,7 +26,7 @@ if (typeof window !== 'undefined') {
   // This is the most reliable way to ensure App Check works locally.
   try {
     // By setting the debug token directly, we tell Firebase to bypass reCAPTCHA.
-    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = "10268d83-b4fc-4a24-ac74-5f621e7d19fa";
+    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
     
     // We still need to call initializeAppCheck, but without a provider.
     // The presence of the debug token is what enables App Check locally.
@@ -34,7 +34,6 @@ if (typeof window !== 'undefined') {
       provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"), // This key is still needed, but the debug token will override it.
       isTokenAutoRefreshEnabled: true
     });
-    console.log("App Check: Initializing with debug token for development environment.");
   } catch (error) {
     console.error("Error initializing App Check with debug token:", error);
   }
