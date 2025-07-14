@@ -4,6 +4,7 @@ export interface BaseProfile {
     name: string;
     email: string;
     mobile: string;
+    pincode: string;
     location: string;
     walletBalance: number;
 }
@@ -19,6 +20,7 @@ export interface VLEProfile extends BaseProfile {
     status: 'Pending' | 'Approved';
     available: boolean;
     offeredServices?: string[];
+    lastAssigned?: { [serviceId: string]: string }; // ISO string date
 }
 
 export interface AdminProfile extends BaseProfile {
@@ -112,6 +114,7 @@ export interface Task {
     customerAddress: string;
     customerMobile: string;
     customerEmail?: string;
+    customerPincode: string;
     service: string;
     serviceId: string;
     date: string; // ISO String

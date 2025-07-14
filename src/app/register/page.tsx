@@ -189,11 +189,12 @@ export default function RegisterPage() {
         name: fullName,
         email: email,
         mobile: mobile,
+        pincode: pincode,
         location: fullLocation,
         role: role,
         walletBalance: 0,
         ...(role === 'vle' 
-            ? { status: isAdminUser ? 'Approved' : 'Pending', available: isAdminUser, isAdmin: isAdminUser } 
+            ? { status: isAdminUser ? 'Approved' : 'Pending', available: isAdminUser, isAdmin: isAdminUser, lastAssigned: {} } 
             : { isAdmin: false }),
       };
 
