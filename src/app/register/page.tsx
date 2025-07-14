@@ -234,15 +234,13 @@ export default function RegisterPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background text-foreground p-4">
-       <Card className="mx-auto max-w-sm w-full">
-        <CardHeader>
-          <div className="flex justify-center mb-4">
-            <Link href="/" className="inline-block p-3 bg-primary/20 rounded-full" prefetch={false}>
+       <Card className="w-full max-w-sm">
+        <CardHeader className="text-center">
+            <Link href="/" className="inline-block p-3 bg-primary/20 rounded-full w-fit mx-auto" prefetch={false}>
                 <ShieldCheck className="h-8 w-8 text-primary" />
             </Link>
-          </div>
-          <CardTitle className="text-2xl text-center tracking-tight">Register for eGoa Sarathi</CardTitle>
-          <CardDescription className="text-center">Enter your details below to create an account</CardDescription>
+            <CardTitle className="text-2xl tracking-tight">Register for eGoa Sarathi</CardTitle>
+            <CardDescription>Enter your details below to create an account</CardDescription>
         </CardHeader>
         <CardContent>
           {isConfigMissing && (

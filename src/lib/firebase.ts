@@ -1,4 +1,3 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
@@ -21,25 +20,21 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
-  // --- START OF FIX ---
-  // Force debug token for the development environment to prevent reCAPTCHA errors.
-  // This is the most reliable way to ensure App Check works locally.
-  try {
-    // By setting the debug token directly, we tell Firebase to bypass reCAPTCHA.
+  if (process.env.NODE_ENV === 'development' || window.location.hostname !== 'goasarthi.in') {
+    // Use debug token for development environments (including Firebase Studio)
     (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-    
-    // We still need to call initializeAppCheck, but without a provider.
-    // The presence of the debug token is what enables App Check locally.
     initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"), // This key is still needed, but the debug token will override it.
+      provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"),
       isTokenAutoRefreshEnabled: true
     });
-  } catch (error) {
-    console.error("Error initializing App Check with debug token:", error);
+  } else {
+    // Use reCAPTCHA for the production domain
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"),
+      isTokenAutoRefreshEnabled: true
+    });
   }
-  // --- END OF FIX ---
 }
-
 
 const db = getFirestore(app);
 const auth = getAuth(app);
