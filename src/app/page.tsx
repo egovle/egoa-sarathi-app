@@ -149,11 +149,11 @@ export default function LoginPage() {
       </main>
 
       <footer className="mt-10 flex items-center gap-4 z-10 text-muted-foreground">
-        <a href="tel:+919834637587" className="flex items-center gap-2 hover:text-foreground transition-colors">
+        <a href="tel:+918380083832" className="flex items-center gap-2 hover:text-foreground transition-colors">
             <Phone className="h-4 w-4" />
-            <span>Helpdesk: +91 9834637587</span>
+            <span>Helpdesk: +91 8380083832</span>
         </a>
-        <a href="https://wa.me/+919834637587" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+        <a href="https://wa.me/+918380083832" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
             <WhatsAppIcon className="h-5 w-5" />
             <span className="sr-only">WhatsApp</span>
         </a>
