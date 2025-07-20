@@ -7,10 +7,13 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Task, UserProfile, Service, CampPayout, TaskDocument, VLEProfile } from "@/lib/types";
 import { calculateVleEarnings } from "@/lib/utils";
 import { defaultServices } from "@/lib/seedData";
+import { sendWhatsAppMessage } from "@/services/whatsapp";
 
 // --- NOTIFICATION HELPERS ---
 export async function createNotification(userId: string, title: string, description: string, link?: string) {
     if (!userId) return;
+
+    // Create in-app notification
     await addDoc(collection(db, "notifications"), {
         userId,
         title,
@@ -19,6 +22,34 @@ export async function createNotification(userId: string, title: string, descript
         read: false,
         date: new Date().toISOString(),
     });
+
+    // Send WhatsApp notification
+    try {
+        const userRef = doc(db, 'users', userId);
+        const vleRef = doc(db, 'vles', userId);
+        const govRef = doc(db, 'government', userId);
+
+        const [userSnap, vleSnap, govSnap] = await Promise.all([
+            getDoc(userRef),
+            getDoc(vleRef),
+            getDoc(govRef)
+        ]);
+        
+        let userProfile: UserProfile | null = null;
+        if(userSnap.exists()) userProfile = userSnap.data() as UserProfile;
+        else if (vleSnap.exists()) userProfile = vleSnap.data() as UserProfile;
+        else if (govSnap.exists()) userProfile = govSnap.data() as UserProfile;
+
+        if (userProfile?.mobile) {
+            const whatsappBody = `*${title}*\n\n${description}`;
+            // Prepend Indian country code if not present
+            const mobileNumber = userProfile.mobile.startsWith('+91') ? userProfile.mobile : `+91${userProfile.mobile}`;
+            await sendWhatsAppMessage(mobileNumber, whatsappBody);
+        }
+    } catch (error) {
+        console.error("Failed to send WhatsApp notification:", error);
+        // We don't want to fail the whole operation if WhatsApp fails, so we just log the error.
+    }
 }
 
 export async function createNotificationForAdmins(title: string, description: string, link?: string) {
