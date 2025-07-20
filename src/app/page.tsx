@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShieldCheck, LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { useState, type FormEvent, useEffect } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { cn } from '@/lib/utils';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AppLogo } from '@/components/ui/AppLogo';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -60,10 +61,7 @@ export default function LoginPage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
       <main className="flex flex-col items-center justify-center w-full flex-1 z-10">
         <div className="text-center mb-10">
-          <div className="inline-block p-4 bg-primary/20 rounded-full mb-4">
-            <ShieldCheck className="h-12 w-12 text-primary" />
-          </div>
-          <h1 className="text-5xl font-bold tracking-tight text-foreground">eGoa Sarathi</h1>
+          <AppLogo className="justify-center text-5xl" iconClassName="h-12 w-12" />
           <p className="text-lg text-muted-foreground mt-2">Streamlined Citizen Services</p>
         </div>
         

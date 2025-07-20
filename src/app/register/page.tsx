@@ -10,13 +10,14 @@ import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useState, type FormEvent, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, ShieldCheck, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AppLogo } from '@/components/ui/AppLogo';
 
 type PostOffice = {
   Name: string;
@@ -237,8 +238,8 @@ export default function RegisterPage() {
     <div className="flex items-center justify-center min-h-screen bg-background text-foreground p-4">
        <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-            <Link href="/" className="inline-block p-3 bg-primary/20 rounded-full w-fit mx-auto" prefetch={false}>
-                <ShieldCheck className="h-8 w-8 text-primary" />
+            <Link href="/" className="mx-auto mb-4" prefetch={false}>
+                <AppLogo className="justify-center" />
             </Link>
             <CardTitle className="text-2xl tracking-tight">Register for eGoa Sarathi</CardTitle>
             <CardDescription>Enter your details below to create an account</CardDescription>
