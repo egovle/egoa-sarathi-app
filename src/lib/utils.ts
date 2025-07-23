@@ -19,7 +19,7 @@ export const validateFiles = (files: File[], allowedMimeTypes?: string[]): { isV
         ? allowedMimeTypes 
         : fileValidationConfig.allowedTypes;
     
-    const friendlyTypeList = ['PDF', 'PNG', 'JPG'].join(', ');
+    const friendlyTypeList = validMimeTypes.map(m => m.split('/')[1].toUpperCase()).join(', ');
 
     for (const file of files) {
         if (!validMimeTypes.includes(file.type)) {

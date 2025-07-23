@@ -2,159 +2,140 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
-import { useState, type FormEvent, useEffect } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
-import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AppLogo } from '@/components/ui/AppLogo';
+import { Briefcase, FileText, CheckCircle, Phone } from 'lucide-react';
+import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
 
-export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
-  const { toast } = useToast();
-  
-  const [isConfigMissing, setIsConfigMissing] = useState(false);
+const services = [
+  { name: 'Income Certificate', icon: FileText, description: 'Official proof of income for various financial applications.' },
+  { name: 'Residence Certificate', icon: FileText, description: 'Verify your local residency for official purposes.' },
+  { name: 'PAN Card Services', icon: FileText, description: 'Apply for a new PAN card or make corrections to an existing one.' },
+];
 
-  useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!key || key.startsWith('PASTE_YOUR')) {
-      setIsConfigMissing(true);
-    }
-  }, []);
+const howItWorks = [
+    { title: "Request", description: "Select a service and upload your documents online." },
+    { title: "Process", description: "A local VLE processes your application with the government." },
+    { title: "Receive", description: "Get your final certificate or document directly in your dashboard." },
+]
 
-  const handleLogin = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast({
-        title: 'Login Successful',
-        description: 'Redirecting to your dashboard...',
-      });
-      router.push('/dashboard');
-    } catch (error: any)
-      {
-      console.error('Login failed:', error);
-      toast({
-        title: 'Login Failed',
-        description: 'Invalid email or password. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export default function HomePage() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
-      <main className="flex flex-col items-center justify-center w-full flex-1 z-10">
-        <div className="text-center mb-10">
-          <AppLogo className="justify-center text-5xl" iconClassName="h-12 w-12" />
-          <p className="text-lg text-muted-foreground mt-2">Streamlined Citizen Services</p>
+    <div className="flex flex-col min-h-screen">
+      <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-sm">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
+          <AppLogo />
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline">
+                <Link href="/login">Login</Link>
+            </Button>
+            <Button asChild>
+                <Link href="/register">Register</Link>
+            </Button>
+          </div>
         </div>
-        
-        {isConfigMissing && (
-            <Alert variant="destructive" className="mb-4 max-w-sm w-full">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Configuration Error!</AlertTitle>
-                <AlertDescription>
-                    Your app's API keys are not set correctly. Please follow the setup instructions in the README file to fix this.
-                </AlertDescription>
-            </Alert>
-        )}
+      </header>
 
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <LogIn className="h-5 w-5" />
-                Login to Your Portal
-            </CardTitle>
-            <CardDescription>Access services with your credentials</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2 text-left">
-                <Label htmlFor="email">Email Address</Label>
-                <div className="relative flex items-center">
-                  <Mail className="absolute left-3.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="your.email@example.com"
-                    className="pl-10"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                  />
+      <main className="flex-1">
+        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/20">
+          <div className="container px-4 md:px-6">
+            <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
+                <Image
+                    src="https://placehold.co/600x400.png"
+                    alt="Hero"
+                    width={600}
+                    height={400}
+                    className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last"
+                    data-ai-hint="digital services government"
+                />
+              <div className="flex flex-col justify-center space-y-4">
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
+                    Your Digital Gateway to Goa's Citizen Services
+                  </h1>
+                  <p className="max-w-[600px] text-muted-foreground md:text-xl">
+                    eGoa Sarathi simplifies access to government services, connecting you with local entrepreneurs for fast and transparent processing.
+                  </p>
+                </div>
+                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                    <Button asChild size="lg"><Link href="/register">Get Started</Link></Button>
                 </div>
               </div>
-              <div className="space-y-2 text-left">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative flex items-center">
-                  <Lock className="absolute left-3.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    className="pl-10 pr-10"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                   <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-0 top-0 h-full w-10 text-muted-foreground hover:bg-transparent"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                    </Button>
-                </div>
-              </div>
-              <Button type="submit" disabled={loading || isConfigMissing} className="w-full mt-4">
-                {loading ? <Loader2 className="animate-spin" /> : 'Secure Sign In'}
-              </Button>
-            </form>
+            </div>
+          </div>
+        </section>
 
-              <div className="mt-6 text-center text-sm">
-                  <span className="text-muted-foreground">Don't have an account?{' '}</span>
-                  <Link href="/register" className={cn("underline font-semibold text-primary hover:text-primary/80 transition-colors", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>
-                      Register here
-                  </Link>
-              </div>
-              <p className="text-xs text-muted-foreground text-center mt-4">
-                This site is protected by reCAPTCHA and the Google{' '}
-                <a href="https://policies.google.com/privacy" className="underline">Privacy Policy</a> and{' '}
-                <a href="https://policies.google.com/terms" className="underline">Terms of Service</a> apply.
-              </p>
-          </CardContent>
-        </Card>
-        
+        <section id="services" className="w-full py-12 md:py-24">
+            <div className="container px-4 md:px-6">
+                <div className="flex flex-col items-center justify-center space-y-4 text-center">
+                    <div className="space-y-2">
+                        <Badge variant="outline">Our Services</Badge>
+                        <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Streamlined for You</h2>
+                        <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                            Access a wide range of essential government services through our easy-to-use platform.
+                        </p>
+                    </div>
+                </div>
+                <div className="mx-auto grid max-w-5xl items-start gap-8 py-12 sm:grid-cols-2 md:gap-12 lg:grid-cols-3">
+                    {services.map((service) => (
+                        <div key={service.name} className="grid gap-1 text-center">
+                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
+                                <service.icon className="h-8 w-8 text-primary" />
+                            </div>
+                            <h3 className="text-lg font-bold">{service.name}</h3>
+                            <p className="text-sm text-muted-foreground">{service.description}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
+
+        <section id="how-it-works" className="w-full py-12 md:py-24 bg-muted/40">
+            <div className="container px-4 md:px-6">
+                 <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
+                    <div className="space-y-2">
+                        <Badge variant="outline">How It Works</Badge>
+                        <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Simple. Fast. Transparent.</h2>
+                    </div>
+                </div>
+                <div className="relative grid gap-10 px-10 pt-10 sm:grid-cols-3">
+                    <div className="absolute left-1/2 top-[60px] hidden h-0.5 w-[calc(100%-10rem)] -translate-x-1/2 bg-border sm:block" />
+                     {howItWorks.map((step, index) => (
+                        <div key={step.title} className="relative flex flex-col items-center text-center">
+                            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border-2 border-primary bg-background text-lg font-bold text-primary">
+                               {index + 1}
+                            </div>
+                            <h3 className="mb-2 text-xl font-bold">{step.title}</h3>
+                            <p className="text-muted-foreground">{step.description}</p>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </section>
       </main>
 
-      <footer className="mt-10 flex items-center gap-4 z-10 text-muted-foreground">
-        <a href="tel:+918380083832" className="flex items-center gap-2 hover:text-foreground transition-colors">
-            <Phone className="h-4 w-4" />
-            <span>Helpdesk: +91 8380083832</span>
-        </a>
-        <a href="https://wa.me/+918380083832" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-            <WhatsAppIcon className="h-5 w-5" />
-            <span className="sr-only">WhatsApp</span>
-        </a>
+      <footer className="bg-muted py-6">
+        <div className="container mx-auto flex flex-col items-center justify-between gap-4 px-4 text-center md:flex-row md:px-6">
+          <div className="flex items-center gap-4">
+            <AppLogo className="text-xl" iconClassName="h-6 w-6" />
+          </div>
+          <nav className="flex gap-4 sm:gap-6 text-sm">
+            <Link className="text-muted-foreground hover:text-foreground" href="/about">About Us</Link>
+            <Link className="text-muted-foreground hover:text-foreground" href="/services">Services</Link>
+            <Link className="text-muted-foreground hover:text-foreground" href="/privacy">Privacy Policy</Link>
+          </nav>
+          <div className="flex items-center gap-4 text-muted-foreground">
+            <a href="tel:+918380083832" className="flex items-center gap-2 hover:text-foreground transition-colors">
+                <Phone className="h-4 w-4" />
+                <span>+91 8380083832</span>
+            </a>
+            <a href="https://wa.me/+918380083832" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                <WhatsAppIcon className="h-5 w-5" />
+                <span className="sr-only">WhatsApp</span>
+            </a>
+         </div>
+        </div>
       </footer>
     </div>
   );

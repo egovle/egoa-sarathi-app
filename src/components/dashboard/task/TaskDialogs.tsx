@@ -257,7 +257,7 @@ export const UploadCertificateDialog = ({ taskId, vleId, customerId, onUploadCom
     const handleVleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            const validation = validateFiles([file]);
+            const validation = validateFiles([file], ['application/pdf']); // Only allow PDF
             if (!validation.isValid) {
                 toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
                 return;
@@ -329,13 +329,13 @@ export const UploadCertificateDialog = ({ taskId, vleId, customerId, onUploadCom
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Upload Final Certificate</DialogTitle>
-                    <DialogDescription>Upload the final document for the customer. This will mark the task as "Completed".</DialogDescription>
+                    <DialogDescription>Upload the final document for the customer. This will mark the task as "Completed". Only PDF files up to 1MB are allowed.</DialogDescription>
                 </DialogHeader>
                  <div className="py-4 space-y-2">
                     <Button type="button" onClick={() => vleFileInputRef.current?.click()} size="sm" variant="secondary" className='w-full'>
                         <FileUp /> Choose File
                     </Button>
-                    <Input id="vle-documents" type="file" onChange={handleVleFileChange} ref={vleFileInputRef} className="hidden" />
+                    <Input id="vle-documents" type="file" onChange={handleVleFileChange} ref={vleFileInputRef} className="hidden" accept="application/pdf" />
                     {selectedCertificate && (
                         <div className="text-xs text-muted-foreground space-y-1 pt-1">
                             <p className='font-medium'>Selected file:</p>
