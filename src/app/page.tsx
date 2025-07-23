@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/ui/AppLogo';
 import { Briefcase, FileText, CheckCircle, Phone } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
 
 const services = [
