@@ -36,6 +36,11 @@ export default function ServicesPage() {
           <Link href="/">
             <AppLogo />
           </Link>
+          <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+            <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/about">About Us</Link>
+            <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/services">Services</Link>
+            <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/privacy">Privacy Policy</Link>
+          </nav>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline">
                 <Link href="/login">Login</Link>
