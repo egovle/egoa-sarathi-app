@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useState, type FormEvent, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { Loader2, Eye, EyeOff, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -241,6 +241,9 @@ export default function RegisterPage() {
             <Link href="/" className="mx-auto mb-4" prefetch={false}>
                 <AppLogo className="justify-center" />
             </Link>
+            <Button asChild variant="ghost" className="text-muted-foreground w-fit mx-auto -mt-2 mb-2">
+                <Link href="/"><ArrowLeft className="mr-2 h-4 w-4"/>Back to Home</Link>
+            </Button>
             <CardTitle className="text-2xl tracking-tight">Register for eGoa Sarathi</CardTitle>
             <CardDescription>Enter your details below to create an account</CardDescription>
         </CardHeader>

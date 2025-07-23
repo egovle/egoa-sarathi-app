@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle } from 'lucide-react';
+import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { useState, type FormEvent, useEffect } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -60,9 +60,14 @@ export default function LoginPage() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
       <main className="flex flex-col items-center justify-center w-full flex-1 z-10">
-        <Link href="/" className="mb-10">
-          <AppLogo className="justify-center text-5xl" iconClassName="h-12 w-12" />
-        </Link>
+        <div className="mb-8 text-center">
+            <Link href="/" className="inline-block mb-6">
+                <AppLogo className="justify-center text-5xl" iconClassName="h-12 w-12" />
+            </Link>
+             <Button asChild variant="ghost" className="text-muted-foreground">
+                <Link href="/"><ArrowLeft className="mr-2 h-4 w-4"/>Back to Home</Link>
+            </Button>
+        </div>
         
         {isConfigMissing && (
             <Alert variant="destructive" className="mb-4 max-w-sm w-full">
