@@ -44,7 +44,7 @@ export async function createNotification(userId: string, title: string, descript
             const whatsappBody = `*${title}*\n\n${description}`;
             // Prepend Indian country code if not present
             const mobileNumber = userProfile.mobile.startsWith('+91') ? userProfile.mobile : `+91${userProfile.mobile}`;
-            await sendWhatsAppMessage(mobileNumber, whatsappBody);
+            // await sendWhatsAppMessage(mobileNumber, whatsappBody); // Temporarily disabled
         }
     } catch (error) {
         console.error("Failed to send WhatsApp notification:", error);
