@@ -79,7 +79,7 @@ export default function LoginPage() {
             </Alert>
         )}
 
-        <Card className="w-full max-w-sm">
+        <Card className="w-full max-w-sm bg-card/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
                 <LogIn className="h-5 w-5" />

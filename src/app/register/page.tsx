@@ -236,7 +236,7 @@ export default function RegisterPage() {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background text-foreground p-4">
-       <Card className="w-full max-w-sm">
+       <Card className="w-full max-w-sm bg-card/50">
         <CardHeader className="text-center">
             <Link href="/" className="mx-auto mb-4" prefetch={false}>
                 <AppLogo className="justify-center" />

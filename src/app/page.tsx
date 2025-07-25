@@ -5,9 +5,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/ui/AppLogo';
-import { Briefcase, FileText, CheckCircle, Phone } from 'lucide-react';
+import { FileText, Phone } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
+import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const services = [
   { name: 'Income Certificate', icon: FileText, description: 'Official proof of income for various financial applications.' },
@@ -23,7 +25,7 @@ const howItWorks = [
 
 export default function HomePage() {
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-sm">
         <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           <Link href="/">
@@ -35,10 +37,10 @@ export default function HomePage() {
             <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/privacy">Privacy Policy</Link>
           </nav>
           <div className="flex items-center gap-2">
-            <Button asChild variant="outline">
+            <Button asChild variant="ghost" size="sm">
                 <Link href="/login">Login</Link>
             </Button>
-            <Button asChild>
+            <Button asChild size="sm" className="shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-shadow">
                 <Link href="/register">Register</Link>
             </Button>
           </div>
@@ -46,35 +48,38 @@ export default function HomePage() {
       </header>
 
       <main className="flex-1">
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/20">
-          <div className="container px-4 md:px-6">
-            <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
-                <Image
-                    src="https://placehold.co/600x400.png"
-                    alt="Hero"
-                    width={600}
-                    height={400}
-                    className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last"
-                    data-ai-hint="digital services government"
-                />
-              <div className="flex flex-col justify-center space-y-4">
-                <div className="space-y-2">
-                  <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-                    Your Digital Gateway to Goa's Citizen Services
-                  </h1>
-                  <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    eGoa Sarathi simplifies access to government services, connecting you with local entrepreneurs for fast and transparent processing.
-                  </p>
+        <section className="relative w-full py-20 md:py-32 lg:py-40 overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-blue-900/60 to-purple-900/40 animated-gradient"></div>
+            <div className="container relative px-4 md:px-6 z-10">
+                <div className="grid gap-6 lg:grid-cols-[1fr_500px] lg:gap-12 xl:grid-cols-[1fr_600px]">
+                    <div className="flex flex-col justify-center space-y-6">
+                        <div className="space-y-4">
+                        <h1 className="text-4xl font-bold tracking-tighter text-white sm:text-5xl xl:text-6xl/none">
+                            Your Digital Gateway to Goa's Citizen Services
+                        </h1>
+                        <p className="max-w-[600px] text-gray-300 md:text-xl">
+                            eGoa Sarathi simplifies access to government services, connecting you with local entrepreneurs for fast and transparent processing.
+                        </p>
+                        </div>
+                        <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                            <Button asChild size="lg" className="shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-shadow">
+                                <Link href="/register">Get Started</Link>
+                            </Button>
+                        </div>
+                    </div>
+                     <Image
+                        src="https://placehold.co/600x400.png"
+                        alt="Hero"
+                        width={600}
+                        height={400}
+                        className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last border-2 border-primary/20 shadow-2xl shadow-primary/10"
+                        data-ai-hint="digital services government"
+                    />
                 </div>
-                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                    <Button asChild size="lg"><Link href="/register">Get Started</Link></Button>
-                </div>
-              </div>
             </div>
-          </div>
         </section>
 
-        <section id="services" className="w-full py-12 md:py-24">
+        <section id="services" className="w-full py-12 md:py-24 bg-background">
             <div className="container px-4 md:px-6">
                 <div className="flex flex-col items-center justify-center space-y-4 text-center">
                     <div className="space-y-2">
@@ -87,13 +92,17 @@ export default function HomePage() {
                 </div>
                 <div className="mx-auto grid max-w-5xl items-start gap-8 py-12 sm:grid-cols-2 md:gap-12 lg:grid-cols-3">
                     {services.map((service) => (
-                        <div key={service.name} className="grid gap-1 text-center">
-                            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
-                                <service.icon className="h-8 w-8 text-primary" />
-                            </div>
-                            <h3 className="text-lg font-bold">{service.name}</h3>
-                            <p className="text-sm text-muted-foreground">{service.description}</p>
-                        </div>
+                        <Card key={service.name} className="group overflow-hidden bg-card/50 hover:bg-card/90 transition-all duration-300 hover:shadow-primary/10 hover:-translate-y-2 hover:shadow-lg">
+                            <CardHeader className="items-center">
+                                <div className="p-4 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors duration-300">
+                                    <service.icon className="h-8 w-8 text-primary" />
+                                </div>
+                                <CardTitle>{service.name}</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-sm text-center text-muted-foreground">{service.description}</p>
+                            </CardContent>
+                        </Card>
                     ))}
                 </div>
             </div>
