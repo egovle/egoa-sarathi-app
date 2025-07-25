@@ -7,7 +7,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Task, UserProfile, Service, CampPayout, TaskDocument, VLEProfile } from "@/lib/types";
 import { calculateVleEarnings } from "@/lib/utils";
 import { defaultServices } from "@/lib/seedData";
-import { sendWhatsAppMessage } from "@/services/whatsapp";
+// import { sendWhatsAppMessage } from "@/services/whatsapp";
 
 // --- NOTIFICATION HELPERS ---
 export async function createNotification(userId: string, title: string, description: string, link?: string) {
