@@ -3,6 +3,9 @@
   "apphosting": [
     {
       "backendId": "egoa-sarathi-app",
+      "runConfig": {
+        "minInstances": 0
+      },
       "rootDir": "/",
       "ignore": [
         "node_modules",
