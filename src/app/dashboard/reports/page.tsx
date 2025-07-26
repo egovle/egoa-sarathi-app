@@ -9,29 +9,17 @@ import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Mail, BarChart2, Briefcase, CheckCircle, Clock, AlertTriangle, Wallet, TrendingUp, Sparkles, Tent, Award } from 'lucide-react';
+import { Loader2, Mail, Wallet, Tent, Award, Briefcase, CheckCircle, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { Bar, BarChart, CartesianGrid, XAxis, ResponsiveContainer, PieChart, Pie, Cell, Legend, YAxis } from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import type { ChartConfig } from '@/components/ui/chart';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import type { Task, VLEProfile, UserProfile, Camp } from '@/lib/types';
-import { ADMIN_COMMISSION_RATE } from '@/lib/config';
 import { calculateVleEarnings } from '@/lib/utils';
 
 
 const AdminReports = ({ tasks, vles, camps }: { tasks: Task[], vles: VLEProfile[], camps: Camp[] }) => {
     const { toast } = useToast();
-    const taskStatusCounts = useMemo(() => {
-        return tasks.reduce((acc, task) => {
-            acc[task.status] = (acc[task.status] || 0) + 1;
-            return acc;
-        }, {} as { [key: string]: number });
-    }, [tasks]);
-
-    const taskStatusData = Object.entries(taskStatusCounts).map(([status, count]) => ({ status, count }));
-
+    
     const vlePerformance = useMemo(() => {
         return vles.filter(v => !v.isAdmin).map(vle => {
             const assignedTasks = tasks.filter(t => t.assignedVleId === vle.id);
@@ -82,52 +70,6 @@ const AdminReports = ({ tasks, vles, camps }: { tasks: Task[], vles: VLEProfile[
         return { totalVlePayouts, totalAdminEarnings };
     }, [camps]);
 
-     const chartConfig: ChartConfig = {
-        count: {
-          label: "Tasks",
-        },
-        'Paid Out': {
-            label: "Paid Out",
-            color: "hsl(120, 80%, 40%)",
-        },
-        Completed: {
-          label: "Completed",
-          color: "hsl(var(--chart-2))",
-        },
-        'In Progress': {
-            label: 'In Progress',
-            color: 'hsl(210, 80%, 60%)',
-        },
-        Assigned: {
-          label: "Assigned",
-          color: "hsl(var(--chart-1))",
-        },
-        Unassigned: {
-          label: "Unassigned",
-          color: "hsl(var(--destructive))",
-        },
-         'Awaiting Documents': {
-          label: "Awaiting Docs",
-          color: "hsl(var(--chart-3))",
-        },
-        'Awaiting Payment': {
-          label: "Awaiting Payment",
-          color: "hsl(var(--chart-4))",
-        },
-         'Pending Price Approval': {
-          label: "Pending Price",
-          color: "hsl(var(--chart-5))",
-        },
-        'Complaint Raised': {
-          label: "Complaint",
-          color: "hsl(0, 100%, 30%)",
-        },
-      } satisfies ChartConfig
-
-      const revenueChartConfig: ChartConfig = {
-        revenue: { label: "Revenue", color: "hsl(var(--chart-1))" },
-    };
-
     const handleEmailReport = (vle: any) => {
         const subject = `Your Weekly Performance Report - eGoa Sarathi`;
         const body = `
@@ -153,40 +95,6 @@ eGoa Sarathi Admin Team
     return (
         <div className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Task Status Overview</CardTitle>
-                        <CardDescription>A summary of all tasks in the system.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-                            <BarChart accessibilityLayer data={taskStatusData} layout="vertical" margin={{ left: 20 }}>
-                                <CartesianGrid horizontal={false} />
-                                <XAxis type="number" hide />
-                                 <YAxis
-                                    dataKey="status"
-                                    type="category"
-                                    tickLine={false}
-                                    tickMargin={10}
-                                    axisLine={false}
-                                    width={120}
-                                />
-                                <ChartTooltip 
-                                    cursor={false}
-                                    content={<ChartTooltipContent 
-                                        labelKey="count"
-                                        indicator="dot"
-                                    />} 
-                                />
-                                <Bar dataKey="count" radius={5}>
-                                    {taskStatusData.map((entry) => (
-                                        <Cell key={entry.status} fill={chartConfig[entry.status as keyof typeof chartConfig]?.color || 'hsl(var(--muted))'} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ChartContainer>
-                    </CardContent>
-                </Card>
                  <Card>
                     <CardHeader>
                         <CardTitle>Top VLE Performance</CardTitle>
@@ -197,9 +105,8 @@ eGoa Sarathi Admin Team
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>VLE Name</TableHead>
-                                    <TableHead>Tasks Assigned</TableHead>
-                                    <TableHead>Tasks Completed</TableHead>
-                                    <TableHead>Commission Earned</TableHead>
+                                    <TableHead>Completed</TableHead>
+                                    <TableHead>Commission</TableHead>
                                     <TableHead className="text-right">Action</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -207,12 +114,11 @@ eGoa Sarathi Admin Team
                                 {vlePerformance.map(vle => (
                                     <TableRow key={vle.id}>
                                         <TableCell>{vle.name}</TableCell>
-                                        <TableCell>{vle.tasksAssigned}</TableCell>
                                         <TableCell>{vle.tasksCompleted}</TableCell>
                                         <TableCell>₹{vle.totalCommission.toFixed(2)}</TableCell>
                                         <TableCell className="text-right">
                                             <Button variant="outline" size="sm" onClick={() => handleEmailReport(vle)}>
-                                                <Mail className="mr-2 h-4 w-4" /> Email Report
+                                                <Mail className="mr-2 h-4 w-4" /> Email
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -221,32 +127,11 @@ eGoa Sarathi Admin Team
                         </Table>
                      </CardContent>
                  </Card>
-            </div>
-             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <Card>
-                    <CardHeader className="flex flex-row items-center gap-2">
-                        <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                        <CardTitle>Task Revenue Over Time</CardTitle>
-                    </CardHeader>
-                    <CardDescription className="px-6 -mt-4">Based on 20% commission from completed tasks.</CardDescription>
-                    <CardContent>
-                        <ChartContainer config={revenueChartConfig} className="min-h-[250px] w-full pt-4">
-                            <BarChart data={revenueByMonth}>
-                                <CartesianGrid vertical={false} />
-                                <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
-                                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${value}`} />
-                                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                <Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} />
-                            </BarChart>
-                        </ChartContainer>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center gap-2">
-                         <Sparkles className="h-5 w-5 text-muted-foreground" />
+                 <Card>
+                    <CardHeader>
                          <CardTitle>Most Popular Services</CardTitle>
+                     <CardDescription>Top 5 services by task count.</CardDescription>
                     </CardHeader>
-                     <CardDescription className="px-6 -mt-4">Top 5 services by task count.</CardDescription>
                     <CardContent className="pt-6">
                         <Table>
                             <TableHeader>
@@ -266,9 +151,34 @@ eGoa Sarathi Admin Team
                         </Table>
                     </CardContent>
                 </Card>
+            </div>
+             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
                 <Card>
-                    <CardHeader className="flex flex-row items-center gap-2">
-                         <Tent className="h-5 w-5 text-muted-foreground" />
+                    <CardHeader>
+                        <CardTitle>Task Revenue Over Time</CardTitle>
+                    </CardHeader>
+                    <CardDescription className="px-6 -mt-4">Based on 20% commission from completed tasks.</CardDescription>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Month</TableHead>
+                                    <TableHead className="text-right">Revenue</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {revenueByMonth.map(item => (
+                                    <TableRow key={item.month}>
+                                        <TableCell>{item.month}</TableCell>
+                                        <TableCell className="text-right">₹{item.revenue.toFixed(2)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
                          <CardTitle>Camp Financials</CardTitle>
                     </CardHeader>
                      <CardDescription className="px-6 -mt-4">Summary of earnings from all paid out camps.</CardDescription>
@@ -489,3 +399,5 @@ export default function ReportsPage() {
         ? <AdminReports tasks={tasks} vles={vles} camps={camps} /> 
         : <VleReports tasks={tasks} camps={camps} userProfile={userProfile as VLEProfile} />;
 }
+
+    
