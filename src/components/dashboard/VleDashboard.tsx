@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
@@ -33,9 +33,20 @@ const PendingApprovalView = () => (
     </Alert>
 );
 
-export default function VleDashboard({ assignedTasks, services, camps, taskInvitations, campInvitations }: { assignedTasks: Task[], services: Service[], camps: Camp[], taskInvitations: Task[], campInvitations: Camp[] }) {
+export default function VleDashboard({ assignedTasks, camps, taskInvitations }: { assignedTasks: Task[], camps: Camp[], taskInvitations: Task[] }) {
     const { toast } = useToast();
     const { user, userProfile } = useAuth();
+    
+    const campInvitations = useMemo(() => {
+        if (!userProfile) return [];
+        const todayStr = new Date().toLocaleDateString('en-CA');
+
+        return camps.filter(camp => {
+            if (camp.date.substring(0, 10) < todayStr) return false;
+            const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
+            return myAssignment?.status === 'pending';
+        });
+    }, [camps, userProfile]);
     
     const onVleAvailabilityChange = async (vleId: string, available: boolean) => {
         const vleRef = doc(db, "vles", vleId);

@@ -24,7 +24,6 @@ export default function DashboardPage() {
     
     const [tasks, setTasks] = useState<Task[]>([]);
     const [taskInvitations, setTaskInvitations] = useState<Task[]>([]);
-    const [campInvitations, setCampInvitations] = useState<Camp[]>([]);
     const [services, setServices] = useState<Service[]>([]);
     const [camps, setCamps] = useState<Camp[]>([]);
     
@@ -65,16 +64,7 @@ export default function DashboardPage() {
             const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
             unsubscribers.push(onSnapshot(campsQuery, (snapshot) => {
                 const allCampsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp);
-                const todayStr = new Date().toLocaleDateString('en-CA');
-                
-                const myInvitations = allCampsData.filter(camp => {
-                    if (camp.date.substring(0, 10) < todayStr) return false;
-                    const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
-                    return myAssignment?.status === 'pending';
-                });
-
                 setCamps(allCampsData);
-                setCampInvitations(myInvitations);
             }));
         
         } else if (userProfile.role === 'customer') {
@@ -113,10 +103,8 @@ export default function DashboardPage() {
             case 'vle':
                 return <VleDashboard 
                     assignedTasks={tasks} 
-                    services={services} 
                     camps={camps}
                     taskInvitations={taskInvitations}
-                    campInvitations={campInvitations}
                  />;
             case 'customer':
                 return <CustomerDashboard tasks={tasks} services={services} />;

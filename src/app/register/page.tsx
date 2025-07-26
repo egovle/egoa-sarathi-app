@@ -206,7 +206,7 @@ export default function RegisterPage() {
         title: 'Registration Successful!',
         description: `Your account has been created. ${role === 'vle' ? 'It is now pending admin approval.' : 'Redirecting to login...'}`,
       });
-      router.push('/');
+      router.push('/login');
 
     } catch (error: any) {
       console.error("Registration failed:", error);
@@ -370,7 +370,7 @@ export default function RegisterPage() {
           </form>
           <div className="mt-4 text-center text-sm">
             <span className="text-muted-foreground">Already have an account?{' '}</span>
-            <Link href="/" className={cn("underline font-semibold text-primary", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>
+            <Link href="/login" className={cn("underline font-semibold text-primary", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>
               Log in
             </Link>
           </div>
