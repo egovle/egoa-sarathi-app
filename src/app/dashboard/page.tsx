@@ -23,7 +23,6 @@ export default function DashboardPage() {
     const searchParams = useSearchParams();
     
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [taskInvitations, setTaskInvitations] = useState<Task[]>([]);
     const [services, setServices] = useState<Service[]>([]);
     const [camps, setCamps] = useState<Camp[]>([]);
     
@@ -57,8 +56,7 @@ export default function DashboardPage() {
             const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
             unsubscribers.push(onSnapshot(assignedTasksQuery, snapshot => {
                 const allAssigned = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-                setTasks(allAssigned.filter(t => t.status !== 'Pending VLE Acceptance'));
-                setTaskInvitations(allAssigned.filter(t => t.status === 'Pending VLE Acceptance'));
+                setTasks(allAssigned);
             }));
 
             const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
@@ -102,12 +100,11 @@ export default function DashboardPage() {
         switch (userProfile.role) {
             case 'vle':
                 return <VleDashboard 
-                    assignedTasks={tasks} 
+                    allAssignedTasks={tasks} 
                     camps={camps}
-                    taskInvitations={taskInvitations}
                  />;
             case 'customer':
-                return <CustomerDashboard tasks={tasks} services={services} />;
+                return <CustomerDashboard tasks={tasks} />;
             case 'government':
                 return <GovernmentDashboard />;
             default:

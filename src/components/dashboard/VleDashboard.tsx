@@ -33,9 +33,13 @@ const PendingApprovalView = () => (
     </Alert>
 );
 
-export default function VleDashboard({ assignedTasks, camps, taskInvitations }: { assignedTasks: Task[], camps: Camp[], taskInvitations: Task[] }) {
+export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedTasks: Task[], camps: Camp[] }) {
     const { toast } = useToast();
     const { user, userProfile } = useAuth();
+    
+    const taskInvitations = useMemo(() => 
+        allAssignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), 
+    [allAssignedTasks]);
     
     const campInvitations = useMemo(() => {
         if (!userProfile) return [];

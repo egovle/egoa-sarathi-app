@@ -187,8 +187,18 @@ export default function DashboardLayout({
       toast({ title: 'Error', description: 'Failed to log out. Please try again.', variant: 'destructive' });
     }
   };
+  
+  const isLinkActive = (href: string) => {
+    if (href === '/dashboard') {
+        // Only active if it's exactly /dashboard or a task detail page
+        return pathname === '/dashboard' || pathname.startsWith('/dashboard/task/');
+    }
+    // For all other links, require an exact match
+    return pathname === href;
+  }
 
-  const NavLink = ({ href, icon: Icon, label, isActive }: { href: string; icon: React.ElementType; label: string; isActive: boolean; }) => (
+
+  const NavLink = ({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string; }) => (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -196,7 +206,7 @@ export default function DashboardLayout({
             href={href}
             className={cn(
               "flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground md:h-8 md:w-8",
-              isActive && "bg-accent text-accent-foreground"
+              isLinkActive(href) && "bg-accent text-accent-foreground"
             )}
           >
             <Icon className="h-5 w-5" />
@@ -208,12 +218,12 @@ export default function DashboardLayout({
     </TooltipProvider>
   );
 
-  const MobileNavLink = ({ href, icon: Icon, label, isActive }: { href: string; icon: React.ElementType; label: string; isActive: boolean; }) => (
+  const MobileNavLink = ({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string; }) => (
      <Link
         href={href}
         className={cn(
             "mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground",
-            isActive && "bg-muted text-foreground"
+            isLinkActive(href) && "bg-muted text-foreground"
         )}
         >
         <Icon className="h-5 w-5" />
@@ -240,7 +250,7 @@ export default function DashboardLayout({
       <aside className="fixed inset-y-0 left-0 z-10 hidden w-14 flex-col border-r bg-background sm:flex">
         <nav className="flex flex-col items-center gap-4 px-2 sm:py-5">
           {navItems.map(item => (
-            <NavLink key={item.href} {...item} isActive={pathname === item.href || (item.href === '/dashboard' && pathname.startsWith('/dashboard/task/'))} />
+            <NavLink key={item.href} {...item} />
           ))}
         </nav>
         <nav className="mt-auto flex flex-col items-center gap-4 px-2 sm:py-5">
@@ -277,7 +287,7 @@ export default function DashboardLayout({
               </SheetHeader>
               <nav className="grid gap-6 text-lg font-medium">
                 {navItems.map(item => (
-                    <MobileNavLink key={item.href} {...item} isActive={pathname === item.href} />
+                    <MobileNavLink key={item.href} {...item} />
                 ))}
                  {!userProfile?.isAdmin && userProfile?.role !== 'government' && (
                     <div className="mt-auto border-t p-4">

@@ -26,7 +26,7 @@ import { FeedbackDialog } from './dialogs/FeedbackDialog';
 import type { Task, Service, UserProfile, Complaint } from '@/lib/types';
 
 
-export default function CustomerDashboard({ tasks, services }: { tasks: Task[], services: Service[] }) {
+export default function CustomerDashboard({ tasks }: { tasks: Task[] }) {
     const { toast } = useToast();
     const { user, userProfile } = useAuth();
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...(t.complaint as Complaint), taskId: t.id, service: t.service}));
@@ -80,7 +80,7 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
                 <TabsTrigger value="tasks">My Bookings <Badge className="ml-2">{tasks.length}</Badge></TabsTrigger>
                 <TabsTrigger value="complaints">My Complaints <Badge className="ml-2">{customerComplaints.length}</Badge></TabsTrigger>
             </TabsList>
-             <TaskCreatorDialog services={services} creatorId={user.uid} creatorProfile={userProfile} type="Customer Request" buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />Create New Booking</Button>} />
+             <TaskCreatorDialog services={[]} creatorId={user.uid} creatorProfile={userProfile} type="Customer Request" buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />Create New Booking</Button>} />
           </div>
             <TabsContent value="tasks" className="mt-4 space-y-6">
                 <Card>
