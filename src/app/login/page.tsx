@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useState, type FormEvent, useEffect } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -61,12 +61,14 @@ export default function LoginPage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
       <main className="flex flex-col items-center justify-center w-full flex-1 z-10">
         <div className="mb-8 text-center">
-            <Link href="/" className="inline-block mb-6">
-                <AppLogo className="justify-center text-5xl" iconClassName="h-12 w-12" />
+            <div className="flex justify-center mb-4">
+              <div className="bg-primary/10 p-3 rounded-full">
+                <ShieldCheck className="h-8 w-8 text-primary"/>
+              </div>
+            </div>
+            <Link href="/" className="inline-block">
+                <AppLogo className="justify-center text-4xl" subtitle='Streamlined Citizen Services' />
             </Link>
-             <Button asChild variant="ghost" className="text-muted-foreground">
-                <Link href="/"><ArrowLeft className="mr-2 h-4 w-4"/>Back to Home</Link>
-            </Button>
         </div>
         
         {isConfigMissing && (
@@ -79,10 +81,10 @@ export default function LoginPage() {
             </Alert>
         )}
 
-        <Card className="w-full max-w-sm bg-card/50">
+        <Card className="w-full max-w-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <LogIn className="h-5 w-5" />
+            <CardTitle className="flex items-center gap-2 text-xl">
+                <ArrowRight className="h-5 w-5" />
                 Login to Your Portal
             </CardTitle>
             <CardDescription>Access services with your credentials</CardDescription>
@@ -140,11 +142,6 @@ export default function LoginPage() {
                       Register here
                   </Link>
               </div>
-              <p className="text-xs text-muted-foreground text-center mt-4">
-                This site is protected by reCAPTCHA and the Google{' '}
-                <a href="https://policies.google.com/privacy" className="underline">Privacy Policy</a> and{' '}
-                <a href="https://policies.google.com/terms" className="underline">Terms of Service</a> apply.
-              </p>
           </CardContent>
         </Card>
         
