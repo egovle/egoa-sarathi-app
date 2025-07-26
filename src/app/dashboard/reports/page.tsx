@@ -399,5 +399,3 @@ export default function ReportsPage() {
         ? <AdminReports tasks={tasks} vles={vles} camps={camps} /> 
         : <VleReports tasks={tasks} camps={camps} userProfile={userProfile as VLEProfile} />;
 }
-
-    
