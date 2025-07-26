@@ -1,11 +1,8 @@
-
-import type {NextConfig} from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   /* config options here */
   output: 'standalone',
-  experimental: {
-  },
+  experimental: {},
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -24,7 +21,7 @@ const nextConfig: NextConfig = {
   },
   env: {
     NEXT_PUBLIC_RECAPTCHA_SITE_KEY: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
-  }
+  },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
