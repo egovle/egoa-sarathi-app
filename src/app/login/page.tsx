@@ -58,16 +58,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 text-foreground p-4">
       <main className="flex flex-col items-center justify-center w-full flex-1 z-10">
         <div className="mb-8 text-center">
-            <div className="flex justify-center mb-4">
-              <div className="bg-primary/10 p-3 rounded-full">
-                <ShieldCheck className="h-8 w-8 text-primary"/>
-              </div>
-            </div>
             <Link href="/" className="inline-block">
-                <AppLogo className="justify-center text-4xl" subtitle='Streamlined Citizen Services' />
+                <AppLogo className="justify-center text-3xl" subtitle='Streamlined Citizen Services' />
             </Link>
         </div>
         
@@ -81,10 +76,10 @@ export default function LoginPage() {
             </Alert>
         )}
 
-        <Card className="w-full max-w-sm">
+        <Card className="w-full max-w-sm shadow-xl bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl">
-                <ArrowRight className="h-5 w-5" />
+                <LogIn className="h-5 w-5" />
                 Login to Your Portal
             </CardTitle>
             <CardDescription>Access services with your credentials</CardDescription>
