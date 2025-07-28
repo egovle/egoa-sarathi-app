@@ -36,7 +36,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge"
@@ -173,7 +173,10 @@ export default function DashboardLayout({
   };
   
   const isLinkActive = (href: string) => {
-    return pathname === href;
+    if (href === '/dashboard') {
+        return pathname === href;
+    }
+    return pathname.startsWith(href);
   }
 
   const NavLink = ({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string; }) => (
@@ -380,3 +383,5 @@ export default function DashboardLayout({
     </div>
   )
 }
+
+    
