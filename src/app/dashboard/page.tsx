@@ -104,7 +104,7 @@ export default function DashboardPage() {
                     camps={camps}
                  />;
             case 'customer':
-                return <CustomerDashboard tasks={tasks} />;
+                return <CustomerDashboard tasks={tasks} services={services} />;
             case 'government':
                 return <GovernmentDashboard />;
             default:

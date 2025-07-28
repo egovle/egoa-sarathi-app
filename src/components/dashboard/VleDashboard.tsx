@@ -42,7 +42,7 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     [allAssignedTasks]);
     
     const campInvitations = useMemo(() => {
-        if (!userProfile) return [];
+        if (!userProfile || userProfile.role !== 'vle') return [];
         const todayStr = new Date().toLocaleDateString('en-CA');
 
         return camps.filter(camp => {
@@ -123,9 +123,9 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
         }
     };
 
-    if (!user || !userProfile) return null;
+    if (!user || !userProfile || userProfile.role !== 'vle') return null;
     
-    if ((userProfile as VLEProfile).status === 'Pending') {
+    if (userProfile.status === 'Pending') {
         return <PendingApprovalView />;
     }
 
@@ -137,14 +137,14 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                 <ToggleRight className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="pt-2">
-                {userProfile && (userProfile as VLEProfile).status === 'Approved' ? (
+                {userProfile.status === 'Approved' ? (
                     <div className="flex items-center space-x-2 pt-2">
                         <Switch 
                             id="availability-mode" 
-                            checked={(userProfile as VLEProfile).available} 
+                            checked={userProfile.available} 
                             onCheckedChange={(checked) => onVleAvailabilityChange(user.uid, checked)}
                         />
-                        <Label htmlFor="availability-mode">{(userProfile as VLEProfile).available ? 'Available' : 'Unavailable'} for Tasks</Label>
+                        <Label htmlFor="availability-mode">{userProfile.available ? 'Available' : 'Unavailable'} for Tasks</Label>
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>
