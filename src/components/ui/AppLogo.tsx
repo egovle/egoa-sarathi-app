@@ -4,12 +4,19 @@ import { cn } from '@/lib/utils';
 
 export const AppLogo = ({ className, iconClassName, subtitle }: { className?: string; iconClassName?: string, subtitle?: string }) => {
     return (
-        <div className="flex flex-col items-center">
-            <div className={cn("flex items-center gap-3 text-2xl font-bold tracking-tight text-primary", className)}>
-                <ShieldCheck className={cn("h-8 w-8 hidden", iconClassName)} />
+        <div className="flex flex-col">
+            <div className={cn("flex items-center gap-2 text-lg font-semibold", className)}>
+                <svg
+                    className={cn("h-6 w-6", iconClassName)}
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 256 256"
+                    fill="currentColor"
+                >
+                    <path d="M208.49,152.49l-72,72a12,12,0,0,1-17,0l-72-72a12,12,0,0,1,17-17L116,187V40a12,12,0,0,1,24,0V187l51.51-51.52a12,12,0,0,1,17,17Z" />
+                </svg>
                 <span>eGoa Sarathi</span>
             </div>
-            {subtitle && <p className="text-sm text-muted-foreground -mt-1">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-muted-foreground -mt-1">{subtitle}</p>}
         </div>
     );
 };
