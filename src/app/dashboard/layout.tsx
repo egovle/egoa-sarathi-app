@@ -36,12 +36,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { auth, db } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -60,7 +59,6 @@ const ALL_NAV_ITEMS = [
     { href: "/dashboard/camps", icon: Tent, label: "Camps", roles: ['admin', 'vle', 'customer', 'government'] },
     { href: "/dashboard/services", icon: ListPlus, label: "Services", roles: ['admin'] },
     { href: "/dashboard/users", icon: Users, label: "User Management", roles: ['admin'] },
-    { href: "/dashboard/my-office", icon: Building, label: "My Office", roles: ['vle','customer', 'government', 'admin']},
     { href: "/dashboard/settings", icon: Settings, label: "Settings", roles: ['admin', 'vle', 'customer', 'government']},
 ];
 
@@ -176,21 +174,28 @@ export default function DashboardLayout({
     if (href === '/dashboard') {
         return pathname === href;
     }
+     // Special case for settings to match profile tab
+    if (href === '/dashboard/settings') {
+        return pathname === '/dashboard' && useSearchParams().get('tab') === 'profile';
+    }
     return pathname.startsWith(href);
   }
 
-  const NavLink = ({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string; }) => (
-    <Link
-        href={href}
-        className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sidebar-foreground/80 transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            isLinkActive(href) && "bg-sidebar-accent text-sidebar-accent-foreground"
-        )}
-    >
-        <Icon className="h-4 w-4" />
-        {label}
-    </Link>
-  );
+  const NavLink = ({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string; }) => {
+    const finalHref = href === '/dashboard/settings' ? '/dashboard?tab=profile' : href;
+    return (
+        <Link
+            href={finalHref}
+            className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sidebar-foreground/80 transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                isLinkActive(href) && "bg-sidebar-accent text-sidebar-accent-foreground"
+            )}
+        >
+            <Icon className="h-4 w-4" />
+            {label}
+        </Link>
+    )
+  };
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -211,7 +216,7 @@ export default function DashboardLayout({
         
         <aside className="hidden border-r bg-sidebar md:block">
             <div className="flex h-full max-h-screen flex-col gap-2">
-                <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+                <div className="flex h-14 items-center border-b border-sidebar-border px-4 lg:h-[60px] lg:px-6">
                     <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
                         <AppLogo className="text-white" iconClassName="text-white" />
                     </Link>
@@ -224,11 +229,11 @@ export default function DashboardLayout({
                     </nav>
                 </div>
                 {!userProfile?.isAdmin && userProfile?.role !== 'government' && (
-                    <div className="mt-auto p-4 border-t">
-                        <Card className="bg-sidebar-accent/20 border-sidebar-accent/50">
+                    <div className="mt-auto p-4 border-t border-sidebar-border">
+                        <Card className="bg-sidebar-accent/20 border-sidebar-accent/50 text-sidebar-foreground">
                             <CardHeader className="p-2 pt-0 md:p-4">
                                <CardTitle>Need Help?</CardTitle>
-                               <CardDescription>Contact our support team for any assistance.</CardDescription>
+                               <CardDescription className="text-sidebar-foreground/70">Contact our support team for any assistance.</CardDescription>
                             </CardHeader>
                             <CardContent className="p-2 pt-0 md:p-4 md:pt-0">
                                 <SupportContent/>
@@ -249,7 +254,7 @@ export default function DashboardLayout({
                         </Button>
                     </SheetTrigger>
                     <SheetContent side="left" className="flex flex-col bg-sidebar text-sidebar-foreground p-0">
-                        <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+                        <div className="flex h-14 items-center border-b border-sidebar-border px-4 lg:h-[60px] lg:px-6">
                             <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
                                 <AppLogo className="text-white" iconClassName="text-white" />
                             </Link>
@@ -260,11 +265,11 @@ export default function DashboardLayout({
                             ))}
                         </nav>
                          {!userProfile?.isAdmin && userProfile?.role !== 'government' && (
-                            <div className="mt-auto p-4 border-t">
-                                <Card>
+                            <div className="mt-auto p-4 border-t border-sidebar-border">
+                                <Card className="bg-sidebar-accent/20 border-sidebar-accent/50 text-sidebar-foreground">
                                    <CardHeader>
                                        <CardTitle>Need Help?</CardTitle>
-                                       <CardDescription>Contact our support team for any assistance.</CardDescription>
+                                       <CardDescription className="text-sidebar-foreground/70">Contact our support team for any assistance.</CardDescription>
                                    </CardHeader>
                                    <CardContent>
                                        <SupportContent/>
@@ -391,3 +396,5 @@ export default function DashboardLayout({
     </div>
   )
 }
+
+    

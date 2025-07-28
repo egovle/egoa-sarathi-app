@@ -6,13 +6,13 @@ import { getStorage } from "firebase/storage";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAVWezupcCQhE6FhdxSgsD1SVPxtjDK72w",
-  authDomain: "egoasarthi.firebaseapp.com",
-  projectId: "egoasarthi",
-  storageBucket: "egoasarthi.firebasestorage.app",
-  messagingSenderId: "582450828090",
-  appId: "1:582450828090:web:a0ed05ea1a74710230f603",
-  measurementId: "G-9ZGSFH8X1F",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
 // Initialize Firebase
@@ -20,19 +20,14 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
-  if (process.env.NODE_ENV === 'development' || window.location.hostname !== 'goasarthi.in') {
-    // Use debug token for development environments (including Firebase Studio)
-    (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  const recaptchaKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+  if (recaptchaKey) {
     initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"),
-      isTokenAutoRefreshEnabled: true
+        provider: new ReCaptchaV3Provider(recaptchaKey),
+        isTokenAutoRefreshEnabled: true
     });
   } else {
-    // Use reCAPTCHA for the production domain
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider("6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"),
-      isTokenAutoRefreshEnabled: true
-    });
+    console.warn("Firebase App Check: reCAPTCHA site key is not defined. App Check will not be initialized.");
   }
 }
 
@@ -41,3 +36,5 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 
 export { app, db, auth, storage };
+
+    

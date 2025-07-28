@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { useState, type FormEvent, useEffect } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -29,7 +29,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!key || key.startsWith('PASTE_YOUR')) {
+    if (!key || key.includes('PASTE_YOUR')) {
       setIsConfigMissing(true);
     }
   }, []);
@@ -61,9 +61,12 @@ export default function LoginPage() {
     <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 text-foreground p-4">
       <main className="flex flex-col items-center justify-center w-full flex-1 z-10">
         <div className="mb-8 text-center">
-            <Link href="/" className="inline-block">
+             <Link href="/" className="inline-block" prefetch={false}>
                 <AppLogo className="justify-center text-3xl" subtitle='Streamlined Citizen Services' />
             </Link>
+             <Button asChild variant="ghost" className="text-muted-foreground w-fit mx-auto mt-2">
+                <Link href="/"><ArrowLeft className="mr-2 h-4 w-4"/>Back to Home</Link>
+            </Button>
         </div>
         
         {isConfigMissing && (
@@ -155,3 +158,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    

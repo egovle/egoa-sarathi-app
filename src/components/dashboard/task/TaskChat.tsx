@@ -79,12 +79,12 @@ export const TaskChat = ({ taskId, task, user, userProfile }: { taskId: string, 
     };
     
     return (
-        <Card>
+        <Card className="flex flex-col h-full">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2"><MessageSquare className="h-5 w-5" />Task Chat</CardTitle>
             </CardHeader>
-            <CardContent>
-                <div ref={scrollContainerRef} className="h-64 overflow-y-auto space-y-4 pr-2 flex flex-col">
+            <CardContent className="flex-1 overflow-hidden">
+                <div ref={scrollContainerRef} className="h-full overflow-y-auto space-y-4 pr-2 flex flex-col">
                     {messages.length > 0 ? (
                         messages.map(msg => (
                             <div key={msg.id} className={cn("flex flex-col", msg.senderId === user.uid ? "items-end" : "items-start")}>
@@ -130,3 +130,5 @@ export const TaskChat = ({ taskId, task, user, userProfile }: { taskId: string, 
         </Card>
     );
 };
+
+    

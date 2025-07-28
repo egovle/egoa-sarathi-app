@@ -137,7 +137,7 @@ export default function TaskDetailPage() {
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
                 const metadata = { customMetadata: { uploaderId: user.uid, groupKey: 'additional_documents', optionKey: 'user_upload' } };
                 await uploadBytes(storageRef, file, metadata);
-                const downloadURL = await getDownloadURL(storageRef);
+                const downloadURL = await getDownloadURL(snapshot.ref);
                 return { name: file.name, url: downloadURL, groupKey: 'additional_documents', optionKey: 'user_upload' };
             });
     
@@ -352,7 +352,9 @@ export default function TaskDetailPage() {
                     )}
 
                     {user && userProfile && (
-                        <TaskChat taskId={taskId as string} task={task} user={user} userProfile={userProfile} />
+                        <div className="h-[600px] flex flex-col">
+                            <TaskChat taskId={taskId as string} task={task} user={user} userProfile={userProfile} />
+                        </div>
                     )}
 
                     <Card>
@@ -422,7 +424,7 @@ export default function TaskDetailPage() {
                                </Button>
                            )}
                            
-                           {(!isAssignedVle && !isAdmin && !isTaskCreator && !canUploadMoreDocs && !canVleTakeAction && !canVleWorkOnTask && !canAdminSetPrice && !canAdminApprovePayout) && task.status !== 'Completed' && task.status !== 'Pending VLE Acceptance' && task.status !== 'Awaiting Payment' && task.status !== 'Paid Out' &&(
+                           {(!canVleTakeAction && !canVleWorkOnTask && !canAdminSetPrice && !canAdminApprovePayout && !canCustomerPay && !canUploadMoreDocs) && (
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
                            )}
                         </CardContent>
@@ -588,3 +590,5 @@ export default function TaskDetailPage() {
     
 
 }
+
+    
