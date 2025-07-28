@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, UserPlus, MoreHorizontal, Eye, GitFork, AlertTriangle, Mail, Phone, Search, Trash2, CircleDollarSign, Briefcase, Users, Users2, Wallet, Send, XCircle, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { Loader2, UserPlus, MoreHorizontal, Eye, GitFork, AlertTriangle, Mail, Phone, Search, Trash2, CircleDollarSign, Briefcase, Users, Users2, Wallet, Send, XCircle, ChevronLeft, ChevronRight, Download, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { doc, updateDoc, writeBatch, query, arrayUnion, getDoc, runTransaction, getDocs, where, collection, onSnapshot, orderBy, startAt, endAt, startAfter, endBefore, limit, Query, DocumentData,getCountFromServer } from 'firebase/firestore';
@@ -72,8 +72,8 @@ export default function AdminDashboard() {
 
 
     return (
-        <div className="flex flex-col h-full">
-            <header className="flex items-center justify-between pb-4">
+        <div className="flex flex-col h-full space-y-4">
+            <header className="flex items-center justify-between">
                 <div>
                     <h1 className="text-lg font-semibold md:text-2xl">NUTENIQ SOLUTIONS PRIVATE LIMITED (R)</h1>
                 </div>

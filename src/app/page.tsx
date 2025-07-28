@@ -48,16 +48,15 @@ export default function HomePage() {
       </header>
 
       <main className="flex-1">
-        <section className="relative w-full py-20 md:py-32 lg:py-40 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-blue-900/60 to-purple-900/40 animated-gradient"></div>
-            <div className="container relative px-4 md:px-6 z-10">
+        <section className="relative w-full py-20 md:py-32 lg:py-40">
+            <div className="container px-4 md:px-6 z-10">
                 <div className="grid gap-6 lg:grid-cols-[1fr_500px] lg:gap-12 xl:grid-cols-[1fr_600px]">
                     <div className="flex flex-col justify-center space-y-6">
                         <div className="space-y-4">
-                        <h1 className="text-4xl font-bold tracking-tighter text-white sm:text-5xl xl:text-6xl/none">
+                        <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
                             Your Digital Gateway to Goa's Citizen Services
                         </h1>
-                        <p className="max-w-[600px] text-gray-300 md:text-xl">
+                        <p className="max-w-[600px] text-muted-foreground md:text-xl">
                             eGoa Sarathi simplifies access to government services, connecting you with local entrepreneurs for fast and transparent processing.
                         </p>
                         </div>
@@ -79,7 +78,7 @@ export default function HomePage() {
             </div>
         </section>
 
-        <section id="services" className="w-full py-12 md:py-24 bg-background">
+        <section id="services" className="w-full py-12 md:py-24 bg-muted/40">
             <div className="container px-4 md:px-6">
                 <div className="flex flex-col items-center justify-center space-y-4 text-center">
                     <div className="space-y-2">
@@ -108,7 +107,7 @@ export default function HomePage() {
             </div>
         </section>
 
-        <section id="how-it-works" className="w-full py-12 md:py-24 bg-muted/40">
+        <section id="how-it-works" className="w-full py-12 md:py-24 bg-background">
             <div className="container px-4 md:px-6">
                  <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
                     <div className="space-y-2">
