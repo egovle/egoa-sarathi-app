@@ -204,7 +204,10 @@ export default function AdminDashboard() {
                     </Card>
                 </TabsContent>
                 <TabsContent value="dashboard"><p>Dashboard content goes here.</p></TabsContent>
-                {/* Other tab contents */}
+                 <TabsContent value="gst-returns"><p>GST Returns content goes here.</p></TabsContent>
+                 <TabsContent value="reports"><p>Reports content goes here.</p></TabsContent>
+                 <TabsContent value="jsons"><p>JSONs content goes here.</p></TabsContent>
+                 <TabsContent value="acknowledgements"><p>Acknowledgements content goes here.</p></TabsContent>
             </Tabs>
         </div>
     );
