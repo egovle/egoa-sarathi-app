@@ -4,7 +4,7 @@ const nextConfig = {
   output: 'standalone',
   experimental: {},
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   images: {
     remotePatterns: [

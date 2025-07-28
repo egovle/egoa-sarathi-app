@@ -261,7 +261,15 @@ export default function DashboardLayout({
                         </nav>
                          {!userProfile?.isAdmin && userProfile?.role !== 'government' && (
                             <div className="mt-auto p-4 border-t">
-                               <SupportContent/>
+                                <Card>
+                                   <CardHeader>
+                                       <CardTitle>Need Help?</CardTitle>
+                                       <CardDescription>Contact our support team for any assistance.</CardDescription>
+                                   </CardHeader>
+                                   <CardContent>
+                                       <SupportContent/>
+                                   </CardContent>
+                                </Card>
                             </div>
                          )}
                     </SheetContent>
@@ -383,5 +391,3 @@ export default function DashboardLayout({
     </div>
   )
 }
-
-    
