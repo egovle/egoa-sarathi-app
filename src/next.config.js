@@ -3,6 +3,9 @@ const nextConfig = {
   /* config options here */
   output: 'standalone',
   experimental: {},
+  typescript: {
+    ignoreBuildErrors: false,
+  },
   images: {
     remotePatterns: [
       {
