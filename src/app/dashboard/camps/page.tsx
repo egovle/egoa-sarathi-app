@@ -25,7 +25,7 @@ export default function CampManagementPage() {
     const [vles, setVles] = useState<VLEProfile[]>([]);
     const [loadingData, setLoadingData] = useState(true);
 
-    const [lastVisible, setLastVisible] = useState<any>({});
+    const [lastVisible, setLastVisible] = useState<{ [key: string]: DocumentData | null }>({});
     const [page, setPage] = useState<any>({});
 
     useEffect(() => {
@@ -70,7 +70,7 @@ export default function CampManagementPage() {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
         if (!snapshot.empty) {
-            setLastVisible((prev: any) => ({ ...prev, [category]: snapshot.docs[snapshot.docs.length - 1] }));
+            setLastVisible((prev) => ({ ...prev, [category]: snapshot.docs[snapshot.docs.length - 1] }));
         }
         
         if (category === 'suggestions') {
@@ -171,11 +171,11 @@ export default function CampManagementPage() {
                     onNextSuggestionPage={() => handleNext('suggestions')}
                     onPrevSuggestionPage={() => handlePrev('suggestions')}
                     isFirstSuggestionPage={isFirstPage('suggestions')}
-                    isLastSuggestionPage={isLastPage('suggestions')}
+                    isLastPage={isLastPage('suggestions')}
                     onNextPastPage={() => handleNext('past')}
                     onPrevPastPage={() => handlePrev('past')}
                     isFirstPastPage={isFirstPage('past')}
-                    isLastPastPage={isLastPage('past')}
+                    isLastPage={isLastPage('past')}
                 />
             );
         }
