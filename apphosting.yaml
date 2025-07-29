@@ -23,4 +23,4 @@ env:
   - variable: NEXT_PUBLIC_RECAPTCHA_SITE_KEY
     value: "6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"
   - variable: CACHE_BUSTER
-    value: "1721839800"
+    value: "1721925000"
