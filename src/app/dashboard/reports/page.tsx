@@ -9,12 +9,13 @@ import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, Mail, Wallet, Tent, Award, Briefcase, CheckCircle, Clock } from 'lucide-react';
+import { Loader2, Wallet, Tent, Award, Briefcase, CheckCircle, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Task, VLEProfile, UserProfile, Camp, Service } from '@/lib/types';
 import { calculateVleEarnings } from '@/lib/utils';
+import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
 
 
 const AdminReports = ({ tasks, vles, camps, services }: { tasks: Task[], vles: VLEProfile[], camps: Camp[], services: Service[] }) => {
@@ -23,7 +24,7 @@ const AdminReports = ({ tasks, vles, camps, services }: { tasks: Task[], vles: V
     const [selectedService, setSelectedService] = useState('all-services');
 
     const uniquePincodes = useMemo(() => {
-        const pincodes = new Set(vles.map(v => v.pincode));
+        const pincodes = new Set(vles.map(v => v.pincode).filter(Boolean));
         return Array.from(pincodes).sort();
     }, [vles]);
 
@@ -91,25 +92,20 @@ const AdminReports = ({ tasks, vles, camps, services }: { tasks: Task[], vles: V
         return { totalVlePayouts, totalAdminEarnings };
     }, [camps]);
 
-    const handleEmailReport = (vle: any) => {
-        const subject = `Your Weekly Performance Report - eGoa Sarathi`;
-        const body = `
+    const handleWhatsAppReport = (vle: any) => {
+        const message = `
 Hi ${vle.name},
 
-Here is your performance summary:
-
+Here is your performance summary for eGoa Sarathi:
 - Tasks Assigned: ${vle.tasksAssigned}
 - Tasks Completed: ${vle.tasksCompleted}
 - Total Commission Earned: ₹${vle.totalCommission.toFixed(2)}
 
 Keep up the great work!
-
-Regards,
-eGoa Sarathi Admin Team
-        `.trim().replace(/\n/g, '%0A').replace(/ /g, '%20');
-
-        window.location.href = `mailto:${vle.email}?subject=${subject}&body=${body}`;
-        toast({ title: "Email Ready", description: "Your email client has been opened with the report."});
+        `.trim();
+        const whatsappUrl = `https://wa.me/+91${vle.mobile}?text=${encodeURIComponent(message)}`;
+        window.open(whatsappUrl, '_blank');
+        toast({ title: "WhatsApp Ready", description: "Your WhatsApp has been opened with the report."});
     };
     
     const resetFilters = () => {
@@ -159,8 +155,8 @@ eGoa Sarathi Admin Team
                                         <TableCell>{vle.tasksCompleted}</TableCell>
                                         <TableCell>₹{vle.totalCommission.toFixed(2)}</TableCell>
                                         <TableCell className="text-right">
-                                            <Button variant="outline" size="sm" onClick={() => handleEmailReport(vle)}>
-                                                <Mail className="mr-2 h-4 w-4" /> Email
+                                            <Button variant="outline" size="sm" onClick={() => handleWhatsAppReport(vle)}>
+                                                <WhatsAppIcon className="mr-2 h-4 w-4 fill-current" /> WhatsApp
                                             </Button>
                                         </TableCell>
                                     </TableRow>
@@ -451,5 +447,3 @@ export default function ReportsPage() {
         ? <AdminReports tasks={tasks} vles={vles} camps={camps} services={services} /> 
         : <VleReports tasks={tasks} camps={camps} userProfile={userProfile as VLEProfile} />;
 }
-
-    

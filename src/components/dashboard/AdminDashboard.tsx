@@ -26,8 +26,6 @@ export default function AdminDashboard() {
 
     // Data states
     const [tasks, setTasks] = useState<Task[]>([]);
-    const [vleRequests, setVleRequests] = useState<VLEProfile[]>([]);
-    const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
     
     // Stats
     const [stats, setStats] = useState({
@@ -39,6 +37,8 @@ export default function AdminDashboard() {
     
     // Loading states
     const [loading, setLoading] = useState(true);
+    const [isResetting, setIsResetting] = useState(false);
+
 
     useEffect(() => {
         const fetchStats = async () => {
@@ -58,62 +58,63 @@ export default function AdminDashboard() {
         fetchStats();
 
         // Realtime listeners for actionable items
-        const tasksUnsub = onSnapshot(query(collection(db, 'tasks'), where('status', 'in', ['Unassigned', 'Pending Price Approval', 'Completed', 'Complaint Raised']), orderBy('date', 'desc')), (snapshot) => {
+        const actionableTaskStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Completed', 'Complaint Raised'];
+        const tasksUnsub = onSnapshot(query(collection(db, 'tasks'), where('status', 'in', actionableTaskStatuses), orderBy('date', 'desc')), (snapshot) => {
             const taskData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as Task }));
             setTasks(taskData);
-            setLoading(false);
+            setLoading(false); // Set loading to false after fetching tasks
+        }, (error) => {
+            console.error("Error fetching tasks:", error);
+            setLoading(false); // Also handle loading state on error
         });
-
+        
+        // We can keep listening to stats changes in real-time as well
         const vlesUnsub = onSnapshot(query(collection(db, 'vles'), where('status', '==', 'Pending')), (snapshot) => {
-            setVleRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as VLEProfile })));
-        });
-
-        const paymentsUnsub = onSnapshot(query(collection(db, 'paymentRequests'), where('status', '==', 'pending')), (snapshot) => {
-            setPaymentRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as PaymentRequest })));
+            setStats(s => ({...s, pendingVles: snapshot.size}));
         });
 
         return () => {
             tasksUnsub();
             vlesUnsub();
-            paymentsUnsub();
         }
     }, []);
 
-    const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
-
     const handleReset = async () => {
+        setIsResetting(true);
         const result = await resetApplicationData();
         if (result.success) {
             toast({ title: "Application Reset", description: result.message });
         } else {
             toast({ title: "Error", description: result.error, variant: 'destructive' });
         }
-        setIsResetAlertOpen(false);
+        setIsResetting(false);
     }
     
     return (
         <div className="space-y-6">
-            <AlertDialog open={isResetAlertOpen} onOpenChange={setIsResetAlertOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This action will permanently delete all tasks, camps, and notifications, and reset all user wallets to zero. This cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleReset} className={buttonVariants({variant: 'destructive'})}>Reset Application</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-
-                <div className="flex items-center justify-between">
-                    <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+             <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+                <AlertDialog>
                     <AlertDialogTrigger asChild>
-                         <Button variant="destructive"><Trash2 /> Reset Application Data</Button>
+                         <Button variant="destructive" disabled={isResetting}>
+                            {isResetting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />} 
+                            Reset Application Data
+                        </Button>
                     </AlertDialogTrigger>
-                </div>
-            </AlertDialog>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This action will permanently delete all tasks, camps, and notifications, and reset all user wallets to zero. This cannot be undone.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleReset} className={buttonVariants({variant: 'destructive'})}>Reset Application</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </div>
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <StatCard title="Pending Tasks" value={stats.pendingTasks.toString()} icon={Briefcase} description="Tasks needing price/VLE assignment" />
@@ -140,9 +141,8 @@ export default function AdminDashboard() {
                         <TableBody>
                             {loading ? (
                                 <TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></TableCell></TableRow>
-                            ) : (
-                                <>
-                                {tasks.map(task => (
+                            ) : tasks.length > 0 ? (
+                                tasks.map(task => (
                                     <TableRow key={task.id}>
                                         <TableCell className="font-medium">{task.service}</TableCell>
                                         <TableCell>Task</TableCell>
@@ -153,8 +153,9 @@ export default function AdminDashboard() {
                                             </Button>
                                         </TableCell>
                                     </TableRow>
-                                ))}
-                                </>
+                                ))
+                            ) : (
+                                <TableRow><TableCell colSpan={4} className="h-24 text-center">No immediate actions required.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
