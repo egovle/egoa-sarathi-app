@@ -22,6 +22,7 @@ import { cn, validateFiles, calculateVleEarnings } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { TaskChat } from '@/components/dashboard/task/TaskChat';
 import { SetPriceDialog, RequestInfoDialog, SubmitAcknowledgementDialog, UploadCertificateDialog } from '@/components/dashboard/task/TaskDialogs';
+import type { Task } from '@/lib/types';
 
 
 export default function TaskDetailPage() {
@@ -30,7 +31,7 @@ export default function TaskDetailPage() {
     const router = useRouter();
     const { toast } = useToast();
 
-    const [task, setTask] = useState<any | null>(null);
+    const [task, setTask] = useState<Task | null>(null);
     const [loading, setLoading] = useState(true);
     const [isPaying, setIsPaying] = useState(false);
     const [vleContact, setVleContact] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export default function TaskDetailPage() {
         const taskRef = doc(db, 'tasks', taskId as string);
         const unsubscribe = onSnapshot(taskRef, (docSnap) => {
             if (docSnap.exists()) {
-                const taskData = { id: docSnap.id, ...docSnap.data() };
+                const taskData = { id: docSnap.id, ...docSnap.data() } as Task;
                 setTask(taskData);
                 
                 if (taskData.status === 'Awaiting Documents') {
@@ -136,7 +137,7 @@ export default function TaskDetailPage() {
             const uploadPromises = selectedFiles.map(async (file) => {
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
                 const metadata = { customMetadata: { uploaderId: user.uid, groupKey: 'additional_documents', optionKey: 'user_upload' } };
-                await uploadBytes(storageRef, file, metadata);
+                const snapshot = await uploadBytes(storageRef, file, metadata);
                 const downloadURL = await getDownloadURL(snapshot.ref);
                 return { name: file.name, url: downloadURL, groupKey: 'additional_documents', optionKey: 'user_upload' };
             });
@@ -590,5 +591,3 @@ export default function TaskDetailPage() {
     
 
 }
-
-    
