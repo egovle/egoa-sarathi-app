@@ -22,8 +22,10 @@ export const SupportContent = () => (
             </Button>
              <Button asChild size="sm" variant="outline" className="flex-1">
                 <a href="https://wa.me/+918380083832" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center">
-                    <WhatsAppIcon className="mr-2 h-5 w-5 shrink-0 fill-green-600"/>
-                    <span className="ml-2">Chat</span>
+                    <span className="flex items-center gap-2">
+                        <WhatsAppIcon className="h-5 w-5 shrink-0 fill-green-600"/>
+                        <span>Chat</span>
+                    </span>
                 </a>
             </Button>
         </div>

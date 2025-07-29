@@ -375,47 +375,40 @@ export default function ReportsPage() {
         if (!userProfile) return;
 
         setLoadingData(true);
-
-        let unsubTasks: () => void = () => {};
-        let unsubVles: () => void = () => {};
-        let unsubCamps: () => void = () => {};
-        let unsubServices: () => void = () => {};
+        const unsubscribers: (() => void)[] = [];
 
         const campsQuery = query(collection(db, "camps"), orderBy('date', 'desc'));
-        unsubCamps = onSnapshot(campsQuery, (snapshot) => {
+        unsubscribers.push(onSnapshot(campsQuery, (snapshot) => {
             setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp));
-        });
+        }));
 
         const servicesQuery = query(collection(db, "services"), orderBy('name'));
-        unsubServices = onSnapshot(servicesQuery, (snapshot) => {
+        unsubscribers.push(onSnapshot(servicesQuery, (snapshot) => {
             setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
-        });
-
+        }));
+        
+        let tasksQuery;
         if (userProfile.isAdmin) {
-            const tasksQuery = query(collection(db, "tasks"));
-            unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
-                setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task));
-                setLoadingData(false);
-            });
+            tasksQuery = query(collection(db, "tasks"));
             const vlesQuery = query(collection(db, "vles"));
-            unsubVles = onSnapshot(vlesQuery, (snapshot) => {
+             unsubscribers.push(onSnapshot(vlesQuery, (snapshot) => {
                 setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as VLEProfile));
-            });
+            }));
         } else if (userProfile.role === 'vle') {
-            const tasksQuery = query(collection(db, "tasks"), where('assignedVleId', '==', userProfile.id));
-             unsubTasks = onSnapshot(tasksQuery, (snapshot) => {
+            tasksQuery = query(collection(db, "tasks"), where('assignedVleId', '==', userProfile.id));
+        }
+
+        if(tasksQuery){
+             unsubscribers.push(onSnapshot(tasksQuery, (snapshot) => {
                 setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task));
                 setLoadingData(false);
-            });
+            }));
         } else {
             setLoadingData(false);
         }
         
         return () => {
-            unsubTasks();
-            unsubVles();
-            unsubCamps();
-            unsubServices();
+            unsubscribers.forEach(unsub => unsub());
         };
 
     }, [userProfile]);
