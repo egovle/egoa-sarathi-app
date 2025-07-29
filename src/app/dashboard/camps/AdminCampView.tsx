@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { createNotification } from '@/app/actions';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CampFormDialog, CampPayoutDialog } from './CampDialogs';
+import { CampFormDialog, CampPayoutDialog } from '@/components/dashboard/camps/CampDialogs';
 import type { Camp, CampSuggestion, VLEProfile, UserProfile } from '@/lib/types';
 
 

@@ -8,7 +8,7 @@ import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, PlusCircle, Phone, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
-import { SuggestCampDialog } from './CampDialogs';
+import { SuggestCampDialog } from '@/components/dashboard/camps/CampDialogs';
 import type { Camp, Service, GovernmentProfile, VLEProfile } from '@/lib/types';
 
 

@@ -16,8 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { createNotificationForAdmins } from '@/app/actions';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { SuggestCampDialog } from './CampDialogs';
-import { CampDetailsDialog } from './CampDetailsDialog';
+import { SuggestCampDialog } from '@/components/dashboard/camps/CampDialogs';
+import { CampDetailsDialog } from '@/components/dashboard/camps/CampDetailsDialog';
 import type { Camp, Service, VLEProfile } from '@/lib/types';
 
 
