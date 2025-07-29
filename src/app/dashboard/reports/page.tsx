@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
@@ -10,23 +10,44 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Loader2, Mail, Wallet, Tent, Award, Briefcase, CheckCircle, Clock } from 'lucide-react';
-import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import type { Task, VLEProfile, UserProfile, Camp } from '@/lib/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { Task, VLEProfile, UserProfile, Camp, Service } from '@/lib/types';
 import { calculateVleEarnings } from '@/lib/utils';
 
 
-const AdminReports = ({ tasks, vles, camps }: { tasks: Task[], vles: VLEProfile[], camps: Camp[] }) => {
+const AdminReports = ({ tasks, vles, camps, services }: { tasks: Task[], vles: VLEProfile[], camps: Camp[], services: Service[] }) => {
     const { toast } = useToast();
-    
+    const [selectedPincode, setSelectedPincode] = useState('');
+    const [selectedService, setSelectedService] = useState('');
+
+    const uniquePincodes = useMemo(() => {
+        const pincodes = new Set(vles.map(v => v.pincode));
+        return Array.from(pincodes).sort();
+    }, [vles]);
+
     const vlePerformance = useMemo(() => {
-        return vles.filter(v => !v.isAdmin).map(vle => {
-            const assignedTasks = tasks.filter(t => t.assignedVleId === vle.id);
+        const filteredTasks = tasks.filter(task => {
+            if (selectedService && task.serviceId !== selectedService) {
+                return false;
+            }
+            return true;
+        });
+
+        const filteredVles = vles.filter(vle => {
+            if (selectedPincode && vle.pincode !== selectedPincode) {
+                return false;
+            }
+            return !vle.isAdmin;
+        });
+        
+        return filteredVles.map(vle => {
+            const assignedTasks = filteredTasks.filter(t => t.assignedVleId === vle.id);
             const completedTasks = assignedTasks.filter(t => t.status === 'Paid Out');
             const totalCommission = completedTasks.reduce((sum, task) => {
-                 const { vleCommission } = calculateVleEarnings(task);
-                return sum + vleCommission;
+                 const { vleCommission, governmentFee } = calculateVleEarnings(task);
+                return sum + vleCommission + governmentFee;
             }, 0);
             return {
                 ...vle,
@@ -35,7 +56,7 @@ const AdminReports = ({ tasks, vles, camps }: { tasks: Task[], vles: VLEProfile[
                 totalCommission,
             };
         }).sort((a,b) => b.tasksCompleted - a.tasksCompleted);
-    }, [tasks, vles]);
+    }, [tasks, vles, selectedPincode, selectedService]);
 
     const revenueByMonth = useMemo(() => {
         const data: { [key: string]: number } = {};
@@ -91,6 +112,10 @@ eGoa Sarathi Admin Team
         toast({ title: "Email Ready", description: "Your email client has been opened with the report."});
     };
     
+    const resetFilters = () => {
+        setSelectedPincode('');
+        setSelectedService('');
+    };
 
     return (
         <div className="space-y-6">
@@ -99,6 +124,23 @@ eGoa Sarathi Admin Team
                     <CardHeader>
                         <CardTitle>Top VLE Performance</CardTitle>
                          <CardDescription>Performance metrics for all VLEs, sorted by completions.</CardDescription>
+                         <div className="flex items-center gap-2 pt-2">
+                            <Select value={selectedPincode} onValueChange={setSelectedPincode}>
+                                <SelectTrigger><SelectValue placeholder="Filter by Pincode" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="">All Pincodes</SelectItem>
+                                    {uniquePincodes.map(pincode => <SelectItem key={pincode} value={pincode}>{pincode}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Select value={selectedService} onValueChange={setSelectedService}>
+                                <SelectTrigger><SelectValue placeholder="Filter by Service" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="">All Services</SelectItem>
+                                    {services.filter(s => s.parentId).map(service => <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                             <Button variant="outline" onClick={resetFilters}>Reset</Button>
+                         </div>
                     </CardHeader>
                      <CardContent>
                         <Table>
@@ -324,6 +366,7 @@ export default function ReportsPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [vles, setVles] = useState<VLEProfile[]>([]);
     const [camps, setCamps] = useState<Camp[]>([]);
+    const [services, setServices] = useState<Service[]>([]);
     const [loadingData, setLoadingData] = useState(true);
 
     useEffect(() => {
@@ -340,10 +383,16 @@ export default function ReportsPage() {
         let unsubTasks: () => void = () => {};
         let unsubVles: () => void = () => {};
         let unsubCamps: () => void = () => {};
+        let unsubServices: () => void = () => {};
 
         const campsQuery = query(collection(db, "camps"), orderBy('date', 'desc'));
         unsubCamps = onSnapshot(campsQuery, (snapshot) => {
             setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp));
+        });
+
+        const servicesQuery = query(collection(db, "services"), orderBy('name'));
+        unsubServices = onSnapshot(servicesQuery, (snapshot) => {
+            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
         });
 
         if (userProfile.isAdmin) {
@@ -368,6 +417,7 @@ export default function ReportsPage() {
             unsubTasks();
             unsubVles();
             unsubCamps();
+            unsubServices();
         };
 
     }, [userProfile]);
@@ -396,6 +446,6 @@ export default function ReportsPage() {
     }
 
     return userProfile.isAdmin 
-        ? <AdminReports tasks={tasks} vles={vles} camps={camps} /> 
+        ? <AdminReports tasks={tasks} vles={vles} camps={camps} services={services} /> 
         : <VleReports tasks={tasks} camps={camps} userProfile={userProfile as VLEProfile} />;
 }
