@@ -21,12 +21,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { TaskCreatorDialog } from '@/components/dashboard/shared';
-import { ComplaintDialog } from './dialogs/ComplaintDialog';
-import { FeedbackDialog } from './dialogs/FeedbackDialog';
+import { ComplaintDialog } from '@/components/dashboard/dialogs/ComplaintDialog';
+import { FeedbackDialog } from '@/components/dashboard/dialogs/FeedbackDialog';
 import type { Task, Service, UserProfile, Complaint } from '@/lib/types';
 
 
-export default function CustomerDashboard({ tasks }: { tasks: Task[] }) {
+export default function CustomerDashboard({ tasks, services }: { tasks: Task[], services: Service[] }) {
     const { toast } = useToast();
     const { user, userProfile } = useAuth();
     const customerComplaints = tasks.filter(t => t.complaint).map(t => ({...(t.complaint as Complaint), taskId: t.id, service: t.service}));
@@ -80,7 +80,7 @@ export default function CustomerDashboard({ tasks }: { tasks: Task[] }) {
                 <TabsTrigger value="tasks">My Bookings <Badge className="ml-2">{tasks.length}</Badge></TabsTrigger>
                 <TabsTrigger value="complaints">My Complaints <Badge className="ml-2">{customerComplaints.length}</Badge></TabsTrigger>
             </TabsList>
-             <TaskCreatorDialog services={[]} creatorId={user.uid} creatorProfile={userProfile} type="Customer Request" buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />Create New Booking</Button>} />
+             <TaskCreatorDialog services={services} creatorId={user.uid} creatorProfile={userProfile} type="Customer Request" buttonTrigger={<Button size="sm" className="h-8 gap-1"><PlusCircle className="h-3.5 w-3.5" />Create New Booking</Button>} />
           </div>
             <TabsContent value="tasks" className="mt-4 space-y-6">
                 <Card>
