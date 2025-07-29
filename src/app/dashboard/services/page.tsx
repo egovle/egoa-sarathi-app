@@ -26,7 +26,7 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
     const [vleRate, setVleRate] = useState(service?.vleRate.toString() || '');
     const [governmentFee, setGovernmentFee] = useState(service?.governmentFee.toString() || '');
     const [isVariable, setIsVariable] = useState(service?.isVariable || false);
-    const [parentId, setParentId] = useState(service?.parentId || '');
+    const [parentId, setParentId] = useState(service?.parentId || 'none');
     const [documentGroups, setDocumentGroups] = useState<DocumentGroup[]>(service?.documentGroups || []);
     const [loading, setLoading] = useState(false);
 
@@ -40,7 +40,7 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
             vleRate: parseFloat(vleRate) || 0,
             governmentFee: parseFloat(governmentFee) || 0,
             isVariable,
-            parentId: parentId || null,
+            parentId: parentId === 'none' ? null : parentId,
             documentGroups,
         };
 
@@ -105,7 +105,7 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
                              <Select value={parentId} onValueChange={setParentId}>
                                 <SelectTrigger><SelectValue placeholder="Select a parent (optional)"/></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">None (Is a Parent Category)</SelectItem>
+                                    <SelectItem value="none">None (Is a Parent Category)</SelectItem>
                                     {services.filter(s => !s.parentId).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                                 </SelectContent>
                              </Select>
