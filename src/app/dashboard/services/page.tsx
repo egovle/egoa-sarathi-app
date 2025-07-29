@@ -31,13 +31,24 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        setName(service?.name || '');
-        setCustomerRate(service?.customerRate.toString() || '');
-        setVleRate(service?.vleRate.toString() || '');
-        setGovernmentFee(service?.governmentFee.toString() || '');
-        setIsVariable(service?.isVariable || false);
-        setParentId(service?.parentId || 'none');
-        setDocumentGroups(service?.documentGroups || []);
+        if (service) {
+            setName(service.name || '');
+            setCustomerRate(service.customerRate?.toString() || '');
+            setVleRate(service.vleRate?.toString() || '');
+            setGovernmentFee(service.governmentFee?.toString() || '');
+            setIsVariable(service.isVariable || false);
+            setParentId(service.parentId || 'none');
+            setDocumentGroups(service.documentGroups || []);
+        } else {
+            // Reset form for creating new
+            setName('');
+            setCustomerRate('');
+            setVleRate('');
+            setGovernmentFee('');
+            setIsVariable(false);
+            setParentId('none');
+            setDocumentGroups([]);
+        }
     }, [service]);
 
 
