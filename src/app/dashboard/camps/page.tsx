@@ -171,11 +171,11 @@ export default function CampManagementPage() {
                     onNextSuggestionPage={() => handleNext('suggestions')}
                     onPrevSuggestionPage={() => handlePrev('suggestions')}
                     isFirstSuggestionPage={isFirstPage('suggestions')}
-                    isLastPage={isLastPage('suggestions')}
+                    isLastSuggestionPage={isLastPage('suggestions')}
                     onNextPastPage={() => handleNext('past')}
                     onPrevPastPage={() => handlePrev('past')}
                     isFirstPastPage={isFirstPage('past')}
-                    isLastPage={isLastPage('past')}
+                    isLastPastPage={isLastPage('past')}
                 />
             );
         }
