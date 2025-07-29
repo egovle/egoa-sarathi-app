@@ -19,8 +19,8 @@ import { calculateVleEarnings } from '@/lib/utils';
 
 const AdminReports = ({ tasks, vles, camps, services }: { tasks: Task[], vles: VLEProfile[], camps: Camp[], services: Service[] }) => {
     const { toast } = useToast();
-    const [selectedPincode, setSelectedPincode] = useState('');
-    const [selectedService, setSelectedService] = useState('');
+    const [selectedPincode, setSelectedPincode] = useState('all-pincodes');
+    const [selectedService, setSelectedService] = useState('all-services');
 
     const uniquePincodes = useMemo(() => {
         const pincodes = new Set(vles.map(v => v.pincode));
@@ -29,14 +29,14 @@ const AdminReports = ({ tasks, vles, camps, services }: { tasks: Task[], vles: V
 
     const vlePerformance = useMemo(() => {
         const filteredTasks = tasks.filter(task => {
-            if (selectedService && task.serviceId !== selectedService) {
+            if (selectedService && selectedService !== 'all-services' && task.serviceId !== selectedService) {
                 return false;
             }
             return true;
         });
 
         const filteredVles = vles.filter(vle => {
-            if (selectedPincode && vle.pincode !== selectedPincode) {
+            if (selectedPincode && selectedPincode !== 'all-pincodes' && vle.pincode !== selectedPincode) {
                 return false;
             }
             return !vle.isAdmin;
@@ -113,8 +113,8 @@ eGoa Sarathi Admin Team
     };
     
     const resetFilters = () => {
-        setSelectedPincode('');
-        setSelectedService('');
+        setSelectedPincode('all-pincodes');
+        setSelectedService('all-services');
     };
 
     return (
@@ -128,14 +128,14 @@ eGoa Sarathi Admin Team
                             <Select value={selectedPincode} onValueChange={setSelectedPincode}>
                                 <SelectTrigger><SelectValue placeholder="Filter by Pincode" /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Pincodes</SelectItem>
+                                    <SelectItem value="all-pincodes">All Pincodes</SelectItem>
                                     {uniquePincodes.map(pincode => <SelectItem key={pincode} value={pincode}>{pincode}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                             <Select value={selectedService} onValueChange={setSelectedService}>
                                 <SelectTrigger><SelectValue placeholder="Filter by Service" /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Services</SelectItem>
+                                    <SelectItem value="all-services">All Services</SelectItem>
                                     {services.filter(s => s.parentId).map(service => <SelectItem key={service.id} value={service.id}>{service.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
@@ -411,6 +411,8 @@ export default function ReportsPage() {
                 setTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task));
                 setLoadingData(false);
             });
+        } else {
+            setLoadingData(false);
         }
         
         return () => {
@@ -449,3 +451,5 @@ export default function ReportsPage() {
         ? <AdminReports tasks={tasks} vles={vles} camps={camps} services={services} /> 
         : <VleReports tasks={tasks} camps={camps} userProfile={userProfile as VLEProfile} />;
 }
+
+    
