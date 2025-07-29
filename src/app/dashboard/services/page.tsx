@@ -21,14 +21,25 @@ import type { Service, DocumentGroup, DocumentOption } from '@/lib/types';
 
 const ServiceForm = ({ service, onFinished, services }: { service?: Service | null, onFinished: () => void, services: Service[] }) => {
     const { toast } = useToast();
-    const [name, setName] = useState(service?.name || '');
-    const [customerRate, setCustomerRate] = useState(service?.customerRate.toString() || '');
-    const [vleRate, setVleRate] = useState(service?.vleRate.toString() || '');
-    const [governmentFee, setGovernmentFee] = useState(service?.governmentFee.toString() || '');
-    const [isVariable, setIsVariable] = useState(service?.isVariable || false);
-    const [parentId, setParentId] = useState(service?.parentId || 'none');
-    const [documentGroups, setDocumentGroups] = useState<DocumentGroup[]>(service?.documentGroups || []);
+    const [name, setName] = useState('');
+    const [customerRate, setCustomerRate] = useState('');
+    const [vleRate, setVleRate] = useState('');
+    const [governmentFee, setGovernmentFee] = useState('');
+    const [isVariable, setIsVariable] = useState(false);
+    const [parentId, setParentId] = useState('none');
+    const [documentGroups, setDocumentGroups] = useState<DocumentGroup[]>([]);
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        setName(service?.name || '');
+        setCustomerRate(service?.customerRate.toString() || '');
+        setVleRate(service?.vleRate.toString() || '');
+        setGovernmentFee(service?.governmentFee.toString() || '');
+        setIsVariable(service?.isVariable || false);
+        setParentId(service?.parentId || 'none');
+        setDocumentGroups(service?.documentGroups || []);
+    }, [service]);
+
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
@@ -106,7 +117,7 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
                                 <SelectTrigger><SelectValue placeholder="Select a parent (optional)"/></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">None (Is a Parent Category)</SelectItem>
-                                    {services.filter(s => !s.parentId).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                                    {services.filter(s => !s.parentId && s.id !== service?.id).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                                 </SelectContent>
                              </Select>
                         </div>
@@ -264,7 +275,13 @@ export default function ServicesPage() {
                     <Accordion type="multiple" className="w-full">
                         {serviceCategories.map(category => (
                             <AccordionItem value={category.id} key={category.id}>
-                                <AccordionTrigger className="font-semibold text-lg">{category.name}</AccordionTrigger>
+                                <AccordionTrigger className="font-semibold text-lg flex justify-between w-full">
+                                    <span>{category.name}</span>
+                                    <div className="space-x-2 mr-4">
+                                        <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(category); }}><Edit className="h-4 w-4"/></Button>
+                                        <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(category.id); }}><Trash2 className="h-4 w-4"/></Button>
+                                    </div>
+                                </AccordionTrigger>
                                 <AccordionContent>
                                     <div className="space-y-2 pl-4">
                                         {category.children.length > 0 ? category.children.map(service => (
@@ -292,3 +309,5 @@ export default function ServicesPage() {
         </div>
     );
 }
+
+    
