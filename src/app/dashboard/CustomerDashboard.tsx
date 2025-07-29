@@ -20,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { TaskCreatorDialog } from './shared';
+import { TaskCreatorDialog } from '@/components/dashboard/shared';
 import { ComplaintDialog } from './dialogs/ComplaintDialog';
 import { FeedbackDialog } from './dialogs/FeedbackDialog';
 import type { Task, Service, UserProfile, Complaint } from '@/lib/types';
