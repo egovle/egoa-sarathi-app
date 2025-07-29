@@ -49,6 +49,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { AppLogo } from "@/components/ui/AppLogo";
 import { SupportContent } from '@/components/dashboard/SupportContent';
+import type { Notification } from "@/lib/types";
 
 
 const ALL_NAV_ITEMS = [
@@ -71,7 +72,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const { toast } = useToast();
   const { user, userProfile } = useAuth();
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
   
   const navItems = ALL_NAV_ITEMS.filter(item => {
@@ -88,7 +89,7 @@ export default function DashboardLayout({
     );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Notification);
       // Sort on the client to avoid needing a composite index
       notifs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setNotifications(notifs);
@@ -396,5 +397,3 @@ export default function DashboardLayout({
     </div>
   )
 }
-
-    
