@@ -2,28 +2,22 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, MoreHorizontal, Eye, GitFork, AlertTriangle, Mail, Phone, Search, Trash2, CircleDollarSign, Briefcase, Users, Users2, Wallet, Send, XCircle, ChevronLeft, ChevronRight, Download, Check, ListFilter, UserPlus } from 'lucide-react';
+import { Loader2, Trash2, Briefcase, UserPlus, Wallet, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { doc, updateDoc, writeBatch, query, arrayUnion, getDoc, runTransaction, getDocs, where, collection, onSnapshot, orderBy, startAt, endAt, startAfter, endBefore, limit, Query, DocumentData,getCountFromServer } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, getCountFromServer } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { createNotification, processPayout, resetApplicationData } from '@/app/actions';
+import { resetApplicationData } from '@/app/actions';
 
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Input } from '@/components/ui/input';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatCard } from './shared';
 import Link from 'next/link';
 
-import type { Task, VLEProfile, CustomerProfile, PaymentRequest, Complaint as ComplaintType } from '@/lib/types';
+import type { Task, VLEProfile, PaymentRequest } from '@/lib/types';
 
 
 export default function AdminDashboard() {
@@ -34,7 +28,6 @@ export default function AdminDashboard() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [vleRequests, setVleRequests] = useState<VLEProfile[]>([]);
     const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
-    const [complaints, setComplaints] = useState<(ComplaintType & {taskId: string, customerId: string})[]>([]);
     
     // Stats
     const [stats, setStats] = useState({
@@ -113,14 +106,14 @@ export default function AdminDashboard() {
                         <AlertDialogAction onClick={handleReset} className={buttonVariants({variant: 'destructive'})}>Reset Application</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
-            </AlertDialog>
 
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-                <AlertDialogTrigger asChild>
-                     <Button variant="destructive"><Trash2 /> Reset Application Data</Button>
-                </AlertDialogTrigger>
-            </div>
+                <div className="flex items-center justify-between">
+                    <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
+                    <AlertDialogTrigger asChild>
+                         <Button variant="destructive"><Trash2 /> Reset Application Data</Button>
+                    </AlertDialogTrigger>
+                </div>
+            </AlertDialog>
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <StatCard title="Pending Tasks" value={stats.pendingTasks.toString()} icon={Briefcase} description="Tasks needing price/VLE assignment" />
