@@ -32,7 +32,7 @@ export const StatCard = ({ title, value, icon: Icon, description }: {title: stri
     </Card>
 );
 
-export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: UserProfile, services: any[] }) => {
+export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: UserProfile, services: Service[] }) => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
@@ -369,7 +369,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                                   id={fileKey}
                                                   type="file"
                                                   className="hidden"
-                                                  ref={el => fileInputRefs.current[fileKey] = el}
+                                                  ref={el => { fileInputRefs.current[fileKey] = el; }}
                                                   onChange={(e) => handleFileChange(e, group.key, option.key)}
                                                   accept=".pdf,.png,.jpg,.jpeg"
                                               />
