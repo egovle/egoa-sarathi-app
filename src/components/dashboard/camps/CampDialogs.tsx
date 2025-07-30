@@ -24,20 +24,21 @@ import type { Camp, CampSuggestion, VLEProfile, Service, GovernmentProfile, Camp
 
 export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinished }: { camp?: Camp | null; suggestion?: CampSuggestion | null; vles: VLEProfile[]; adminProfile: UserProfile | null; onFinished: () => void; }) => {
     const { toast } = useToast();
-    const initialData = camp || suggestion || {};
     
     const initialName = camp?.name || (suggestion ? `Goa Sarathi Camp at ${suggestion.location}`: '');
 
     const [name, setName] = useState(initialName);
-    const [location, setLocation] = useState(initialData.location || '');
-    const [date, setDate] = useState<Date | undefined>(initialData.date ? new Date(initialData.date) : undefined);
+    const [location, setLocation] = useState(camp?.location || suggestion?.location || '');
+    const [date, setDate] = useState<Date | undefined>((camp?.date || suggestion?.date) ? new Date(camp?.date || suggestion!.date) : undefined);
     const [loading, setLoading] = useState(false);
     
     const [assignedVles, setAssignedVles] = useState<VLEProfile[]>([]);
 
     useEffect(() => {
-        const initialAssignedVles = camp ? vles.filter(vle => camp.assignedVles.some(av => av.vleId === vle.id)) : [];
-        setAssignedVles(initialAssignedVles);
+        if (camp) {
+            const initialAssignedVles = vles.filter(vle => camp.assignedVles.some(av => av.vleId === vle.id));
+            setAssignedVles(initialAssignedVles);
+        }
     }, [camp, vles]);
 
 
@@ -82,8 +83,8 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
             date: date.toISOString(),
             status: camp?.status === 'Paid Out' ? 'Paid Out' : 'Upcoming',
             type: camp ? camp.type : (suggestion ? 'suggested' : 'created'),
-            services: initialData.services || [],
-            otherServices: initialData.otherServices || '',
+            services: camp?.services || suggestion?.services || [],
+            otherServices: camp?.otherServices || suggestion?.otherServices || '',
             assignedVles: assignedVles.map(vle => {
                 const existingVle = camp?.assignedVles.find(av => av.vleId === vle.id);
                 if (existingVle) return existingVle;
