@@ -134,6 +134,9 @@ export default function TaskDetailPage() {
         setIsUploading(true);
     
         try {
+            if (!user.uid) {
+                throw new Error("User not authenticated.");
+            }
             const uploadPromises = selectedFiles.map(async (file) => {
                 const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
                 const metadata = { customMetadata: { uploaderId: user.uid, groupKey: 'additional_documents', optionKey: 'user_upload' } };
