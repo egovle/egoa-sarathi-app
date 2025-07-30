@@ -25,11 +25,9 @@ import type { Camp, CampSuggestion, VLEProfile, Service, GovernmentProfile, Camp
 export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinished }: { camp?: Camp | null; suggestion?: CampSuggestion | null; vles: VLEProfile[]; adminProfile: UserProfile | null; onFinished: () => void; }) => {
     const { toast } = useToast();
     
-    const initialName = camp?.name || (suggestion ? `Goa Sarathi Camp at ${suggestion.location}`: '');
-
-    const [name, setName] = useState(initialName);
+    const [name, setName] = useState(camp?.name || (suggestion ? `Goa Sarathi Camp at ${suggestion.location}`: ''));
     const [location, setLocation] = useState(camp?.location || suggestion?.location || '');
-    const [date, setDate] = useState<Date | undefined>((camp?.date || suggestion?.date) ? new Date(camp?.date || suggestion!.date) : undefined);
+    const [date, setDate] = useState<Date | undefined>((camp?.date || suggestion?.date) ? new Date(camp.date || suggestion!.date) : undefined);
     const [loading, setLoading] = useState(false);
     
     const [assignedVles, setAssignedVles] = useState<VLEProfile[]>([]);
@@ -219,7 +217,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
                                                     <Checkbox
                                                         id={`vle-${vle.id}`}
                                                         checked={isSelected}
-                                                        readOnly
+                                                        disabled
                                                         tabIndex={-1}
                                                     />
                                                     <Label htmlFor={`vle-${vle.id}`} className="font-normal cursor-pointer">
