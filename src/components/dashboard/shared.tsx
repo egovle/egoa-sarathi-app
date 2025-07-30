@@ -15,7 +15,7 @@ import { validateFiles } from '@/lib/utils';
 import { Briefcase, Users, Users2, AlertTriangle } from 'lucide-react';
 import { createTask } from '@/app/actions';
 import { Badge } from '../ui/badge';
-import type { Service } from '@/lib/types';
+import type { Service, UserProfile } from '@/lib/types';
 
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -32,7 +32,7 @@ export const StatCard = ({ title, value, icon: Icon, description }: {title: stri
     </Card>
 );
 
-export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: any, services: any[] }) => {
+export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfile, services }: { buttonTrigger: React.ReactNode, type: 'Customer Request' | 'VLE Lead', creatorId?: string, creatorProfile?: UserProfile, services: any[] }) => {
   const { toast } = useToast();
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubCategory, setSelectedSubCategory] = useState('');
@@ -56,7 +56,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
   const serviceFee = useMemo(() => {
     if (!selectedService || selectedService.isVariable) return 0;
     const isVleLead = creatorProfile?.role === 'vle';
-    return parseFloat(isVleLead ? selectedService.vleRate : selectedService.customerRate);
+    return isVleLead ? selectedService.vleRate : selectedService.customerRate;
   }, [selectedService, creatorProfile]);
 
   const remainingBalance = useMemo(() => {
