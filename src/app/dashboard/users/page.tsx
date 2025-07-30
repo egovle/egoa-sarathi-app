@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import type { CustomerProfile, VLEProfile, GovernmentProfile, PaymentRequest, UserProfile } from '@/lib/types';
+import type { CustomerProfile, VLEProfile, GovernmentProfile, PaymentRequest } from '@/lib/types';
 import { AddBalanceDialog } from '@/components/dashboard/dialogs/AdminDialogs';
 import { createNotification, createNotificationForAdmins } from '@/app/actions';
 
@@ -128,19 +128,19 @@ export default function UserManagementPage() {
 
     useEffect(() => {
         const unsubCustomers = onSnapshot(collection(db, "users"), (snapshot) => {
-            setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomerProfile)));
+            setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as CustomerProfile));
             setLoadingData(false);
         });
         const unsubVles = onSnapshot(collection(db, "vles"), (snapshot) => {
-            setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VLEProfile)));
+            setVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as VLEProfile));
              setLoadingData(false);
         });
         const unsubGov = onSnapshot(collection(db, "government"), (snapshot) => {
-            setGovernment(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GovernmentProfile)));
+            setGovernment(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as GovernmentProfile));
              setLoadingData(false);
         });
         const unsubPayments = onSnapshot(query(collection(db, "paymentRequests"), where('status', '==', 'pending')), (snapshot) => {
-            setPaymentRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PaymentRequest)));
+            setPaymentRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as PaymentRequest));
         });
 
         return () => { unsubCustomers(); unsubVles(); unsubGov(); unsubPayments() };
@@ -201,7 +201,7 @@ export default function UserManagementPage() {
          toast({ title: "Request Rejected" });
     };
 
-    const filteredData = useMemo(() => {
+    const filteredData: UserTypes[] = useMemo(() => {
         let data: UserTypes[] = [];
         if (activeTab === 'customers') data = customers;
         else if (activeTab === 'vles') data = vles;

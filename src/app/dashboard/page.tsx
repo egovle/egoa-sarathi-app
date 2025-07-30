@@ -14,7 +14,7 @@ import CustomerDashboard from '@/components/dashboard/CustomerDashboard';
 import GovernmentDashboard from '@/components/dashboard/GovernmentDashboard';
 import ProfileView from '@/components/dashboard/ProfileView';
 
-import type { Task, Service, UserProfile, VLEProfile, CustomerProfile, PaymentRequest, Camp } from '@/lib/types';
+import type { Task, Service, Camp } from '@/lib/types';
 
 
 export default function DashboardPage() {

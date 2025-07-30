@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { collection, onSnapshot, query, orderBy, where, getDocs, limit, startAfter, Query, DocumentData, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
-import type { Camp, CampSuggestion, Service, VLEProfile, GovernmentProfile, UserProfile } from '@/lib/types';
+import type { Camp, CampSuggestion, Service, VLEProfile, GovernmentProfile, UserProfile, AdminProfile } from '@/lib/types';
 import AdminCampView from '@/app/dashboard/camps/AdminCampView';
 import VleCampView from './VleCampView';
 import CustomerCampView from '@/app/dashboard/camps/CustomerCampView';
@@ -127,7 +127,7 @@ export default function CampManagementPage() {
     const handlePrev = (category: string) => {
         // Firestore SDK doesn't efficiently support previous pages without complex logic,
         // so we'll just refetch the first page for simplicity.
-        setLastVisible(prev => ({...prev, [category]: null}));
+        setLastVisible((prev: {[key: string]: DocumentData | null}) => ({...prev, [category]: null}));
         fetchPaginatedData(category, 'initial');
         setPage((prev: any) => ({...prev, [category]: 1}));
     };
@@ -163,7 +163,7 @@ export default function CampManagementPage() {
                     allCamps={{ upcoming: allCamps.upcoming, past: allCamps.past }}
                     suggestions={campSuggestions} 
                     vles={vles} 
-                    userProfile={userProfile} 
+                    userProfile={userProfile as AdminProfile} 
                     onNextPage={() => handleNext('upcoming')}
                     onPrevPage={() => handlePrev('upcoming')}
                     isFirstPage={isFirstPage('upcoming')}

@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { StatCard } from './shared';
 import Link from 'next/link';
 
-import type { Task, VLEProfile, PaymentRequest } from '@/lib/types';
+import type { Task } from '@/lib/types';
 
 
 export default function AdminDashboard() {
@@ -60,7 +60,7 @@ export default function AdminDashboard() {
         // Realtime listeners for actionable items
         const actionableTaskStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Completed', 'Complaint Raised'];
         const tasksUnsub = onSnapshot(query(collection(db, 'tasks'), where('status', 'in', actionableTaskStatuses), orderBy('date', 'desc')), (snapshot) => {
-            const taskData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as Task }));
+            const taskData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
             setTasks(taskData);
             setLoading(false); // Set loading to false after fetching tasks
         }, (error) => {

@@ -1,3 +1,4 @@
+// Trigger new deployment with all fixes
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */

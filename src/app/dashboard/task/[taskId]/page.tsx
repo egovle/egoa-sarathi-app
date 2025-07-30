@@ -22,7 +22,7 @@ import { cn, validateFiles, calculateVleEarnings } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { TaskChat } from '@/components/dashboard/task/TaskChat';
 import { SetPriceDialog, RequestInfoDialog, SubmitAcknowledgementDialog, UploadCertificateDialog } from '@/components/dashboard/task/TaskDialogs';
-import type { Task } from '@/lib/types';
+import type { Task, HistoryEntry } from '@/lib/types';
 
 
 export default function TaskDetailPage() {
@@ -51,7 +51,7 @@ export default function TaskDetailPage() {
                 setTask(taskData);
                 
                 if (taskData.status === 'Awaiting Documents') {
-                    const lastRequest = taskData.history?.slice().reverse().find((h:any) => h.action === 'Information Requested');
+                    const lastRequest = taskData.history?.slice().reverse().find((h: HistoryEntry) => h.action === 'Information Requested');
                     if (lastRequest) {
                         setInformationRequest(lastRequest.details);
                     }
@@ -79,7 +79,7 @@ export default function TaskDetailPage() {
      useEffect(() => {
         if (task?.assignedVleId && (isTaskCreator || isAdmin)) {
             const getVleContact = async () => {
-                const vleDocRef = doc(db, 'vles', task.assignedVleId);
+                const vleDocRef = doc(db, 'vles', task.assignedVleId as string);
                 const vleDocSnap = await getDoc(vleDocRef);
                 if (vleDocSnap.exists()) {
                     setVleContact(vleDocSnap.data().mobile);
@@ -148,7 +148,7 @@ export default function TaskDetailPage() {
             
             const actorRole = userProfile.isAdmin ? 'Admin' : (userProfile.role === 'vle' ? 'VLE' : 'Customer');
 
-            const historyEntry = {
+            const historyEntry: HistoryEntry = {
                 timestamp: new Date().toISOString(),
                 actorId: user.uid,
                 actorRole: actorRole,
@@ -187,11 +187,13 @@ export default function TaskDetailPage() {
                 );
             }
 
-            await createNotificationForAdmins(
-                `Docs Uploaded for Task #${String(taskId).slice(-6).toUpperCase()}`,
-                `${actorRole} has uploaded additional documents.`,
-                 `/dashboard/task/${taskId}`
-            );
+            if (!userProfile.isAdmin) {
+                await createNotificationForAdmins(
+                    `Docs Uploaded for Task #${String(taskId).slice(-6).toUpperCase()}`,
+                    `${actorRole} has uploaded additional documents.`,
+                    `/dashboard/task/${taskId}`
+                );
+            }
            
             toast({ title: "Upload Complete", description: "The relevant parties have been notified." });
             setSelectedFiles([]);
@@ -229,7 +231,7 @@ export default function TaskDetailPage() {
         }
     };
     
-    const handleApprovePayout = async (task: any) => {
+    const handleApprovePayout = async (task: Task) => {
         if (!user || !userProfile?.isAdmin) {
             toast({ title: 'Error', description: 'Permission denied.', variant: 'destructive' });
             return;
@@ -283,7 +285,7 @@ export default function TaskDetailPage() {
     const canAdminSetPrice = isAdmin && task.status === 'Pending Price Approval';
     const canAdminApprovePayout = isAdmin && task.status === 'Completed';
     const canCustomerPay = isTaskCreator && task.status === 'Awaiting Payment';
-    const canUploadMoreDocs = (isTaskCreator || isAdmin) && task.status === 'Awaiting Documents';
+    const canUploadMoreDocs = (isTaskCreator || isAdmin || isAssignedVle) && task.status === 'Awaiting Documents';
 
     const displayStatus = task.status === 'Paid Out' && isTaskCreator ? 'Completed' : task.status;
     
@@ -365,7 +367,7 @@ export default function TaskDetailPage() {
                         <CardContent>
                             <div className="relative pl-6">
                                 <div className="absolute left-0 top-0 h-full w-0.5 bg-border -translate-x-1/2 ml-3"></div>
-                                {task.history?.sort((a:any, b:any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((entry: any, index: number) => (
+                                {task.history?.sort((a: HistoryEntry, b: HistoryEntry) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((entry: HistoryEntry, index: number) => (
                                     <div key={index} className="relative mb-6">
                                         <div className="absolute -left-[30px] top-1.5 h-3 w-3 rounded-full bg-primary border-2 border-background"></div>
                                         <p className="font-semibold">{entry.action}</p>
