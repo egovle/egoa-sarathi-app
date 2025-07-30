@@ -27,7 +27,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
     
     const [name, setName] = useState(camp?.name || (suggestion ? `Goa Sarathi Camp at ${suggestion.location}`: ''));
     const [location, setLocation] = useState(camp?.location || suggestion?.location || '');
-    const [date, setDate] = useState<Date | undefined>((camp?.date || suggestion?.date) ? new Date(camp.date || suggestion!.date) : undefined);
+    const [date, setDate] = useState<Date | undefined>((camp?.date || suggestion?.date) ? new Date(camp?.date || suggestion!.date) : undefined);
     const [loading, setLoading] = useState(false);
     
     const [assignedVles, setAssignedVles] = useState<VLEProfile[]>([]);

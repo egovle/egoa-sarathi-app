@@ -15,6 +15,7 @@ import { validateFiles } from '@/lib/utils';
 import { Briefcase, Users, Users2, AlertTriangle } from 'lucide-react';
 import { createTask } from '@/app/actions';
 import { Badge } from '../ui/badge';
+import type { Service } from '@/lib/types';
 
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -47,7 +48,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
     return services.filter(s => s.parentId === selectedCategory);
   }, [services, selectedCategory]);
 
-  const selectedService = useMemo(() => {
+  const selectedService: Service | undefined = useMemo(() => {
     const finalServiceId = selectedSubCategory || selectedCategory;
     return services.find(s => s.id === finalServiceId);
   }, [services, selectedCategory, selectedSubCategory]);
