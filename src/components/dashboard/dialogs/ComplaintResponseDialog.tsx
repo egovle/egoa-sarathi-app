@@ -27,6 +27,10 @@ export const ComplaintResponseDialog = ({ trigger, complaint, taskId, customerId
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
+        if (!user) {
+            toast({ title: "Authentication Error", description: "You must be logged in to submit a response.", variant: "destructive" });
+            return;
+        }
         setIsSubmitting(true);
         
         try {
@@ -34,7 +38,7 @@ export const ComplaintResponseDialog = ({ trigger, complaint, taskId, customerId
             if (selectedFiles.length > 0) {
                 for (const file of selectedFiles) {
                     const storageRef = ref(storage, `tasks/${taskId}/complaint_responses/${Date.now()}_${file.name}`);
-                    const metadata = { customMetadata: { uploaderId: user?.uid } };
+                    const metadata = { customMetadata: { uploaderId: user.uid } };
                     await uploadBytes(storageRef, file, metadata);
                     const downloadURL = await getDownloadURL(storageRef);
                     uploadedDocuments.push({ name: file.name, url: downloadURL });
