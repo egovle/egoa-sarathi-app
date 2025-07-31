@@ -56,11 +56,11 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
   const serviceFee = useMemo(() => {
     if (!selectedService || selectedService.isVariable) return 0;
     const isVleLead = creatorProfile?.role === 'vle';
-    return isVleLead ? selectedService.vleRate : selectedService.customerRate;
+    return isVleLead ? Number(selectedService.vleRate) : Number(selectedService.customerRate);
   }, [selectedService, creatorProfile]);
 
   const remainingBalance = useMemo(() => {
-    const currentBalance = creatorProfile?.walletBalance || 0;
+    const currentBalance = Number(creatorProfile?.walletBalance || 0);
     return currentBalance - serviceFee;
   }, [creatorProfile, serviceFee]);
 
@@ -369,7 +369,11 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                                   id={fileKey}
                                                   type="file"
                                                   className="hidden"
-                                                  ref={el => { fileInputRefs.current[fileKey] = el; }}
+                                                  ref={el => {
+                                                    if (el) {
+                                                      fileInputRefs.current[fileKey] = el;
+                                                    }
+                                                  }}
                                                   onChange={(e) => handleFileChange(e, group.key, option.key)}
                                                   accept=".pdf,.png,.jpg,.jpeg"
                                               />
