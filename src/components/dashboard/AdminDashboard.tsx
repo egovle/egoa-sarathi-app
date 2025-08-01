@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Loader2, Trash2, Briefcase, UserPlus, Wallet, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
-import { collection, onSnapshot, query, where, orderBy, getCountFromServer } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, getCountFromServer, limit } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { resetApplicationData } from '@/app/actions';
 
@@ -59,13 +59,20 @@ export default function AdminDashboard() {
 
         // Realtime listeners for actionable items
         const actionableTaskStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Completed', 'Complaint Raised'];
-        const tasksUnsub = onSnapshot(query(collection(db, 'tasks'), where('status', 'in', actionableTaskStatuses), orderBy('date', 'desc')), (snapshot) => {
+        const tasksQuery = query(
+            collection(db, 'tasks'), 
+            where('status', 'in', actionableTaskStatuses), 
+            orderBy('date', 'desc'),
+            limit(20) // Limit to the most recent 20 actionable tasks
+        );
+
+        const tasksUnsub = onSnapshot(tasksQuery, (snapshot) => {
             const taskData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
             setTasks(taskData);
-            setLoading(false); // Set loading to false after fetching tasks
+            setLoading(false);
         }, (error) => {
             console.error("Error fetching tasks:", error);
-            setLoading(false); // Also handle loading state on error
+            setLoading(false);
         });
         
         // We can keep listening to stats changes in real-time as well

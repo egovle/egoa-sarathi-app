@@ -45,14 +45,20 @@ export default function DashboardPage() {
         }
 
         let unsubscribers: (() => void)[] = [];
+
+        // All users need services for creating tasks or viewing profiles
         const servicesQuery = query(collection(db, "services"), orderBy("name"));
         unsubscribers.push(onSnapshot(servicesQuery, (snapshot) => {
             setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
         }));
 
+        // Admin data is now fetched inside the AdminDashboard component for scalability.
         if (userProfile.isAdmin) {
-             // Admin data is now fetched inside the AdminDashboard component for scalability.
-        } else if (userProfile.role === 'vle') {
+            return; 
+        }
+
+        // VLEs need their assigned tasks and all upcoming camps for invitations.
+        if (userProfile.role === 'vle') {
             const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
             unsubscribers.push(onSnapshot(assignedTasksQuery, snapshot => {
                 const allAssigned = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
@@ -65,11 +71,11 @@ export default function DashboardPage() {
                 setCamps(allCampsData);
             }));
         
+        // Customers only need the tasks they created.
         } else if (userProfile.role === 'customer') {
-            const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
+            const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
             unsubscribers.push(onSnapshot(tasksQuery, (snapshot) => {
                 const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-                fetchedTasks.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                 setTasks(fetchedTasks);
             }));
         }
