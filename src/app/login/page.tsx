@@ -105,7 +105,16 @@ export default function LoginPage() {
                 </div>
               </div>
               <div className="space-y-2 text-left">
-                <Label htmlFor="password">Password</Label>
+                 <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <Link
+                        href="/forgot-password"
+                        className="text-sm font-medium text-primary hover:underline"
+                        prefetch={false}
+                    >
+                        Forgot Password?
+                    </Link>
+                </div>
                 <div className="relative flex items-center">
                   <Lock className="absolute left-3.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -158,5 +167,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    
