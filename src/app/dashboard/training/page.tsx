@@ -10,13 +10,12 @@ import { db, storage } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Loader2, PlusCircle, Trash, Link as LinkIcon, Upload, Download, ExternalLink } from 'lucide-react';
+import { Loader2, PlusCircle, Trash, Link as LinkIcon, Upload, Download, ExternalLink, FileText, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { validateFiles } from '@/lib/utils';
 import type { TrainingMaterial, UserProfile } from '@/lib/types';
@@ -28,43 +27,36 @@ const UploadMaterialDialog = ({ userProfile, onUploadFinished }: { userProfile: 
     const [description, setDescription] = useState('');
     const [file, setFile] = useState<File | null>(null);
     const [link, setLink] = useState('');
-    const [uploadType, setUploadType] = useState<'file' | 'link'>('file');
     const [loading, setLoading] = useState(false);
     const [open, setOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
-        if (uploadType === 'file' && !file) {
-            toast({ title: "File required", description: "Please select a file to upload.", variant: "destructive" });
-            setLoading(false);
-            return;
-        }
-        if (uploadType === 'link' && !link) {
-            toast({ title: "Link required", description: "Please enter a URL.", variant: "destructive" });
+        if (!title.trim() || !description.trim()) {
+            toast({ title: "Missing Information", description: "Title and description are required.", variant: "destructive" });
             setLoading(false);
             return;
         }
 
         try {
-            let url = '';
+            let fileUrl: string | undefined = undefined;
             let fileName: string | undefined = undefined;
 
-            if (uploadType === 'file' && file) {
+            if (file) {
                 const storageRef = ref(storage, `training_materials/${Date.now()}_${file.name}`);
                 await uploadBytes(storageRef, file);
-                url = await getDownloadURL(storageRef);
+                fileUrl = await getDownloadURL(storageRef);
                 fileName = file.name;
-            } else {
-                url = link;
             }
 
-            const materialData = {
+            const materialData: Partial<TrainingMaterial> = {
                 title,
                 description,
-                type: uploadType,
-                url,
+                type: file ? 'file' : 'link', // Prioritize file if both are present
+                url: fileUrl || link, // Use fileUrl if it exists, otherwise use the link
                 fileName,
                 createdAt: new Date().toISOString(),
                 createdBy: userProfile.id,
@@ -73,7 +65,7 @@ const UploadMaterialDialog = ({ userProfile, onUploadFinished }: { userProfile: 
             await addDoc(collection(db, 'trainingMaterials'), materialData);
             toast({ title: 'Material Added', description: 'The training material has been successfully added.' });
             onUploadFinished();
-            setOpen(false); // Close dialog on success
+            setOpen(false); 
             setTitle('');
             setDescription('');
             setFile(null);
@@ -87,6 +79,18 @@ const UploadMaterialDialog = ({ userProfile, onUploadFinished }: { userProfile: 
         }
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const uploadedFile = e.target.files[0];
+            const validation = validateFiles([uploadedFile]);
+            if (!validation.isValid) {
+                toast({ title: 'Validation Error', description: validation.message, variant: 'destructive' });
+                return;
+            }
+            setFile(uploadedFile);
+        }
+    };
+    
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -96,35 +100,30 @@ const UploadMaterialDialog = ({ userProfile, onUploadFinished }: { userProfile: 
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>Add Training Material</DialogTitle>
+                         <DialogDescription>
+                            Provide a title, description, and optionally a file or an external link.
+                        </DialogDescription>
                     </DialogHeader>
-                    <div className="py-4">
-                        <Tabs value={uploadType} onValueChange={(value) => setUploadType(value as 'file' | 'link')}>
-                            <TabsList className="grid w-full grid-cols-2">
-                                <TabsTrigger value="file">Upload File</TabsTrigger>
-                                <TabsTrigger value="link">Add Link</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="file" className="space-y-4 pt-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="file">File (PDF, PNG, JPG)</Label>
-                                    <Input id="file" type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-                                </div>
-                            </TabsContent>
-                            <TabsContent value="link" className="space-y-4 pt-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="link">URL (YouTube, Google Drive, etc.)</Label>
-                                    <Input id="link" type="url" placeholder="https://" value={link} onChange={(e) => setLink(e.target.value)} />
-                                </div>
-                            </TabsContent>
-                        </Tabs>
-                        <div className="space-y-4 mt-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="title">Title</Label>
-                                <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="description">Description</Label>
-                                <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} required />
-                            </div>
+                    <div className="py-4 space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="title">Title</Label>
+                            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} required />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="description">Description</Label>
+                            <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} required />
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="file-upload">File (Optional)</Label>
+                            <Button type="button" variant="outline" className="w-full justify-start text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
+                                <UploadCloud className="mr-2 h-4 w-4"/>
+                                {file ? <span className="text-foreground">{file.name}</span> : 'Choose File'}
+                            </Button>
+                            <Input id="file-upload" type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden"/>
+                         </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="link">URL (Optional)</Label>
+                            <Input id="link" type="url" placeholder="e.g., https://youtube.com/watch?v=..." value={link} onChange={(e) => setLink(e.target.value)} />
                         </div>
                     </div>
                     <DialogFooter>
@@ -167,7 +166,7 @@ export default function TrainingPage() {
 
         try {
             await deleteDoc(doc(db, "trainingMaterials", material.id));
-            if (material.type === 'file') {
+            if (material.type === 'file' && material.url) {
                 const fileRef = ref(storage, material.url);
                 await deleteObject(fileRef);
             }
@@ -217,7 +216,7 @@ export default function TrainingPage() {
                                 <TableCell className="text-muted-foreground max-w-sm">{material.description}</TableCell>
                                 <TableCell>{format(new Date(material.createdAt), 'dd MMM yyyy')}</TableCell>
                                 <TableCell className="text-right space-x-2">
-                                     <Button asChild variant="outline" size="sm">
+                                     <Button asChild variant="outline" size="sm" disabled={!material.url}>
                                         <a href={material.url} target="_blank" rel="noopener noreferrer">
                                             {material.type === 'file' ? <Download className="mr-2 h-4 w-4"/> : <ExternalLink className="mr-2 h-4 w-4" />}
                                             {material.type === 'file' ? 'Download' : 'Open Link'}
