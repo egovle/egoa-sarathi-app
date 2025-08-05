@@ -62,7 +62,7 @@ export default function PrivacyPage() {
         <section className="w-full py-12 md:py-24">
           <div className="container px-4 md:px-6 max-w-4xl mx-auto">
             <Card className="p-6 md:p-8">
-                <CardContent className="prose prose-lg max-w-none">
+                <CardContent className="prose">
                     <p>Your privacy is important to us. This policy explains how we collect, use, and protect your personal information.</p>
             
                     <h2>1. Information We Collect</h2>

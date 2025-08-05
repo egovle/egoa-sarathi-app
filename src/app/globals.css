@@ -54,4 +54,22 @@
   }
 }
 
+/* Custom Prose styles for policy pages */
+@layer components {
+    .prose {
+        @apply max-w-none text-muted-foreground;
+    }
+    .prose h2 {
+        @apply text-xl font-semibold text-foreground mt-8 mb-4;
+    }
+    .prose p {
+        @apply leading-relaxed mb-4;
+    }
+    .prose ul {
+        @apply list-disc list-outside pl-5 mb-4 space-y-2;
+    }
+    .prose a {
+        @apply text-primary hover:underline;
+    }
+}
     

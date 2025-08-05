@@ -62,7 +62,7 @@ export default function TermsPage() {
         <section className="w-full py-12 md:py-24">
           <div className="container px-4 md:px-6 max-w-4xl mx-auto">
             <Card className="p-6 md:p-8">
-                <CardContent className="prose prose-lg max-w-none">
+                <CardContent className="prose">
                     <p>Welcome to eGoa Sarathi. Please read these Terms and Conditions ("Terms") carefully before using our website or services. By accessing or using our platform, you agree to be bound by these Terms.</p>
             
                     <h2>1. Services Provided</h2>

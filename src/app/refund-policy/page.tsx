@@ -62,7 +62,7 @@ export default function RefundPolicyPage() {
         <section className="w-full py-12 md:py-24">
           <div className="container px-4 md:px-6 max-w-4xl mx-auto">
              <Card className="p-6 md:p-8">
-                <CardContent className="prose prose-lg max-w-none">
+                <CardContent className="prose">
                     <p>Please read our refund policy carefully before making any purchase.</p>
 
                     <h2>Our Policy</h2>
