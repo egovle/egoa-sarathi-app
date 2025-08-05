@@ -153,9 +153,11 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
             </CardContent>
         </Card>
         <Tabs defaultValue="invitations" className="w-full">
-            <div className="flex items-center">
+            <div className="flex justify-between items-center">
                 <TabsList>
                     <TabsTrigger value="invitations">Invitations</TabsTrigger>
+                </TabsList>
+                 <TabsList>
                     <TabsTrigger value="chat">Group Chat</TabsTrigger>
                 </TabsList>
             </div>

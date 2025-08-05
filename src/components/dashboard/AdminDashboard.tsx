@@ -130,10 +130,14 @@ export default function AdminDashboard() {
             </div>
             
              <Tabs defaultValue="overview">
-                <TabsList>
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="chat">VLE Group Chat</TabsTrigger>
-                </TabsList>
+                <div className="flex justify-between items-center">
+                    <TabsList>
+                        <TabsTrigger value="overview">Overview</TabsTrigger>
+                    </TabsList>
+                    <TabsList>
+                        <TabsTrigger value="chat">Group Chat</TabsTrigger>
+                    </TabsList>
+                </div>
 
                 <TabsContent value="overview" className="mt-4 space-y-6">
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
