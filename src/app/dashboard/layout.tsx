@@ -21,6 +21,8 @@ import {
   FilePlus,
   Users,
   Settings,
+  BookOpenCheck,
+  MessageSquare,
   Building,
 } from "lucide-react"
 import { useEffect, useState } from "react";
@@ -58,8 +60,10 @@ const ALL_NAV_ITEMS = [
     { href: "/dashboard/lead-management", icon: FilePlus, label: "Lead Management", roles: ['vle'] },
     { href: "/dashboard/reports", icon: BarChart, label: "Reports", roles: ['admin', 'vle'] },
     { href: "/dashboard/camps", icon: Tent, label: "Camps", roles: ['admin', 'vle', 'customer', 'government'] },
+    { href: "/dashboard/group-chat", icon: MessageSquare, label: "Group Chat", roles: ['admin', 'vle'] },
     { href: "/dashboard/services", icon: ListPlus, label: "Services", roles: ['admin'] },
     { href: "/dashboard/users", icon: Users, label: "User Management", roles: ['admin'] },
+    { href: "/dashboard/training", icon: BookOpenCheck, label: "Help", roles: ['admin', 'vle'] },
     { href: "/dashboard/settings", icon: Settings, label: "Settings", roles: ['admin', 'vle', 'customer', 'government']},
 ];
 
