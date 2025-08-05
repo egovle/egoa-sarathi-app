@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, Trash2, Briefcase, UserPlus, Wallet, AlertTriangle } from 'lucide-react';
+import { Loader2, Trash2, Briefcase, UserPlus, Wallet, AlertTriangle, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { collection, onSnapshot, query, where, orderBy, getCountFromServer, limit } from 'firebase/firestore';
@@ -14,10 +14,12 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatCard } from './shared';
 import Link from 'next/link';
+import { GroupChat } from './GroupChat';
 
-import type { Task } from '@/lib/types';
+import type { Task, UserProfile } from '@/lib/types';
 
 
 export default function AdminDashboard() {
@@ -79,10 +81,14 @@ export default function AdminDashboard() {
         const vlesUnsub = onSnapshot(query(collection(db, 'vles'), where('status', '==', 'Pending')), (snapshot) => {
             setStats(s => ({...s, pendingVles: snapshot.size}));
         });
+         const paymentsUnsub = onSnapshot(query(collection(db, 'paymentRequests'), where('status', '==', 'pending')), (snapshot) => {
+            setStats(s => ({...s, pendingPayments: snapshot.size}));
+        });
 
         return () => {
             tasksUnsub();
             vlesUnsub();
+            paymentsUnsub();
         }
     }, []);
 
@@ -123,51 +129,74 @@ export default function AdminDashboard() {
                 </AlertDialog>
             </div>
             
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Pending Tasks" value={stats.pendingTasks.toString()} icon={Briefcase} description="Tasks needing price/VLE assignment" />
-                <StatCard title="VLE Requests" value={stats.pendingVles.toString()} icon={UserPlus} description="New VLEs awaiting approval" />
-                <StatCard title="Payment Requests" value={stats.pendingPayments.toString()} icon={Wallet} description="Wallet balance requests to approve" />
-                <StatCard title="Open Complaints" value={stats.openComplaints.toString()} icon={AlertTriangle} description="Customer complaints needing review" />
-            </div>
+             <Tabs defaultValue="overview">
+                <TabsList>
+                    <TabsTrigger value="overview">Overview</TabsTrigger>
+                    <TabsTrigger value="chat">VLE Group Chat</TabsTrigger>
+                </TabsList>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Action Center</CardTitle>
-                    <CardDescription>All items requiring your immediate attention.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Item</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Status/Details</TableHead>
-                                <TableHead className="text-right">Action</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {loading ? (
-                                <TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></TableCell></TableRow>
-                            ) : tasks.length > 0 ? (
-                                tasks.map(task => (
-                                    <TableRow key={task.id}>
-                                        <TableCell className="font-medium">{task.service}</TableCell>
-                                        <TableCell>Task</TableCell>
-                                        <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
-                                        <TableCell className="text-right">
-                                            <Button asChild variant="outline" size="sm">
-                                                <Link href={`/dashboard/task/${task.id}`}>View Task</Link>
-                                            </Button>
-                                        </TableCell>
+                <TabsContent value="overview" className="mt-4 space-y-6">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        <StatCard title="Pending Tasks" value={stats.pendingTasks.toString()} icon={Briefcase} description="Tasks needing price/VLE assignment" />
+                        <StatCard title="VLE Requests" value={stats.pendingVles.toString()} icon={UserPlus} description="New VLEs awaiting approval" />
+                        <StatCard title="Payment Requests" value={stats.pendingPayments.toString()} icon={Wallet} description="Wallet balance requests to approve" />
+                        <StatCard title="Open Complaints" value={stats.openComplaints.toString()} icon={AlertTriangle} description="Customer complaints needing review" />
+                    </div>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Action Center</CardTitle>
+                            <CardDescription>All items requiring your immediate attention.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Item</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Status/Details</TableHead>
+                                        <TableHead className="text-right">Action</TableHead>
                                     </TableRow>
-                                ))
-                            ) : (
-                                <TableRow><TableCell colSpan={4} className="h-24 text-center">No immediate actions required.</TableCell></TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {loading ? (
+                                        <TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></TableCell></TableRow>
+                                    ) : tasks.length > 0 ? (
+                                        tasks.map(task => (
+                                            <TableRow key={task.id}>
+                                                <TableCell className="font-medium">{task.service}</TableCell>
+                                                <TableCell>Task</TableCell>
+                                                <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button asChild variant="outline" size="sm">
+                                                        <Link href={`/dashboard/task/${task.id}`}>View Task</Link>
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow><TableCell colSpan={4} className="h-24 text-center">No immediate actions required.</TableCell></TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+                
+                <TabsContent value="chat" className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className='flex items-center gap-2'><MessageSquare />VLE & Admin Group Chat</CardTitle>
+                            <CardDescription>A central place for VLEs and Admins to communicate.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {user && userProfile && (
+                                <GroupChat user={user} userProfile={userProfile} />
                             )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

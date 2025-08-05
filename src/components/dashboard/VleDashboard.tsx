@@ -10,7 +10,7 @@ import { db } from '@/lib/firebase';
 import { doc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
 import { createNotificationForAdmins } from '@/app/actions';
 
-import { ToggleRight, CheckCircle2, XCircle, Info } from 'lucide-react';
+import { ToggleRight, CheckCircle2, XCircle, Info, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +20,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { calculateVleEarnings } from '@/lib/utils';
-import type { Task, Service, VLEProfile, Camp } from '@/lib/types';
+import { GroupChat } from './GroupChat';
+import type { Task, Service, VLEProfile, Camp, UserProfile } from '@/lib/types';
 
 
 const PendingApprovalView = () => (
@@ -141,95 +142,108 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                     <div className="flex items-center space-x-2 pt-2">
                         <Switch 
                             id="availability-mode" 
-                            checked={userProfile.available} 
+                            checked={(userProfile as VLEProfile).available} 
                             onCheckedChange={(checked) => onVleAvailabilityChange(user.uid, checked)}
                         />
-                        <Label htmlFor="availability-mode">{userProfile.available ? 'Available' : 'Unavailable'} for Tasks</Label>
+                        <Label htmlFor="availability-mode">{(userProfile as VLEProfile).available ? 'Available' : 'Unavailable'} for Tasks</Label>
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>
                 )}
             </CardContent>
         </Card>
-        <Tabs defaultValue="camp-invitations" className="w-full">
+        <Tabs defaultValue="invitations" className="w-full">
             <div className="flex items-center">
                 <TabsList>
-                    <TabsTrigger value="camp-invitations">Camp Invitations <Badge className="ml-2">{campInvitations.length}</Badge></TabsTrigger>
-                    <TabsTrigger value="task-invitations">Task Invitations <Badge className="ml-2">{taskInvitations.length}</Badge></TabsTrigger>
+                    <TabsTrigger value="invitations">Invitations</TabsTrigger>
+                    <TabsTrigger value="chat">Group Chat</TabsTrigger>
                 </TabsList>
             </div>
-            <TabsContent value="camp-invitations" className="mt-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>New Camp Invitations</CardTitle>
-                        <CardDescription>You have been invited to join these camps. Please respond on the Camp Management page.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Camp Name</TableHead>
-                                    <TableHead>Location</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {campInvitations.length > 0 ? campInvitations.map(camp => (
-                                    <TableRow key={camp.id}>
-                                        <TableCell>{camp.name}</TableCell>
-                                        <TableCell>{camp.location}</TableCell>
-                                        <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button asChild variant="outline" size="sm">
-                                                <Link href="/dashboard/camps">View & Respond</Link>
-                                            </Button>
-                                        </TableCell>
+             <TabsContent value="invitations" className="mt-4">
+                 <div className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>New Camp Invitations <Badge className="ml-2">{campInvitations.length}</Badge></CardTitle>
+                            <CardDescription>You have been invited to join these camps. Please respond on the Camp Management page.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Camp Name</TableHead>
+                                        <TableHead>Location</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead className="text-right">Action</TableHead>
                                     </TableRow>
-                                )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new camp invitations.</TableCell></TableRow>}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                                </TableHeader>
+                                <TableBody>
+                                    {campInvitations.length > 0 ? campInvitations.map(camp => (
+                                        <TableRow key={camp.id}>
+                                            <TableCell>{camp.name}</TableCell>
+                                            <TableCell>{camp.location}</TableCell>
+                                            <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Button asChild variant="outline" size="sm">
+                                                    <Link href="/dashboard/camps">View & Respond</Link>
+                                                </Button>
+                                            </TableCell>
+                                        </TableRow>
+                                    )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new camp invitations.</TableCell></TableRow>}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>New Task Invitations <Badge className="ml-2">{taskInvitations.length}</Badge></CardTitle>
+                            <CardDescription>Please review and respond to these new task assignments.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                           <Table>
+                               <TableHeader>
+                                   <TableRow>
+                                       <TableHead>Service</TableHead>
+                                       <TableHead>Customer</TableHead>
+                                       <TableHead>Your Earnings</TableHead>
+                                       <TableHead className="text-right">Actions</TableHead>
+                                   </TableRow>
+                               </TableHeader>
+                               <TableBody>
+                                   {taskInvitations.length > 0 ? taskInvitations.map(task => {
+                                       const { governmentFee, vleCommission } = calculateVleEarnings(task);
+                                       return (
+                                           <TableRow key={task.id}>
+                                               <TableCell className="font-medium">{task.service}</TableCell>
+                                               <TableCell>{task.customer}</TableCell>
+                                               <TableCell>
+                                                   <div className='text-sm'>
+                                                       <p>Commission: <span className='font-semibold'>₹{vleCommission.toFixed(2)}</span></p>
+                                                       <p className='text-xs text-muted-foreground'>+ ₹{governmentFee.toFixed(2)} for Govt. Fee</p>
+                                                   </div>
+                                               </TableCell>
+                                               <TableCell className="text-right space-x-2">
+                                                   <Button size="sm" variant="outline" onClick={() => onTaskAccept(task.id)}><CheckCircle2 className="mr-2 h-4 w-4"/>Accept</Button>
+                                                   <Button size="sm" variant="destructive" onClick={() => onTaskReject(task.id)}><XCircle className="mr-2 h-4 w-4"/>Reject</Button>
+                                               </TableCell>
+                                           </TableRow>
+                                       )
+                                   }) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No pending task invitations.</TableCell></TableRow>}
+                               </TableBody>
+                           </Table>
+                        </CardContent>
+                    </Card>
+                 </div>
             </TabsContent>
-            <TabsContent value="task-invitations" className="mt-4">
+            <TabsContent value="chat" className="mt-4">
                  <Card>
                     <CardHeader>
-                        <CardTitle>New Task Invitations</CardTitle>
-                        <CardDescription>Please review and respond to these new task assignments.</CardDescription>
+                        <CardTitle className='flex items-center gap-2'><MessageSquare />Group Chat</CardTitle>
+                        <CardDescription>A central place to communicate with Admins and other VLEs.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                       <Table>
-                           <TableHeader>
-                               <TableRow>
-                                   <TableHead>Service</TableHead>
-                                   <TableHead>Customer</TableHead>
-                                   <TableHead>Your Earnings</TableHead>
-                                   <TableHead className="text-right">Actions</TableHead>
-                               </TableRow>
-                           </TableHeader>
-                           <TableBody>
-                               {taskInvitations.length > 0 ? taskInvitations.map(task => {
-                                   const { governmentFee, vleCommission } = calculateVleEarnings(task);
-                                   return (
-                                       <TableRow key={task.id}>
-                                           <TableCell className="font-medium">{task.service}</TableCell>
-                                           <TableCell>{task.customer}</TableCell>
-                                           <TableCell>
-                                               <div className='text-sm'>
-                                                   <p>Commission: <span className='font-semibold'>₹{vleCommission.toFixed(2)}</span></p>
-                                                   <p className='text-xs text-muted-foreground'>+ ₹{governmentFee.toFixed(2)} for Govt. Fee</p>
-                                               </div>
-                                           </TableCell>
-                                           <TableCell className="text-right space-x-2">
-                                               <Button size="sm" variant="outline" onClick={() => onTaskAccept(task.id)}><CheckCircle2 className="mr-2 h-4 w-4"/>Accept</Button>
-                                               <Button size="sm" variant="destructive" onClick={() => onTaskReject(task.id)}><XCircle className="mr-2 h-4 w-4"/>Reject</Button>
-                                           </TableCell>
-                                       </TableRow>
-                                   )
-                               }) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No pending task invitations.</TableCell></TableRow>}
-                           </TableBody>
-                       </Table>
+                        {user && userProfile && (
+                            <GroupChat user={user} userProfile={userProfile as UserProfile} />
+                        )}
                     </CardContent>
                 </Card>
             </TabsContent>

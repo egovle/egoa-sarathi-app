@@ -201,5 +201,26 @@ export interface Notification {
 export interface User {
   uid: string;
   email: string | null;
-  // Add any other properties you expect from a Firebase User object
+}
+
+export interface TrainingMaterial {
+    id: string;
+    title: string;
+    description: string;
+    type: 'file' | 'link';
+    url: string; // URL to Firebase Storage file or external link
+    fileName?: string; // Original name of the uploaded file
+    createdAt: string; // ISO String
+    createdBy: string; // Admin User ID
+}
+
+export interface GroupChatMessage {
+    id: string;
+    text?: string;
+    fileUrl?: string;
+    fileName?: string;
+    senderId: string;
+    senderName: string;
+    senderRole: 'Admin' | 'VLE' | 'Customer';
+    timestamp: any; // Firestore ServerTimestamp
 }
