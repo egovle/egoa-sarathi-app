@@ -136,10 +136,12 @@ export default function HomePage() {
           <div className="flex items-center gap-4">
             <AppLogo className="text-xl" iconClassName="h-6 w-6" />
           </div>
-          <nav className="flex gap-4 sm:gap-6 text-sm">
+          <nav className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
             <Link className="text-muted-foreground hover:text-foreground" href="/about">About Us</Link>
             <Link className="text-muted-foreground hover:text-foreground" href="/services">Services</Link>
             <Link className="text-muted-foreground hover:text-foreground" href="/privacy">Privacy Policy</Link>
+            <Link className="text-muted-foreground hover:text-foreground" href="/terms">Terms & Conditions</Link>
+            <Link className="text-muted-foreground hover:text-foreground" href="/refund-policy">Refund Policy</Link>
           </nav>
           <div className="flex items-center gap-4 text-muted-foreground">
             <a href="tel:+918380083832" className="flex items-center gap-2 hover:text-foreground transition-colors">

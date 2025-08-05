@@ -44,36 +44,63 @@ export default function PrivacyPage() {
 
         <section className="w-full py-12 md:py-24">
           <div className="container px-4 md:px-6 prose prose-lg max-w-4xl mx-auto">
-            <h2>1. Introduction</h2>
-            <p>Welcome to eGoa Sarathi. We are committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform.</p>
+            <p>Your privacy is important to us. This policy explains how we collect, use, and protect your personal information.</p>
             
-            <h2>2. Information We Collect</h2>
-            <p>We may collect personal information such as your name, email address, mobile number, pincode, address, and documents required for the specific services you request (e.g., Aadhaar card, PAN card).</p>
-
-            <h2>3. How We Use Your Information</h2>
-            <p>We use the information we collect to:</p>
+            <h2>1. Information We Collect</h2>
+            <p>We may collect the following types of information from you:</p>
             <ul>
-                <li>Create and manage your account.</li>
-                <li>Process your service requests and transactions.</li>
-                <li>Communicate with you about your requests and our services.</li>
-                <li>Facilitate communication between you, VLEs, and government administrators.</li>
-                <li>Improve our platform and services.</li>
+                <li><strong>Personal Identification Details:</strong> Full name, address, date of birth, gender, etc.</li>
+                <li><strong>Contact Information:</strong> Email address, phone number</li>
+                <li><strong>Service-Specific Information:</strong> Details and documents necessary for the specific service you request.</li>
+                <li><strong>Payment Information:</strong> Details necessary to process your payment (handled securely by our third-party payment processors)</li>
+            </ul>
+            <p>We collect this information solely to process your service request and deliver our services.</p>
+
+            <h2>2. How We Use Your Information</h2>
+            <p>Your information is used for:</p>
+            <ul>
+                <li>Fulfilling your service requests</li>
+                <li>Contacting you with updates or requests for additional information</li>
+                <li>Providing customer support and assistance</li>
+                <li>Verifying your identity or information (if required for the service)</li>
+                <li>Internal record-keeping and compliance with applicable laws</li>
+            </ul>
+            <p>We do not sell, rent, or trade your personal information to any third party for marketing purposes.</p>
+
+            <h2>3. Data Sharing and Disclosure</h2>
+            <p>We may share your information with:</p>
+            <ul>
+                <li>Third-party service providers who help us deliver our services (e.g., hosting, payment processors, delivery partners), under strict confidentiality agreements</li>
+                <li>Authorities if required by law, subpoena, or legal process</li>
             </ul>
 
-            <h2>4. Information Sharing</h2>
-            <p>Your information is shared only as necessary to provide the services you request. This includes sharing your application details and documents with the assigned Village Level Entrepreneur (VLE) and relevant government departments for processing.</p>
+            <h2>4. Data Security</h2>
+            <p>We implement reasonable administrative, technical, and physical safeguards to protect your personal data from unauthorized access, loss, misuse, or disclosure.</p>
+            <p>However, no method of transmission over the Internet is 100% secure. We cannot guarantee absolute security.</p>
 
-            <h2>5. Data Security</h2>
-            <p>We use administrative, technical, and physical security measures to help protect your personal information. While we have taken reasonable steps to secure the personal information you provide to us, please be aware that despite our efforts, no security measures are perfect or impenetrable.</p>
+             <h2>5. Data Retention</h2>
+            <p>We retain your information only for as long as needed to fulfill the purpose for which it was collected, or as required by law. After this period, your data will be securely deleted or anonymized.</p>
 
              <h2>6. Your Rights</h2>
-            <p>You have the right to access, update, or delete your personal information through your profile dashboard. If you wish to delete your account permanently, please contact our support team.</p>
+            <p>You may request to:</p>
+            <ul>
+                <li>Access the personal data we hold about you</li>
+                <li>Correct inaccurate or outdated information</li>
+                <li>Request deletion of your data (subject to legal limitations)</li>
+                <li>Withdraw consent where applicable</li>
+            </ul>
+            <p>To exercise your rights, please contact us at <a href="mailto:nuteniqspl@gmail.com">nuteniqspl@gmail.com</a>.</p>
 
-             <h2>7. Changes to This Policy</h2>
-            <p>We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. You are advised to review this Privacy Policy periodically for any changes.</p>
+             <h2>7. Cookies and Tracking Technologies</h2>
+            <p>Our website may use cookies or similar technologies to enhance user experience, analyze traffic, and improve our services. You can control cookie preferences through your browser settings.</p>
 
-             <h2>8. Contact Us</h2>
-            <p>If you have any questions about this Privacy Policy, please contact us at <a href="mailto:nuteniqspl@gmail.com">nuteniqspl@gmail.com</a>.</p>
+            <h2>8. Changes to This Policy</h2>
+            <p>We may update this Privacy Policy from time to time. Changes will be posted on this page with the revised effective date. Continued use of our services after changes indicates your acceptance of the updated policy.</p>
+
+            <h2>9. Contact Us</h2>
+            <p>If you have any questions or concerns about this Privacy Policy, please contact:</p>
+            <p>📧 Email: <a href="mailto:nuteniqspl@gmail.com">nuteniqspl@gmail.com</a></p>
+            <p>📞 Phone: <a href="tel:+918380083832">+91 8380083832</a></p>
           </div>
         </section>
       </main>
@@ -83,10 +110,12 @@ export default function PrivacyPage() {
           <div className="flex items-center gap-4">
             <AppLogo className="text-xl" iconClassName="h-6 w-6" />
           </div>
-          <nav className="flex gap-4 sm:gap-6 text-sm">
+          <nav className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
             <Link className="text-muted-foreground hover:text-foreground" href="/about">About Us</Link>
             <Link className="text-muted-foreground hover:text-foreground" href="/services">Services</Link>
             <Link className="font-semibold" href="/privacy">Privacy Policy</Link>
+            <Link className="text-muted-foreground hover:text-foreground" href="/terms">Terms & Conditions</Link>
+            <Link className="text-muted-foreground hover:text-foreground" href="/refund-policy">Refund Policy</Link>
           </nav>
           <div className="flex items-center gap-4 text-muted-foreground">
             <a href="tel:+918380083832" className="flex items-center gap-2 hover:text-foreground transition-colors">

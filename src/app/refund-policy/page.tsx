@@ -4,31 +4,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/ui/AppLogo';
-import { Phone, FileText } from 'lucide-react';
+import { Phone } from 'lucide-react';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
-const serviceCategories = [
-    { 
-        name: 'Income & Residence', 
-        services: ['Income Certificate', 'Residence Certificate', 'Economically Weaker Section (EWS) Certificate']
-    },
-    { 
-        name: 'Identity & Travel',
-        services: ['PAN Card Application', 'PAN Card Correction/Reprint', 'Passport Application Assistance']
-    },
-    {
-        name: 'Business & Labour',
-        services: ['Shop & Establishment Registration', 'Trade License Application', 'Labour Card Registration']
-    },
-    {
-        name: 'Other Essential Services',
-        services: ['Custom Service Request (Variable Rate)', 'Digital Document Attestation', 'Utility Bill Payments']
-    }
-];
-
-export default function ServicesPage() {
+export default function RefundPolicyPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-sm">
@@ -55,31 +34,31 @@ export default function ServicesPage() {
         <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/40">
           <div className="container px-4 md:px-6">
             <div className="flex flex-col items-center space-y-4 text-center">
-              <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl">Our Services</h1>
-              <p className="max-w-[700px] text-muted-foreground md:text-xl">
-                A comprehensive list of citizen services available through the eGoa Sarathi platform.
+              <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl">Refund Policy</h1>
+               <p className="max-w-[700px] text-muted-foreground md:text-xl">
+                Last updated: [Date]
               </p>
             </div>
           </div>
         </section>
 
         <section className="w-full py-12 md:py-24">
-            <div className="container px-4 md:px-6">
-                <div className="mx-auto max-w-4xl">
-                    <Accordion type="single" collapsible className="w-full">
-                        {serviceCategories.map((category, index) => (
-                             <AccordionItem value={`item-${index}`} key={category.name}>
-                                <AccordionTrigger className="text-lg font-semibold">{category.name}</AccordionTrigger>
-                                <AccordionContent>
-                                    <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
-                                        {category.services.map(service => <li key={service}>{service}</li>)}
-                                    </ul>
-                                </AccordionContent>
-                            </AccordionItem>
-                        ))}
-                    </Accordion>
-                </div>
-            </div>
+          <div className="container px-4 md:px-6 prose prose-lg max-w-4xl mx-auto">
+            <p>Please read our refund policy carefully before making any purchase.</p>
+
+            <h2>Our Policy</h2>
+            <p>At eGoa Sarathi, we strive to provide the best service possible. Please note the following regarding refunds:</p>
+            <ul>
+                <li>We do not provide any refunds once the payment is made.</li>
+                <li>All sales are final. We encourage you to carefully review your service selection before making a payment.</li>
+            </ul>
+            <p>If you have any questions or concerns about our services, please contact us prior to making a purchase.</p>
+            
+            <h2>Contact Us</h2>
+            <p>If you have any questions regarding this policy, please contact us:</p>
+            <p>📧 Email: <a href="mailto:nuteniqspl@gmail.com">nuteniqspl@gmail.com</a></p>
+            <p>📞 Phone: <a href="tel:+918380083832">+91 8380083832</a></p>
+          </div>
         </section>
       </main>
 
@@ -90,10 +69,10 @@ export default function ServicesPage() {
           </div>
           <nav className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
             <Link className="text-muted-foreground hover:text-foreground" href="/about">About Us</Link>
-            <Link className="font-semibold" href="/services">Services</Link>
+            <Link className="text-muted-foreground hover:text-foreground" href="/services">Services</Link>
             <Link className="text-muted-foreground hover:text-foreground" href="/privacy">Privacy Policy</Link>
             <Link className="text-muted-foreground hover:text-foreground" href="/terms">Terms & Conditions</Link>
-            <Link className="text-muted-foreground hover:text-foreground" href="/refund-policy">Refund Policy</Link>
+            <Link className="font-semibold" href="/refund-policy">Refund Policy</Link>
           </nav>
           <div className="flex items-center gap-4 text-muted-foreground">
             <a href="tel:+918380083832" className="flex items-center gap-2 hover:text-foreground transition-colors">
