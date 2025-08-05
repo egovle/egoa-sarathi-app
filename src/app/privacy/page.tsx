@@ -4,8 +4,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/ui/AppLogo';
-import { Phone } from 'lucide-react';
+import { Phone, ChevronDown } from 'lucide-react';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function PrivacyPage() {
   return (
@@ -18,7 +20,22 @@ export default function PrivacyPage() {
           <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
             <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/about">About Us</Link>
             <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/services">Services</Link>
-            <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/privacy">Privacy Policy</Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1 text-foreground/60 transition-colors hover:text-foreground focus:outline-none">
+                Policies <ChevronDown className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild>
+                  <Link href="/privacy">Privacy Policy</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/terms">Terms & Conditions</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/refund-policy">Refund Policy</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline">
@@ -36,71 +53,75 @@ export default function PrivacyPage() {
             <div className="flex flex-col items-center space-y-4 text-center">
               <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl">Privacy Policy</h1>
               <p className="max-w-[700px] text-muted-foreground md:text-xl">
-                Last updated: [Date]
+                Last updated: July 26, 2024
               </p>
             </div>
           </div>
         </section>
 
         <section className="w-full py-12 md:py-24">
-          <div className="container px-4 md:px-6 prose prose-lg max-w-4xl mx-auto">
-            <p>Your privacy is important to us. This policy explains how we collect, use, and protect your personal information.</p>
+          <div className="container px-4 md:px-6 max-w-4xl mx-auto">
+            <Card className="p-6 md:p-8">
+                <CardContent className="prose prose-lg max-w-none">
+                    <p>Your privacy is important to us. This policy explains how we collect, use, and protect your personal information.</p>
             
-            <h2>1. Information We Collect</h2>
-            <p>We may collect the following types of information from you:</p>
-            <ul>
-                <li><strong>Personal Identification Details:</strong> Full name, address, date of birth, gender, etc.</li>
-                <li><strong>Contact Information:</strong> Email address, phone number</li>
-                <li><strong>Service-Specific Information:</strong> Details and documents necessary for the specific service you request.</li>
-                <li><strong>Payment Information:</strong> Details necessary to process your payment (handled securely by our third-party payment processors)</li>
-            </ul>
-            <p>We collect this information solely to process your service request and deliver our services.</p>
+                    <h2>1. Information We Collect</h2>
+                    <p>We may collect the following types of information from you:</p>
+                    <ul>
+                        <li><strong>Personal Identification Details:</strong> Full name, address, date of birth, gender, etc.</li>
+                        <li><strong>Contact Information:</strong> Email address, phone number</li>
+                        <li><strong>Service-Specific Information:</strong> Details and documents necessary for the specific service you request.</li>
+                        <li><strong>Payment Information:</strong> Details necessary to process your payment (handled securely by our third-party payment processors)</li>
+                    </ul>
+                    <p>We collect this information solely to process your service request and deliver our services.</p>
 
-            <h2>2. How We Use Your Information</h2>
-            <p>Your information is used for:</p>
-            <ul>
-                <li>Fulfilling your service requests</li>
-                <li>Contacting you with updates or requests for additional information</li>
-                <li>Providing customer support and assistance</li>
-                <li>Verifying your identity or information (if required for the service)</li>
-                <li>Internal record-keeping and compliance with applicable laws</li>
-            </ul>
-            <p>We do not sell, rent, or trade your personal information to any third party for marketing purposes.</p>
+                    <h2>2. How We Use Your Information</h2>
+                    <p>Your information is used for:</p>
+                    <ul>
+                        <li>Fulfilling your service requests</li>
+                        <li>Contacting you with updates or requests for additional information</li>
+                        <li>Providing customer support and assistance</li>
+                        <li>Verifying your identity or information (if required for the service)</li>
+                        <li>Internal record-keeping and compliance with applicable laws</li>
+                    </ul>
+                    <p>We do not sell, rent, or trade your personal information to any third party for marketing purposes.</p>
 
-            <h2>3. Data Sharing and Disclosure</h2>
-            <p>We may share your information with:</p>
-            <ul>
-                <li>Third-party service providers who help us deliver our services (e.g., hosting, payment processors, delivery partners), under strict confidentiality agreements</li>
-                <li>Authorities if required by law, subpoena, or legal process</li>
-            </ul>
+                    <h2>3. Data Sharing and Disclosure</h2>
+                    <p>We may share your information with:</p>
+                    <ul>
+                        <li>Third-party service providers who help us deliver our services (e.g., hosting, payment processors, delivery partners), under strict confidentiality agreements</li>
+                        <li>Authorities if required by law, subpoena, or legal process</li>
+                    </ul>
 
-            <h2>4. Data Security</h2>
-            <p>We implement reasonable administrative, technical, and physical safeguards to protect your personal data from unauthorized access, loss, misuse, or disclosure.</p>
-            <p>However, no method of transmission over the Internet is 100% secure. We cannot guarantee absolute security.</p>
+                    <h2>4. Data Security</h2>
+                    <p>We implement reasonable administrative, technical, and physical safeguards to protect your personal data from unauthorized access, loss, misuse, or disclosure.</p>
+                    <p>However, no method of transmission over the Internet is 100% secure. We cannot guarantee absolute security.</p>
 
-             <h2>5. Data Retention</h2>
-            <p>We retain your information only for as long as needed to fulfill the purpose for which it was collected, or as required by law. After this period, your data will be securely deleted or anonymized.</p>
+                     <h2>5. Data Retention</h2>
+                    <p>We retain your information only for as long as needed to fulfill the purpose for which it was collected, or as required by law. After this period, your data will be securely deleted or anonymized.</p>
 
-             <h2>6. Your Rights</h2>
-            <p>You may request to:</p>
-            <ul>
-                <li>Access the personal data we hold about you</li>
-                <li>Correct inaccurate or outdated information</li>
-                <li>Request deletion of your data (subject to legal limitations)</li>
-                <li>Withdraw consent where applicable</li>
-            </ul>
-            <p>To exercise your rights, please contact us at <a href="mailto:nuteniqspl@gmail.com">nuteniqspl@gmail.com</a>.</p>
+                     <h2>6. Your Rights</h2>
+                    <p>You may request to:</p>
+                    <ul>
+                        <li>Access the personal data we hold about you</li>
+                        <li>Correct inaccurate or outdated information</li>
+                        <li>Request deletion of your data (subject to legal limitations)</li>
+                        <li>Withdraw consent where applicable</li>
+                    </ul>
+                    <p>To exercise your rights, please contact us at <a href="mailto:nuteniqspl@gmail.com">nuteniqspl@gmail.com</a>.</p>
 
-             <h2>7. Cookies and Tracking Technologies</h2>
-            <p>Our website may use cookies or similar technologies to enhance user experience, analyze traffic, and improve our services. You can control cookie preferences through your browser settings.</p>
+                     <h2>7. Cookies and Tracking Technologies</h2>
+                    <p>Our website may use cookies or similar technologies to enhance user experience, analyze traffic, and improve our services. You can control cookie preferences through your browser settings.</p>
 
-            <h2>8. Changes to This Policy</h2>
-            <p>We may update this Privacy Policy from time to time. Changes will be posted on this page with the revised effective date. Continued use of our services after changes indicates your acceptance of the updated policy.</p>
+                    <h2>8. Changes to This Policy</h2>
+                    <p>We may update this Privacy Policy from time to time. Changes will be posted on this page with the revised effective date. Continued use of our services after changes indicates your acceptance of the updated policy.</p>
 
-            <h2>9. Contact Us</h2>
-            <p>If you have any questions or concerns about this Privacy Policy, please contact:</p>
-            <p>📧 Email: <a href="mailto:nuteniqspl@gmail.com">nuteniqspl@gmail.com</a></p>
-            <p>📞 Phone: <a href="tel:+918380083832">+91 8380083832</a></p>
+                    <h2>9. Contact Us</h2>
+                    <p>If you have any questions or concerns about this Privacy Policy, please contact:</p>
+                    <p>📧 Email: <a href="mailto:nuteniqspl@gmail.com">nuteniqspl@gmail.com</a></p>
+                    <p>📞 Phone: <a href="tel:+918380083832">+91 8380083832</a></p>
+                </CardContent>
+            </Card>
           </div>
         </section>
       </main>

@@ -4,8 +4,9 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/ui/AppLogo';
-import { Phone, Users, Target, Eye } from 'lucide-react';
+import { Phone, Users, Target, Eye, ChevronDown } from 'lucide-react';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export default function AboutPage() {
   return (
@@ -18,7 +19,22 @@ export default function AboutPage() {
           <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
             <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/about">About Us</Link>
             <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/services">Services</Link>
-            <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/privacy">Privacy Policy</Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1 text-foreground/60 transition-colors hover:text-foreground focus:outline-none">
+                Policies <ChevronDown className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild>
+                  <Link href="/privacy">Privacy Policy</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/terms">Terms & Conditions</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/refund-policy">Refund Policy</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline">

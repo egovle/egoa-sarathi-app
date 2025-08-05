@@ -4,8 +4,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/ui/AppLogo';
-import { Phone } from 'lucide-react';
+import { Phone, ChevronDown } from 'lucide-react';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function RefundPolicyPage() {
   return (
@@ -18,7 +20,22 @@ export default function RefundPolicyPage() {
           <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
             <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/about">About Us</Link>
             <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/services">Services</Link>
-            <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/privacy">Privacy Policy</Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1 text-foreground/60 transition-colors hover:text-foreground focus:outline-none">
+                Policies <ChevronDown className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild>
+                  <Link href="/privacy">Privacy Policy</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/terms">Terms & Conditions</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/refund-policy">Refund Policy</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
           <div className="flex items-center gap-2">
             <Button asChild variant="outline">
@@ -36,28 +53,32 @@ export default function RefundPolicyPage() {
             <div className="flex flex-col items-center space-y-4 text-center">
               <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl">Refund Policy</h1>
                <p className="max-w-[700px] text-muted-foreground md:text-xl">
-                Last updated: [Date]
+                Last updated: July 26, 2024
               </p>
             </div>
           </div>
         </section>
 
         <section className="w-full py-12 md:py-24">
-          <div className="container px-4 md:px-6 prose prose-lg max-w-4xl mx-auto">
-            <p>Please read our refund policy carefully before making any purchase.</p>
+          <div className="container px-4 md:px-6 max-w-4xl mx-auto">
+             <Card className="p-6 md:p-8">
+                <CardContent className="prose prose-lg max-w-none">
+                    <p>Please read our refund policy carefully before making any purchase.</p>
 
-            <h2>Our Policy</h2>
-            <p>At eGoa Sarathi, we strive to provide the best service possible. Please note the following regarding refunds:</p>
-            <ul>
-                <li>We do not provide any refunds once the payment is made.</li>
-                <li>All sales are final. We encourage you to carefully review your service selection before making a payment.</li>
-            </ul>
-            <p>If you have any questions or concerns about our services, please contact us prior to making a purchase.</p>
-            
-            <h2>Contact Us</h2>
-            <p>If you have any questions regarding this policy, please contact us:</p>
-            <p>📧 Email: <a href="mailto:nuteniqspl@gmail.com">nuteniqspl@gmail.com</a></p>
-            <p>📞 Phone: <a href="tel:+918380083832">+91 8380083832</a></p>
+                    <h2>Our Policy</h2>
+                    <p>At eGoa Sarathi, we strive to provide the best service possible. Please note the following regarding refunds:</p>
+                    <ul>
+                        <li>We do not provide any refunds once the payment is made.</li>
+                        <li>All sales are final. We encourage you to carefully review your service selection before making a payment.</li>
+                    </ul>
+                    <p>If you have any questions or concerns about our services, please contact us prior to making a purchase.</p>
+                    
+                    <h2>Contact Us</h2>
+                    <p>If you have any questions regarding this policy, please contact us:</p>
+                    <p>📧 Email: <a href="mailto:nuteniqspl@gmail.com">nuteniqspl@gmail.com</a></p>
+                    <p>📞 Phone: <a href="tel:+918380083832">+91 8380083832</a></p>
+                </CardContent>
+             </Card>
           </div>
         </section>
       </main>

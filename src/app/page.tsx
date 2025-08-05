@@ -5,11 +5,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { AppLogo } from '@/components/ui/AppLogo';
-import { FileText, Phone } from 'lucide-react';
+import { FileText, Phone, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import WhatsAppIcon from '@/components/ui/WhatsAppIcon';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const services = [
   { name: 'Income Certificate', icon: FileText, description: 'Official proof of income for various financial applications.' },
@@ -34,7 +35,22 @@ export default function HomePage() {
           <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
             <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/about">About Us</Link>
             <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/services">Services</Link>
-            <Link className="text-foreground/60 transition-colors hover:text-foreground" href="/privacy">Privacy Policy</Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center gap-1 text-foreground/60 transition-colors hover:text-foreground focus:outline-none">
+                Policies <ChevronDown className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem asChild>
+                  <Link href="/privacy">Privacy Policy</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/terms">Terms & Conditions</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/refund-policy">Refund Policy</Link>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </nav>
           <div className="flex items-center gap-2">
             <Button asChild variant="ghost" size="sm">
