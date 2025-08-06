@@ -175,7 +175,7 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
                             <TableBody>
                                 {customerComplaints.length > 0 ? (
                                     customerComplaints.map(c => (
-                                    <TableRow key={c.date}>
+                                    <TableRow key={c.taskId}>
                                         <TableCell className="font-medium">{c.taskId.slice(-6).toUpperCase()}</TableCell>
                                         <TableCell>{c.service}</TableCell>
                                         <TableCell className="max-w-xs break-words">{c.text}</TableCell>

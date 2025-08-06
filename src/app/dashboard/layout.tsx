@@ -24,6 +24,7 @@ import {
   BookOpenCheck,
   MessageSquare,
   Building,
+  HardDriveUpload,
 } from "lucide-react"
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch, getDocs, deleteDoc } from "firebase/firestore";
@@ -56,6 +57,7 @@ import type { Notification } from "@/lib/types";
 
 const ALL_NAV_ITEMS = [
     { href: "/dashboard", icon: Home, label: "Home", roles: ['admin', 'vle', 'customer', 'government'] },
+    { href: "/dashboard/documents", icon: HardDriveUpload, label: "My Documents", roles: ['customer'] },
     { href: "/dashboard/task-management", icon: Briefcase, label: "Task Management", roles: ['vle'] },
     { href: "/dashboard/lead-management", icon: FilePlus, label: "Lead Management", roles: ['vle'] },
     { href: "/dashboard/reports", icon: BarChart, label: "Reports", roles: ['admin', 'vle'] },
