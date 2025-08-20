@@ -7,6 +7,7 @@ export interface BaseProfile {
     pincode: string;
     location: string;
     walletBalance: number;
+    photoURL?: string | null;
 }
 
 export interface CustomerProfile extends BaseProfile {
@@ -224,3 +225,5 @@ export interface GroupChatMessage {
     senderRole: 'Admin' | 'VLE' | 'Customer';
     timestamp: any; // Firestore ServerTimestamp
 }
+
+    

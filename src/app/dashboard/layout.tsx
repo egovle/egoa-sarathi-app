@@ -52,6 +52,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
 import { AppLogo } from "@/components/ui/AppLogo";
 import { SupportContent } from '@/components/dashboard/SupportContent';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { Notification } from "@/lib/types";
 
 
@@ -361,9 +362,11 @@ export default function DashboardLayout({
 
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="secondary" size="icon" className="rounded-full">
-                            <User className="h-5 w-5" />
-                            <span className="sr-only">Toggle user menu</span>
+                        <Button variant="ghost" size="icon" className="rounded-full">
+                             <Avatar className="h-8 w-8">
+                                <AvatarImage src={userProfile?.photoURL} alt={userProfile?.name} />
+                                <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
+                            </Avatar>
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -403,3 +406,5 @@ export default function DashboardLayout({
     </div>
   )
 }
+
+    

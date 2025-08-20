@@ -1,8 +1,10 @@
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -11,16 +13,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Wallet, PlusCircle, Edit, Loader2 } from 'lucide-react';
+import { Wallet, PlusCircle, Edit, Loader2, Camera } from 'lucide-react';
 import { AddBalanceRequestDialog } from './dialogs/AddBalanceRequestDialog';
-
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { createNotificationForAdmins } from '@/app/actions';
 import type { UserProfile, Service, VLEProfile } from '@/lib/types';
 
 
 export default function ProfileView({ userId, profileData, services }: { userId: string, profileData: UserProfile, services: Service[]}) {
     const { toast } = useToast();
-    const { user, userProfile } = useAuth();
+    const { user, userProfile, refreshUserProfile } = useAuth();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // Profile Edit State
     const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -30,6 +33,8 @@ export default function ProfileView({ userId, profileData, services }: { userId:
         mobile: profileData?.mobile || '',
         location: profileData?.location || '',
     });
+    const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+    const [photoPreview, setPhotoPreview] = useState<string | null>(profileData?.photoURL || null);
     const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
 
     // Offered Services state
@@ -47,6 +52,7 @@ export default function ProfileView({ userId, profileData, services }: { userId:
             mobile: profileData.mobile || '',
             location: profileData.location || '',
         });
+        setPhotoPreview(profileData.photoURL || null);
     }, [userId, profileData]);
 
     const handleBalanceRequest = async (amount: number) => {
@@ -66,6 +72,22 @@ export default function ProfileView({ userId, profileData, services }: { userId:
         await createNotificationForAdmins('New Balance Request', `${userProfile.name} has requested to add ₹${amount.toFixed(2)} to their wallet.`);
     };
 
+    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (file.size > 100 * 1024) { // 100 KB
+                toast({ title: "Image Too Large", description: "Profile picture must be under 100KB.", variant: "destructive" });
+                return;
+            }
+            if (!['image/png', 'image/jpeg'].includes(file.type)) {
+                toast({ title: "Invalid File Type", description: "Please upload a PNG or JPG image.", variant: "destructive" });
+                return;
+            }
+            setSelectedPhoto(file);
+            setPhotoPreview(URL.createObjectURL(file));
+        }
+    };
+    
     const handleProfileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { id, value } = e.target;
         if (id === 'mobile') {
@@ -90,13 +112,26 @@ export default function ProfileView({ userId, profileData, services }: { userId:
 
         const docRef = doc(db, collectionName, userId);
         try {
+            let photoURL = profileData.photoURL;
+
+            if (selectedPhoto) {
+                const storageRef = ref(storage, `profile-pictures/${userId}/${selectedPhoto.name}`);
+                await uploadBytes(storageRef, selectedPhoto);
+                photoURL = await getDownloadURL(storageRef);
+            }
+
             await updateDoc(docRef, {
                 name: profileFormState.name,
                 mobile: profileFormState.mobile,
                 location: profileFormState.location,
+                photoURL: photoURL || null,
             });
+            
+            await refreshUserProfile();
+
             toast({ title: "Profile Updated", description: "Your details have been successfully saved." });
             setIsEditingProfile(false);
+            setSelectedPhoto(null);
         } catch (error) {
             console.error("Error updating profile:", error);
             toast({ title: "Error", description: "Could not update your profile.", variant: "destructive" });
@@ -115,6 +150,8 @@ export default function ProfileView({ userId, profileData, services }: { userId:
             mobile: profileData.mobile,
             location: profileData.location,
         });
+        setPhotoPreview(profileData.photoURL || null);
+        setSelectedPhoto(null);
         setIsEditingProfile(false);
         setIsCancelAlertOpen(false);
     };
@@ -216,6 +253,29 @@ export default function ProfileView({ userId, profileData, services }: { userId:
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="relative">
+                                <Avatar className="h-24 w-24">
+                                    <AvatarImage src={photoPreview || undefined} alt={profileData.name} />
+                                    <AvatarFallback className="text-3xl">{profileData.name?.charAt(0) || 'U'}</AvatarFallback>
+                                </Avatar>
+                                {isEditingProfile && (
+                                    <>
+                                        <input type="file" ref={fileInputRef} onChange={handlePhotoChange} accept="image/png, image/jpeg" className="hidden" />
+                                        <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="secondary"
+                                            className="absolute bottom-0 right-0 rounded-full h-8 w-8"
+                                            onClick={() => fileInputRef.current?.click()}
+                                        >
+                                            <Camera className="h-4 w-4" />
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
                         {isEditingProfile ? (
                             <>
                                 <div className="space-y-2"><Label htmlFor="name">Full Name</Label><Input id="name" value={profileFormState.name} onChange={handleProfileInputChange} /></div>
@@ -267,3 +327,5 @@ export default function ProfileView({ userId, profileData, services }: { userId:
     </div>
     );
 }
+
+    

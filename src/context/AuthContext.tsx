@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -12,9 +13,10 @@ interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  refreshUserProfile: () => Promise<void>;
 }
 
-const AuthContext = React.createContext<AuthContextType>({ user: null, userProfile: null, loading: true });
+const AuthContext = React.createContext<AuthContextType>({ user: null, userProfile: null, loading: true, refreshUserProfile: async () => {} });
 
 export const useAuth = () => React.useContext(AuthContext);
 
@@ -23,30 +25,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userProfile, setUserProfile] = React.useState<UserProfile | null>(null);
   const [loading, setLoading] = React.useState(true);
 
+  const fetchUserProfile = React.useCallback(async (user: User | null): Promise<UserProfile | null> => {
+    if (!user) return null;
+
+    const userDocRef = doc(db, 'users', user.uid);
+    const vleDocRef = doc(db, 'vles', user.uid);
+    const govDocRef = doc(db, 'government', user.uid);
+
+    const [userSnap, vleSnap, govSnap] = await Promise.all([
+        getDoc(userDocRef),
+        getDoc(vleDocRef),
+        getDoc(govDocRef)
+    ]);
+
+    if (userSnap.exists()) return { id: userSnap.id, ...userSnap.data() } as UserProfile;
+    if (vleSnap.exists()) return { id: vleSnap.id, ...vleSnap.data() } as UserProfile;
+    if (govSnap.exists()) return { id: govSnap.id, ...govSnap.data() } as UserProfile;
+
+    return null;
+  }, []);
+  
+  const refreshUserProfile = React.useCallback(async () => {
+    if (user) {
+      const profile = await fetchUserProfile(user);
+      if (profile) {
+        setUserProfile(profile);
+      }
+    }
+  }, [user, fetchUserProfile]);
+
+
   React.useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true);
       if (user) {
-        
-        const userDocRef = doc(db, 'users', user.uid);
-        const vleDocRef = doc(db, 'vles', user.uid);
-        const govDocRef = doc(db, 'government', user.uid);
-        
-        const [userSnap, vleSnap, govSnap] = await Promise.all([
-            getDoc(userDocRef),
-            getDoc(vleDocRef),
-            getDoc(govDocRef)
-        ]);
-        
-        let profileData: UserProfile | null = null;
-
-        if (userSnap.exists()) {
-          profileData = { id: userSnap.id, ...userSnap.data() } as UserProfile;
-        } else if (vleSnap.exists()) {
-          profileData = { id: vleSnap.id, ...vleSnap.data() } as UserProfile;
-        } else if (govSnap.exists()) {
-          profileData = { id: govSnap.id, ...govSnap.data() } as UserProfile;
-        }
+        const profileData = await fetchUserProfile(user);
         
         if (profileData) {
           setUser(user);
@@ -71,12 +84,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [fetchUserProfile]);
 
   const value = {
     user,
     userProfile,
     loading,
+    refreshUserProfile,
   };
 
   return (
@@ -89,3 +103,5 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     </AuthContext.Provider>
   );
 };
+
+    
