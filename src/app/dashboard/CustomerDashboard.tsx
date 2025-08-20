@@ -48,12 +48,14 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
 
         await updateDoc(taskRef, { complaint: complaintWithDocs, status: 'Complaint Raised' });
         const taskSnap = await getDoc(taskRef);
-        const taskData = taskSnap.data();
-        await createNotificationForAdmins(
-            'New Complaint Raised',
-            `A complaint was raised for task ${taskId.slice(-6).toUpperCase()} by ${taskData?.customer}.`,
-            `/dashboard/task/${taskId}`
-        );
+        if (taskSnap.exists()) {
+            const taskData = taskSnap.data() as Task;
+            await createNotificationForAdmins(
+                'New Complaint Raised',
+                `A complaint was raised for task ${taskId.slice(-6).toUpperCase()} by ${taskData.customer}.`,
+                `/dashboard/task/${taskId}`
+            );
+        }
         toast({ title: 'Complaint Submitted', description: 'Your complaint has been registered. We will look into it shortly.' });
     }
     

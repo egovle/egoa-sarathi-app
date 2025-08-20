@@ -36,11 +36,8 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     const { toast } = useToast();
     const { user, userProfile } = useAuth();
     
-    // State to manage the visual state of the switch to prevent UI flicker
-    const [isAvailable, setIsAvailable] = useState((userProfile as VLEProfile)?.available ?? false);
-
     const taskInvitations = useMemo(() => 
-        allAssignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), 
+        allAssignedTasks.filter((t): t is Task => t.status === 'Pending VLE Acceptance'), 
     [allAssignedTasks]);
     
     const campInvitations = useMemo(() => {
@@ -48,23 +45,16 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
         const todayStr = new Date().toLocaleDateString('en-CA');
 
         return camps.filter(camp => {
-            if (camp.date.substring(0, 10) < todayStr) return false;
+            if (new Date(camp.date).toISOString().substring(0, 10) < todayStr) return false;
             const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
             return myAssignment?.status === 'pending';
         });
     }, [camps, userProfile]);
     
-    const onVleAvailabilityChange = async (available: boolean) => {
-        if (!user) return;
-        setIsAvailable(available); // Optimistic UI update
-        const vleRef = doc(db, "vles", user.uid);
-        try {
-            await updateDoc(vleRef, { available: available });
-            toast({ title: 'Availability Updated', description: `You are now ${available ? 'available' : 'unavailable'} for tasks.`});
-        } catch (error) {
-            toast({ title: 'Error', description: 'Could not update availability.', variant: 'destructive'});
-            setIsAvailable(!available); // Revert on error
-        }
+    const onVleAvailabilityChange = async (vleId: string, available: boolean) => {
+        const vleRef = doc(db, "vles", vleId);
+        await updateDoc(vleRef, { available: available });
+        toast({ title: 'Availability Updated', description: `You are now ${available ? 'available' : 'unavailable'} for tasks.`});
     }
     
     const onTaskAccept = async (taskId: string) => {
@@ -150,17 +140,16 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                     <div className="flex items-center space-x-2 pt-2">
                         <Switch 
                             id="availability-mode" 
-                            checked={isAvailable} 
-                            onCheckedChange={onVleAvailabilityChange}
+                            checked={(userProfile as VLEProfile).available} 
+                            onCheckedChange={(checked) => onVleAvailabilityChange(user.uid, checked)}
                         />
-                        <Label htmlFor="availability-mode">{isAvailable ? 'Available' : 'Unavailable'} for Tasks</Label>
+                        <Label htmlFor="availability-mode">{(userProfile as VLEProfile).available ? 'Available' : 'Unavailable'} for Tasks</Label>
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>
                 )}
             </CardContent>
         </Card>
-        
         <div className="space-y-6">
             <Card>
                 <CardHeader>
@@ -194,7 +183,7 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                     </Table>
                 </CardContent>
             </Card>
-            <Card>
+             <Card>
                 <CardHeader>
                     <CardTitle>New Task Invitations <Badge className="ml-2">{taskInvitations.length}</Badge></CardTitle>
                     <CardDescription>Please review and respond to these new task assignments.</CardDescription>
@@ -233,7 +222,7 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                    </Table>
                 </CardContent>
             </Card>
-         </div>
+        </div>
     </div>
 )
 }
