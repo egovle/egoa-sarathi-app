@@ -364,7 +364,7 @@ export default function DashboardLayout({
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="rounded-full">
                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={userProfile?.photoURL} alt={userProfile?.name} />
+                                <AvatarImage src={userProfile?.photoURL || undefined} alt={userProfile?.name} />
                                 <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
                             </Avatar>
                         </Button>
