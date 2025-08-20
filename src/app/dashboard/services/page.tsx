@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState, useEffect, type FormEvent, useMemo } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Upload, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -17,6 +17,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import type { Service, DocumentGroup, DocumentOption } from '@/lib/types';
+import { bulkUploadServices } from '@/app/actions';
+import { defaultServices } from '@/lib/seedData';
 
 
 const ServiceForm = ({ service, onFinished, services }: { service?: Service | null, onFinished: () => void, services: Service[] }) => {
@@ -208,6 +210,81 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
     );
 };
 
+const BulkUploadDialog = ({ onFinished }: { onFinished: () => void }) => {
+    const { toast } = useToast();
+    const [file, setFile] = useState<File | null>(null);
+    const [loading, setLoading] = useState(false);
+
+    const handleDownloadTemplate = () => {
+        const templateData = defaultServices.slice(0, 2); // Use first 2 services as an example
+        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
+            JSON.stringify(templateData, null, 2)
+        )}`;
+        const link = document.createElement("a");
+        link.href = jsonString;
+        link.download = "services-template.json";
+        link.click();
+    };
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            setFile(e.target.files[0]);
+        }
+    };
+
+    const handleUpload = async () => {
+        if (!file) {
+            toast({ title: "No file selected", description: "Please select a JSON file to upload.", variant: "destructive" });
+            return;
+        }
+        setLoading(true);
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const content = e.target?.result;
+            if (typeof content === 'string') {
+                const result = await bulkUploadServices(content);
+                if (result.success) {
+                    toast({ title: "Upload Successful", description: result.message });
+                    onFinished();
+                } else {
+                    toast({ title: "Upload Failed", description: result.error, variant: "destructive" });
+                }
+            }
+            setLoading(false);
+        };
+        reader.readAsText(file);
+    };
+
+    return (
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Bulk Upload Services</DialogTitle>
+                <DialogDescription>Download the template, fill it with your service data, and upload it here.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+                <div className="space-y-2">
+                    <Label>Step 1: Download Template</Label>
+                    <Button variant="outline" onClick={handleDownloadTemplate} className="w-full">
+                        <Download className="mr-2 h-4 w-4" /> Download JSON Template
+                    </Button>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="json-upload">Step 2: Upload Completed File</Label>
+                    <Input id="json-upload" type="file" accept=".json" onChange={handleFileChange} />
+                </div>
+            </div>
+            <DialogFooter>
+                <Button onClick={handleUpload} disabled={!file || loading}>
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                    Upload and Process
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+    );
+};
+
+
 export default function ServicesPage() {
     const { userProfile, loading: authLoading } = useAuth();
     const router = useRouter();
@@ -216,6 +293,7 @@ export default function ServicesPage() {
     const [services, setServices] = useState<Service[]>([]);
     const [loading, setLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
     const [selectedService, setSelectedService] = useState<Service | null>(null);
 
     useEffect(() => {
@@ -269,12 +347,20 @@ export default function ServicesPage() {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold tracking-tight">Service Management</h1>
-                <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                    <DialogTrigger asChild>
-                        <Button onClick={handleCreate}><PlusCircle className="mr-2 h-4 w-4" /> Create New Service</Button>
-                    </DialogTrigger>
-                    <ServiceForm service={selectedService} services={services} onFinished={() => setIsFormOpen(false)} />
-                </Dialog>
+                <div className="flex gap-2">
+                    <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline"><Upload className="mr-2 h-4 w-4" /> Bulk Actions</Button>
+                        </DialogTrigger>
+                        <BulkUploadDialog onFinished={() => setIsBulkUploadOpen(false)} />
+                    </Dialog>
+                    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                        <DialogTrigger asChild>
+                            <Button onClick={handleCreate}><PlusCircle className="mr-2 h-4 w-4" /> Create New Service</Button>
+                        </DialogTrigger>
+                        <ServiceForm service={selectedService} services={services} onFinished={() => setIsFormOpen(false)} />
+                    </Dialog>
+                </div>
             </div>
             
             <Card>

@@ -561,3 +561,45 @@ export async function resetApplicationData() {
         return { success: false, error: error.message };
     }
 }
+
+export async function bulkUploadServices(jsonContent: string) {
+    let services: Service[];
+    try {
+        services = JSON.parse(jsonContent);
+    } catch (error) {
+        return { success: false, error: "Invalid JSON format. Please check the file content." };
+    }
+
+    if (!Array.isArray(services)) {
+        return { success: false, error: "JSON must be an array of service objects." };
+    }
+
+    const batch = writeBatch(db);
+    let updatedCount = 0;
+    let createdCount = 0;
+
+    for (const service of services) {
+        if (!service.id || !service.name) {
+            console.warn("Skipping invalid service object:", service);
+            continue;
+        }
+        const serviceRef = doc(db, "services", service.id);
+        const docSnap = await getDoc(serviceRef);
+
+        if (docSnap.exists()) {
+            batch.update(serviceRef, service);
+            updatedCount++;
+        } else {
+            batch.set(serviceRef, service);
+            createdCount++;
+        }
+    }
+
+    try {
+        await batch.commit();
+        return { success: true, message: `Successfully created ${createdCount} and updated ${updatedCount} services.` };
+    } catch (error: any) {
+        console.error("Bulk upload failed:", error);
+        return { success: false, error: "Failed to commit changes to the database." };
+    }
+}
