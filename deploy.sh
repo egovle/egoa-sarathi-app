@@ -24,8 +24,10 @@ echo "📝 Committing changes with message: '$COMMIT_MESSAGE'"
 git commit -m "$COMMIT_MESSAGE"
 
 # 3. Push changes to the remote repository
+# Using -u (or --set-upstream) tells git to set the remote 'main' branch as the upstream for the local 'main' branch.
+# This is only needed the first time but is safe to run on subsequent pushes.
 echo "🔼 Pushing changes to remote repository..."
-git push
+git push -u origin main
 
 # 4. Deploy to Firebase
 echo "🚀 Deploying to Firebase App Hosting..."
