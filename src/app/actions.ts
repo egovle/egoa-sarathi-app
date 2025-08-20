@@ -587,7 +587,7 @@ export async function bulkUploadServices(jsonContent: string) {
         const docSnap = await getDoc(serviceRef);
 
         if (docSnap.exists()) {
-            batch.update(serviceRef, service);
+            batch.update(serviceRef, service as any);
             updatedCount++;
         } else {
             batch.set(serviceRef, service);
@@ -603,3 +603,5 @@ export async function bulkUploadServices(jsonContent: string) {
         return { success: false, error: "Failed to commit changes to the database." };
     }
 }
+
+    
