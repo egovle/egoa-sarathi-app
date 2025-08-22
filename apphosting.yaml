@@ -13,7 +13,7 @@ env:
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
     value: "egoasarthi"
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: "egoasarthi.firebasestorage.app"
+    value: "egoasarthi.appspot.com"
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
     value: "582450828090"
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
@@ -23,4 +23,4 @@ env:
   - variable: NEXT_PUBLIC_RECAPTCHA_SITE_KEY
     value: "6LcdeH8rAAAAANnz9thcu5j4-6JYh3Ede8kvvj46"
   - variable: CACHE_BUSTER
-    value: "1721925001"
+    value: "1722000002"

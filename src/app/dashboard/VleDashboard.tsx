@@ -46,7 +46,7 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
         const todayStr = new Date().toLocaleDateString('en-CA');
 
         return camps.filter(camp => {
-            if (camp.date.substring(0, 10) < todayStr) return false;
+            if (new Date(camp.date).toISOString().substring(0, 10) < todayStr) return false;
             const myAssignment = camp.assignedVles?.find(vle => vle.vleId === userProfile.id);
             return myAssignment?.status === 'pending';
         });
@@ -141,10 +141,10 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                     <div className="flex items-center space-x-2 pt-2">
                         <Switch 
                             id="availability-mode" 
-                            checked={userProfile.available} 
+                            checked={(userProfile as VLEProfile).available} 
                             onCheckedChange={(checked) => onVleAvailabilityChange(user.uid, checked)}
                         />
-                        <Label htmlFor="availability-mode">{userProfile.available ? 'Available' : 'Unavailable'} for Tasks</Label>
+                        <Label htmlFor="availability-mode">{(userProfile as VLEProfile).available ? 'Available' : 'Unavailable'} for Tasks</Label>
                     </div>
                 ) : (
                     <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>
