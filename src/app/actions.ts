@@ -7,6 +7,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Task, UserProfile, Service, CampPayout, TaskDocument, VLEProfile } from "@/lib/types";
 import { calculateVleEarnings } from "@/lib/utils";
 import { defaultServices } from "@/lib/seedData";
+import * as XLSX from 'xlsx';
 // import { sendWhatsAppMessage } from "@/services/whatsapp";
 
 // --- NOTIFICATION HELPERS ---
@@ -562,16 +563,32 @@ export async function resetApplicationData() {
     }
 }
 
-export async function bulkUploadServices(jsonContent: string) {
-    let services: Service[];
+export async function bulkUploadServices(fileContent: ArrayBuffer) {
+    let services: Partial<Service>[];
     try {
-        services = JSON.parse(jsonContent);
+        const workbook = XLSX.read(fileContent, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        services = json.map(row => ({
+            id: row.id,
+            name: row.name,
+            customerRate: parseFloat(row.customerRate) || 0,
+            vleRate: parseFloat(row.vleRate) || 0,
+            governmentFee: parseFloat(row.governmentFee) || 0,
+            isVariable: row.isVariable === 'TRUE' || row.isVariable === true,
+            parentId: row.parentId || null,
+            documentGroups: row.documentGroups_json ? JSON.parse(row.documentGroups_json) : [],
+        }));
+
     } catch (error) {
-        return { success: false, error: "Invalid JSON format. Please check the file content." };
+        console.error(error);
+        return { success: false, error: "Invalid file format. Please use the provided Excel template and ensure 'documentGroups_json' is valid JSON." };
     }
 
     if (!Array.isArray(services)) {
-        return { success: false, error: "JSON must be an array of service objects." };
+        return { success: false, error: "Parsed data is not an array. Please check the Excel file structure." };
     }
 
     const batch = writeBatch(db);
@@ -603,5 +620,3 @@ export async function bulkUploadServices(jsonContent: string) {
         return { success: false, error: "Failed to commit changes to the database." };
     }
 }
-
-    

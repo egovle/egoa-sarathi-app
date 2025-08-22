@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState, useEffect, type FormEvent, useMemo } from 'react';
+import { useState, useEffect, type FormEvent, useMemo, useRef } from 'react';
 import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, PlusCircle, Edit, Trash2, Upload, Download } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, Upload, Download, FileText, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -19,6 +19,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import type { Service, DocumentGroup, DocumentOption } from '@/lib/types';
 import { bulkUploadServices } from '@/app/actions';
 import { defaultServices } from '@/lib/seedData';
+import * as XLSX from 'xlsx';
 
 
 const ServiceForm = ({ service, onFinished, services }: { service?: Service | null, onFinished: () => void, services: Service[] }) => {
@@ -214,16 +215,24 @@ const BulkUploadDialog = ({ onFinished }: { onFinished: () => void }) => {
     const { toast } = useToast();
     const [file, setFile] = useState<File | null>(null);
     const [loading, setLoading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleDownloadTemplate = () => {
-        const templateData = defaultServices.slice(0, 2); // Use first 2 services as an example
-        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-            JSON.stringify(templateData, null, 2)
-        )}`;
-        const link = document.createElement("a");
-        link.href = jsonString;
-        link.download = "services-template.json";
-        link.click();
+        const templateData = defaultServices.slice(0, 2).map(s => ({
+            id: s.id,
+            name: s.name,
+            customerRate: s.customerRate,
+            vleRate: s.vleRate,
+            governmentFee: s.governmentFee,
+            isVariable: s.isVariable,
+            parentId: s.parentId || '',
+            documentGroups_json: JSON.stringify(s.documentGroups, null, 2),
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Services");
+        XLSX.writeFile(workbook, "services-template.xlsx");
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -234,7 +243,7 @@ const BulkUploadDialog = ({ onFinished }: { onFinished: () => void }) => {
 
     const handleUpload = async () => {
         if (!file) {
-            toast({ title: "No file selected", description: "Please select a JSON file to upload.", variant: "destructive" });
+            toast({ title: "No file selected", description: "Please select an Excel file to upload.", variant: "destructive" });
             return;
         }
         setLoading(true);
@@ -242,36 +251,40 @@ const BulkUploadDialog = ({ onFinished }: { onFinished: () => void }) => {
         const reader = new FileReader();
         reader.onload = async (e) => {
             const content = e.target?.result;
-            if (typeof content === 'string') {
+            if (content instanceof ArrayBuffer) {
                 const result = await bulkUploadServices(content);
                 if (result.success) {
                     toast({ title: "Upload Successful", description: result.message });
                     onFinished();
                 } else {
-                    toast({ title: "Upload Failed", description: result.error, variant: "destructive" });
+                    toast({ title: "Upload Failed", description: result.error, variant: "destructive", duration: 7000 });
                 }
             }
             setLoading(false);
         };
-        reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
     };
 
     return (
         <DialogContent>
             <DialogHeader>
                 <DialogTitle>Bulk Upload Services</DialogTitle>
-                <DialogDescription>Download the template, fill it with your service data, and upload it here.</DialogDescription>
+                <DialogDescription>Download the Excel template, fill it with your service data, and upload it here.</DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
                 <div className="space-y-2">
                     <Label>Step 1: Download Template</Label>
                     <Button variant="outline" onClick={handleDownloadTemplate} className="w-full">
-                        <Download className="mr-2 h-4 w-4" /> Download JSON Template
+                        <Download className="mr-2 h-4 w-4" /> Download Excel Template
                     </Button>
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="json-upload">Step 2: Upload Completed File</Label>
-                    <Input id="json-upload" type="file" accept=".json" onChange={handleFileChange} />
+                    <Label htmlFor="xlsx-upload">Step 2: Upload Completed File</Label>
+                    <Input id="xlsx-upload" type="file" accept=".xlsx" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
+                    <Button variant="outline" className="w-full justify-start text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
+                        <UploadCloud className="mr-2 h-4 w-4" />
+                        {file ? <span className="text-foreground">{file.name}</span> : 'Choose File'}
+                    </Button>
                 </div>
             </div>
             <DialogFooter>
@@ -406,7 +419,3 @@ export default function ServicesPage() {
         </div>
     );
 }
-
-    
-
-    
