@@ -10,12 +10,78 @@ import { createNotification, createNotificationForAdmins } from '@/app/actions';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Send, PenSquare, MessageSquarePlus, CheckCircle, UploadCloud, FileUp, FileText } from 'lucide-react';
 import { validateFiles } from '@/lib/utils';
+import type { VLEProfile } from '@/lib/types';
 
+export const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger: React.ReactNode, taskId: string, availableVles: VLEProfile[], onAssign: (vleId: string, vleName: string) => void }) => {
+    const { toast } = useToast();
+    const [open, setOpen] = useState(false);
+    const [selectedVleId, setSelectedVleId] = useState('');
+    const [isAssigning, setIsAssigning] = useState(false);
+
+    const handleAssign = async () => {
+        if (!selectedVleId) {
+            toast({ title: 'Select a VLE', description: 'Please select a VLE to assign the task.', variant: 'destructive' });
+            return;
+        }
+        setIsAssigning(true);
+        const vle = availableVles.find(v => v.id === selectedVleId);
+        if (!vle) {
+             toast({ title: 'Error', description: 'Selected VLE not found.', variant: 'destructive' });
+             setIsAssigning(false);
+             return;
+        }
+        
+        try {
+            await onAssign(vle.id, vle.name);
+            setOpen(false);
+        } catch (error) {
+            console.error("Assignment failed from dialog:", error);
+        } finally {
+            setIsAssigning(false);
+        }
+    }
+
+    const handleOpenChange = (isOpen: boolean) => {
+        if (!isOpen) {
+            setSelectedVleId('');
+        }
+        setOpen(isOpen);
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>{trigger}</DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Assign Task {taskId.slice(-6).toUpperCase()}</DialogTitle>
+                    <DialogDescription>Select an available VLE to assign this task to. Only VLEs who offer this service are shown.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Select onValueChange={setSelectedVleId} value={selectedVleId}>
+                        <SelectTrigger><SelectValue placeholder="Select an available VLE" /></SelectTrigger>
+                        <SelectContent>
+                            {availableVles.length > 0 ? availableVles.map(vle => (
+                                <SelectItem key={vle.id} value={vle.id}>{vle.name} - {vle.location}</SelectItem>
+                            )) : <p className="p-4 text-sm text-muted-foreground">No VLEs available for this service.</p>}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <DialogFooter>
+                    <Button onClick={handleAssign} disabled={isAssigning || !selectedVleId}>
+                        {isAssigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Assign VLE
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 export const SetPriceDialog = ({ taskId, customerId, onPriceSet, adminId }: { taskId: string, customerId: string, onPriceSet: () => void, adminId: string }) => {
     const [open, setOpen] = useState(false);

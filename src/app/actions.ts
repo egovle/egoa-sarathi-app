@@ -226,7 +226,14 @@ export async function createFixedPriceTask(
             transaction.set(doc(db, "tasks", taskId), taskWithStatus);
         });
 
-        await autoAssignVleToTask(taskId);
+        // Don't auto-assign anymore, let admin do it.
+        // await autoAssignVleToTask(taskId);
+        await createNotificationForAdmins(
+            "New Task Needs Assignment", 
+            `A new task for "${taskData.service}" has been created and is ready for assignment.`,
+            `/dashboard/task/${taskId}`
+        );
+
 
         return { success: true };
     } catch (error: any) {
@@ -279,7 +286,13 @@ export async function payForVariablePriceTask(task: Task, userProfile: UserProfi
              });
          });
          
-        await autoAssignVleToTask(task.id);
+        // Don't auto-assign anymore
+        // await autoAssignVleToTask(task.id);
+        await createNotificationForAdmins(
+            "Task Paid & Needs Assignment", 
+            `A task for "${task.service}" has been paid and is ready for assignment.`,
+            `/dashboard/task/${task.id}`
+        );
 
         return { success: true };
      } catch (error: any) {
@@ -289,111 +302,36 @@ export async function payForVariablePriceTask(task: Task, userProfile: UserProfi
 }
 
 
-// --- AUTO-ASSIGNMENT LOGIC ---
-export async function autoAssignVleToTask(taskId: string) {
+// --- AUTO-ASSIGNMENT LOGIC (Manual now)---
+export async function assignVleToTask(taskId: string, vleId: string, vleName: string, adminId: string) {
     const taskRef = doc(db, "tasks", taskId);
-    const taskSnap = await getDoc(taskRef);
-    if (!taskSnap.exists()) {
-        console.error(`Auto-assign failed: Task ${taskId} not found.`);
-        return;
-    }
-    const task = taskSnap.data() as Task;
-    const { serviceId, customerPincode } = task;
-
-    // 1. Fetch all potentially eligible VLEs
-    const vlesQuery = query(
-        collection(db, "vles"),
-        where("status", "==", "Approved"),
-        where("available", "==", true),
-        where("offeredServices", "array-contains", serviceId)
-    );
-    const vlesSnapshot = await getDocs(vlesQuery);
-    let eligibleVles = vlesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }) as VLEProfile);
-
-    if (eligibleVles.length === 0) {
-        await createNotificationForAdmins('Auto-Assignment Failed', `No VLEs found for service "${task.service}". Manual assignment required.`, `/dashboard`);
-        return;
-    }
-
-    // 2. Apply task limit filter
-    const activeStatuses: Task['status'][] = ['Assigned', 'Pending VLE Acceptance', 'Awaiting Documents', 'In Progress'];
-    const taskCounts = new Map<string, number>();
-    const tasksQuery = query(collection(db, "tasks"), where("status", "in", activeStatuses));
-    const activeTasksSnap = await getDocs(tasksQuery);
-    activeTasksSnap.forEach(doc => {
-        const taskData = doc.data() as Task;
-        if (taskData.assignedVleId) {
-            taskCounts.set(taskData.assignedVleId, (taskCounts.get(taskData.assignedVleId) || 0) + 1);
-        }
-    });
-
-    eligibleVles = eligibleVles.filter(vle => (taskCounts.get(vle.id) || 0) < 3);
-
-    if (eligibleVles.length === 0) {
-        await createNotificationForAdmins('Auto-Assignment Failed', `No available VLEs with capacity for service "${task.service}". Manual assignment may be needed.`, `/dashboard`);
-        return;
-    }
-
-    // 3. Pincode-based sorting
-    const customerDistrict = task.customerAddress.split(',').map(s => s.trim())[2] || '';
-    const samePincodeVles = eligibleVles.filter(v => v.pincode === customerPincode);
-    const sameDistrictVles = eligibleVles.filter(v => v.pincode !== customerPincode && (v.location.includes(customerDistrict)));
-    const otherVles = eligibleVles.filter(v => !samePincodeVles.includes(v) && !sameDistrictVles.includes(v));
-
-    // 4. Fair Rotation (Round-Robin) within each group
-    const sortByLastAssigned = (a: VLEProfile, b: VLEProfile) => {
-        const aTime = a.lastAssigned?.[serviceId] ? new Date(a.lastAssigned[serviceId]).getTime() : 0;
-        const bTime = b.lastAssigned?.[serviceId] ? new Date(b.lastAssigned[serviceId]).getTime() : 0;
-        return aTime - bTime; // Sorts ascending, oldest first
-    };
     
-    samePincodeVles.sort(sortByLastAssigned);
-    sameDistrictVles.sort(sortByLastAssigned);
-    otherVles.sort(sortByLastAssigned);
-
-    const finalSortedVles = [...samePincodeVles, ...sameDistrictVles, ...otherVles];
-
-    if (finalSortedVles.length === 0) {
-         await createNotificationForAdmins('Auto-Assignment Failed', `No VLEs available after all filters for service "${task.service}". Manual assignment required.`, `/dashboard`);
-        return;
-    }
-    
-    // 5. Assign Task to the best candidate
-    const selectedVle = finalSortedVles[0];
-    const vleRef = doc(db, "vles", selectedVle.id);
-
     const historyEntry = {
         timestamp: new Date().toISOString(),
-        actorId: 'system', // Indicates auto-assignment
-        actorRole: 'System',
+        actorId: adminId,
+        actorRole: 'Admin',
         action: 'Task Assigned to VLE',
-        details: `Task automatically assigned to VLE ${selectedVle.name} for acceptance.`
+        details: `Task manually assigned to VLE ${vleName}.`
     };
 
     try {
         await updateDoc(taskRef, { 
             status: 'Pending VLE Acceptance', 
-            assignedVleId: selectedVle.id, 
-            assignedVleName: selectedVle.name,
+            assignedVleId: vleId, 
+            assignedVleName: vleName,
             history: arrayUnion(historyEntry)
         });
         
-        // Update VLE's lastAssigned timestamp for this service
-        await updateDoc(vleRef, {
-            [`lastAssigned.${serviceId}`]: new Date().toISOString()
-        });
-
         await createNotification(
-            selectedVle.id,
+            vleId,
             'New Task Invitation',
             `You have been invited to work on task: ${taskId.slice(-6).toUpperCase()}.`,
             `/dashboard`
         );
-        await createNotificationForAdmins('Task Auto-Assigned', `Task ${taskId.slice(-6).toUpperCase()} was assigned to ${selectedVle.name}.`, `/dashboard`);
-
-    } catch (error) {
-        console.error("Error during final step of auto-assignment:", error);
-        await createNotificationForAdmins('Auto-Assignment Error', `A system error occurred assigning task ${taskId.slice(-6).toUpperCase()}. Manual check required.`, `/dashboard`);
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error during manual assignment:", error);
+        return { success: false, error: error.message };
     }
 }
 

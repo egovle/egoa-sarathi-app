@@ -3,26 +3,26 @@
 
 import { useEffect, useState, useRef, type ChangeEvent, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, onSnapshot, updateDoc, arrayUnion, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, arrayUnion, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
-import { createNotification, processPayout, payForVariablePriceTask, createNotificationForAdmins } from '@/app/actions';
+import { createNotification, processPayout, payForVariablePriceTask, createNotificationForAdmins, assignVleToTask } from '@/app/actions';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, FileText, History, CheckCircle, Wallet, Phone, CircleDollarSign, User, Mail, FileUp, Info, ListChecks } from 'lucide-react';
+import { Loader2, FileText, History, CheckCircle, Wallet, Phone, CircleDollarSign, User, Mail, FileUp, Info, ListChecks, UserCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn, validateFiles, calculateVleEarnings } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { TaskChat } from '@/components/dashboard/task/TaskChat';
-import { SetPriceDialog, RequestInfoDialog, SubmitAcknowledgementDialog, UploadCertificateDialog } from '@/components/dashboard/task/TaskDialogs';
-import type { Task, HistoryEntry } from '@/lib/types';
+import { AssignVleDialog, SetPriceDialog, RequestInfoDialog, SubmitAcknowledgementDialog, UploadCertificateDialog } from '@/components/dashboard/task/TaskDialogs';
+import type { Task, HistoryEntry, VLEProfile } from '@/lib/types';
 
 
 export default function TaskDetailPage() {
@@ -37,6 +37,7 @@ export default function TaskDetailPage() {
     const [vleContact, setVleContact] = useState<string | null>(null);
     const [isPayoutProcessing, setIsPayoutProcessing] = useState(false);
     const [informationRequest, setInformationRequest] = useState<string | null>(null);
+    const [availableVles, setAvailableVles] = useState<VLEProfile[]>([]);
     
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
@@ -86,6 +87,20 @@ export default function TaskDetailPage() {
                 }
             };
             getVleContact();
+        }
+
+        if (isAdmin && task?.status === 'Unassigned') {
+            const fetchVles = async () => {
+                const vlesQuery = query(
+                    collection(db, "vles"),
+                    where("status", "==", "Approved"),
+                    where("available", "==", true),
+                    where("offeredServices", "array-contains", task.serviceId)
+                );
+                const vlesSnapshot = await getDocs(vlesQuery);
+                setAvailableVles(vlesSnapshot.docs.map(d => ({ id: d.id, ...d.data() }) as VLEProfile));
+            };
+            fetchVles();
         }
     }, [task, isTaskCreator, isAdmin]);
 
@@ -253,6 +268,19 @@ export default function TaskDetailPage() {
         }
     };
 
+    const handleAssignVle = async (vleId: string, vleName: string) => {
+        if (!user || !userProfile?.isAdmin || !task) {
+            toast({ title: 'Error', description: 'Permission denied.', variant: 'destructive' });
+            return;
+        }
+        const result = await assignVleToTask(task.id, vleId, vleName, user.uid);
+         if (result.success) {
+            toast({ title: 'Task Assigned!', description: `Task has been assigned to ${vleName}.` });
+        } else {
+            toast({ title: 'Assignment Failed', description: result.error, variant: 'destructive' });
+        }
+    }
+
 
     if (authLoading || loading) {
         return (
@@ -286,6 +314,7 @@ export default function TaskDetailPage() {
     const canVleTakeAction = isAssignedVle && task.status === 'Assigned' && !task.acknowledgementNumber;
     const canVleWorkOnTask = isAssignedVle && (task.status === 'In Progress' || (task.status === 'Assigned' && task.acknowledgementNumber));
     const canAdminSetPrice = isAdmin && task.status === 'Pending Price Approval';
+    const canAdminAssignTask = isAdmin && task.status === 'Unassigned';
     const canAdminApprovePayout = isAdmin && task.status === 'Completed';
     const canCustomerPay = isTaskCreator && task.status === 'Awaiting Payment';
     const canUploadMoreDocs = (isTaskCreator || isAdmin || isAssignedVle) && task.status === 'Awaiting Documents';
@@ -409,6 +438,15 @@ export default function TaskDetailPage() {
                                 <SetPriceDialog taskId={task.id} customerId={task.creatorId} onPriceSet={() => {}} adminId={user.uid} />
                            )}
 
+                           {canAdminAssignTask && user && (
+                                <AssignVleDialog 
+                                    trigger={<Button><UserCheck className="mr-2 h-4 w-4" />Assign to VLE</Button>}
+                                    taskId={task.id}
+                                    availableVles={availableVles}
+                                    onAssign={handleAssignVle}
+                                />
+                           )}
+
                            {canVleTakeAction && user ? (
                                 <div className='flex flex-col gap-2'>
                                     <RequestInfoDialog taskId={task.id} vleId={user.uid} customerId={task.creatorId} />
@@ -430,7 +468,7 @@ export default function TaskDetailPage() {
                                </Button>
                            )}
                            
-                           {(!canVleTakeAction && !canVleWorkOnTask && !canAdminSetPrice && !canAdminApprovePayout && !canCustomerPay && !canUploadMoreDocs) && (
+                           {(!canVleTakeAction && !canVleWorkOnTask && !canAdminSetPrice && !canAdminAssignTask && !canAdminApprovePayout && !canCustomerPay && !canUploadMoreDocs) && (
                              <p className="text-sm text-muted-foreground">There are no actions for you at this stage.</p>
                            )}
                         </CardContent>
