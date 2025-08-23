@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -181,7 +182,7 @@ export default function CampManagementPage() {
                     onNextPastPage={() => handleNext('past')}
                     onPrevPastPage={() => handlePrev('past')}
                     isFirstPastPage={isFirstPage('past')}
-                    isLastPage={isLastPage('past')}
+                    isLastPastPage={isLastPage('past')}
                 />
             );
         }
