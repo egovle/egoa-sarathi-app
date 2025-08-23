@@ -70,7 +70,7 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
 
         try {
             if (service) {
-                await updateDoc(doc(db, "services", service.id), serviceData);
+                await updateDoc(doc(db, "services", service.id), serviceData as any);
                 toast({ title: 'Service Updated', description: 'The service has been successfully updated.' });
             } else {
                 await addDoc(collection(db, "services"), serviceData);
@@ -168,7 +168,7 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
                                     <div className="grid grid-cols-2 gap-4">
                                         <Input placeholder="Group Key (e.g., identity_proof)" value={group.key} onChange={e => updateGroup(gIndex, 'key', e.target.value)} />
                                         <Input placeholder="Group Label (e.g., Identity Proof)" value={group.label} onChange={e => updateGroup(gIndex, 'label', e.target.value)} />
-                                        <Input placeholder="Min Required (e.g., 1)" type="number" value={group.minRequired || ''} onChange={e => updateGroup(gIndex, 'minRequired', parseInt(e.target.value))} />
+                                        <Input placeholder="Min Required (e.g., 1)" type="number" value={group.minRequired || ''} onChange={e => updateGroup(gIndex, 'minRequired', parseInt(e.target.value) || 0)} />
                                         <Select value={group.type} onValueChange={val => updateGroup(gIndex, 'type', val)}>
                                             <SelectTrigger><SelectValue/></SelectTrigger>
                                             <SelectContent>
@@ -227,20 +227,36 @@ const BulkUploadDialog = ({ onFinished }: { onFinished: () => void }) => {
             parentId: 'pan_card_services',
             documentGroups_json: JSON.stringify([
               {
-                key: 'identity_proof',
-                label: 'Identity Proof',
-                isOptional: false,
-                minRequired: 1,
-                type: 'documents',
-                options: [ { key: 'aadhaar_card', label: 'Aadhaar Card', type: 'document', isOptional: false } ]
+                "key": "identity_proof",
+                "label": "Identity Proof",
+                "isOptional": false,
+                "minRequired": 1,
+                "type": "documents",
+                "options": [{ "key": "aadhaar_card", "label": "Aadhaar Card", "type": "document", "isOptional": false }]
               },
               {
-                key: 'photograph',
-                label: 'Photograph',
-                isOptional: false,
-                minRequired: 1,
-                type: 'documents',
-                options: [ { key: 'photograph', label: 'Photograph', type: 'document', isOptional: false } ]
+                "key": "address_proof",
+                "label": "Address Proof",
+                "isOptional": false,
+                "minRequired": 1,
+                "type": "documents",
+                "options": [{ "key": "aadhaar_card_address", "label": "Aadhaar Card", "type": "document", "isOptional": false }]
+              },
+              {
+                "key": "dob_proof",
+                "label": "Date of Birth Proof",
+                "isOptional": false,
+                "minRequired": 1,
+                "type": "documents",
+                "options": [{ "key": "aadhaar_card_dob", "label": "Aadhaar Card", "type": "document", "isOptional": false }]
+              },
+              {
+                "key": "photograph",
+                "label": "Photograph",
+                "isOptional": false,
+                "minRequired": 1,
+                "type": "documents",
+                "options": [{ "key": "photo_upload", "label": "Photograph", "type": "document", "isOptional": false }]
               }
             ], null, 2),
         };
@@ -298,7 +314,7 @@ const BulkUploadDialog = ({ onFinished }: { onFinished: () => void }) => {
             <DialogHeader>
                 <DialogTitle>Bulk Upload Services</DialogTitle>
                 <DialogDescription>
-                    Use the Excel template to add or update services. The `documentGroups_json` column must contain valid JSON, which can be formatted using an online tool.
+                    Use the Excel template to add or update services. The `documentGroups_json` column must contain valid, complete JSON.
                 </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
@@ -310,7 +326,7 @@ const BulkUploadDialog = ({ onFinished }: { onFinished: () => void }) => {
                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="xlsx-upload">Step 2: Upload Completed File</Label>
-                    <Input id="xlsx-upload" type="file" accept=".xlsx" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
+                    <Input id="xlsx-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
                     <Button variant="outline" className="w-full justify-start text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
                         <UploadCloud className="mr-2 h-4 w-4" />
                         {file ? <span className="text-foreground">{file.name}</span> : 'Choose File'}
@@ -348,7 +364,7 @@ export default function ServicesPage() {
     useEffect(() => {
         const servicesQuery = query(collection(db, "services"), orderBy("name"));
         const unsubscribe = onSnapshot(servicesQuery, (snapshot) => {
-            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
             setLoading(false);
         }, (error) => {
             console.error("Error fetching services:", error);
@@ -397,7 +413,10 @@ export default function ServicesPage() {
                         </DialogTrigger>
                         <BulkUploadDialog onFinished={() => setIsBulkUploadOpen(false)} />
                     </Dialog>
-                    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                    <Dialog open={isFormOpen} onOpenChange={(open) => {
+                        if (!open) setSelectedService(null);
+                        setIsFormOpen(open);
+                    }}>
                         <DialogTrigger asChild>
                             <Button onClick={handleCreate}><PlusCircle className="mr-2 h-4 w-4" /> Create New Service</Button>
                         </DialogTrigger>
@@ -415,11 +434,11 @@ export default function ServicesPage() {
                     <Accordion type="multiple" className="w-full">
                         {serviceCategories.map(category => (
                             <AccordionItem value={category.id} key={category.id}>
-                                <AccordionTrigger className="font-semibold text-lg flex justify-between w-full">
+                                <AccordionTrigger className="font-semibold text-lg flex justify-between w-full hover:no-underline">
                                     <span>{category.name}</span>
-                                    <div className="space-x-2 mr-4">
+                                    <div className="flex items-center space-x-2 mr-4 no-underline">
                                         <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEdit(category); }}><Edit className="h-4 w-4"/></Button>
-                                        <Button variant="ghost" size="icon" className="text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(category.id); }}><Trash2 className="h-4 w-4"/></Button>
+                                        <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDelete(category.id); }}><Trash2 className="h-4 w-4"/></Button>
                                     </div>
                                 </AccordionTrigger>
                                 <AccordionContent>
@@ -435,7 +454,7 @@ export default function ServicesPage() {
                                                 </div>
                                                 <div className="space-x-2">
                                                     <Button variant="ghost" size="icon" onClick={() => handleEdit(service)}><Edit className="h-4 w-4"/></Button>
-                                                    <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDelete(service.id)}><Trash2 className="h-4 w-4"/></Button>
+                                                    <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDelete(service.id)}><Trash2 className="h-4 w-4"/></Button>
                                                 </div>
                                             </div>
                                         )) : <p className="text-sm text-muted-foreground p-2">No sub-services in this category.</p>}
