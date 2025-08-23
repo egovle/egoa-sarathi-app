@@ -28,7 +28,7 @@ const PendingApprovalView = () => (
         <Info className="h-4 w-4" />
         <AlertTitle>Account Pending Approval</AlertTitle>
         <AlertDescription>
-            Your VLE account is currently under review by an administrator. You will be notified once it has been approved. You cannot generate leads or accept tasks until your account is approved.
+            Your VLE account is currently under review by an administrator. You will be notified once it has been approved. Most features will be disabled until your account is approved.
         </AlertDescription>
     </Alert>
 );
@@ -137,18 +137,15 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                 <ToggleRight className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="pt-2">
-                {userProfile.status === 'Approved' ? (
-                    <div className="flex items-center space-x-2 pt-2">
-                        <Switch 
-                            id="availability-mode" 
-                            checked={(userProfile as VLEProfile).available} 
-                            onCheckedChange={(checked) => onVleAvailabilityChange(user.uid, checked)}
-                        />
-                        <Label htmlFor="availability-mode">{(userProfile as VLEProfile).available ? 'Available' : 'Unavailable'} for Tasks</Label>
-                    </div>
-                ) : (
-                    <p className="text-sm text-muted-foreground pt-2">Your account is pending approval.</p>
-                )}
+                <div className="flex items-center space-x-2 pt-2">
+                    <Switch 
+                        id="availability-mode" 
+                        checked={(userProfile as VLEProfile).available} 
+                        onCheckedChange={(checked) => onVleAvailabilityChange(user.uid, checked)}
+                        disabled={userProfile.status !== 'Approved'}
+                    />
+                    <Label htmlFor="availability-mode">{(userProfile as VLEProfile).available ? 'Available' : 'Unavailable'} for Tasks</Label>
+                </div>
             </CardContent>
         </Card>
         <Tabs defaultValue="camp-invitations" className="w-full">

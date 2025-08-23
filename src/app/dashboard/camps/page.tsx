@@ -66,26 +66,31 @@ export default function CampManagementPage() {
             q = query(baseQuery, limit(PAGE_SIZE));
         }
 
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-        if (!snapshot.empty) {
-            setLastVisible((prev) => ({ ...prev, [category]: snapshot.docs[snapshot.docs.length - 1] }));
+        try {
+            const snapshot = await getDocs(q);
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            if (!snapshot.empty) {
+                setLastVisible((prev) => ({ ...prev, [category]: snapshot.docs[snapshot.docs.length - 1] }));
+            }
+            
+            if (category === 'suggestions') {
+                setCampSuggestions(data as CampSuggestion[]);
+            } else if (category === 'vle_past') {
+                setAllCamps((prev: any) => ({ ...prev, past: data }));
+            } else {
+                setAllCamps((prev: any) => ({ ...prev, [category]: data }));
+            }
+        } catch (error) {
+            console.error(`Error fetching paginated data for ${category}:`, error);
+        } finally {
+             setLoadingData(false);
         }
-        
-        if (category === 'suggestions') {
-            setCampSuggestions(data as CampSuggestion[]);
-        } else if (category === 'vle_past') {
-            setAllCamps((prev: any) => ({ ...prev, past: data }));
-        } else {
-            setAllCamps((prev: any) => ({ ...prev, [category]: data }));
-        }
-
-        setLoadingData(false);
     }, [userProfile, lastVisible]);
     
     useEffect(() => {
         if (!userProfile) return;
+        setLoadingData(true);
 
         const initialFetch = async () => {
              setPage({ upcoming: 1, past: 1, suggestions: 1, vle_past: 1 });
@@ -113,6 +118,7 @@ export default function CampManagementPage() {
                  });
                  return () => unsubscribe();
             }
+            setLoadingData(false); // Ensure loading is false even if no data is fetched
         };
 
         initialFetch();
@@ -175,7 +181,7 @@ export default function CampManagementPage() {
                     onNextPastPage={() => handleNext('past')}
                     onPrevPastPage={() => handlePrev('past')}
                     isFirstPastPage={isFirstPage('past')}
-                    isLastPastPage={isLastPage('past')}
+                    isLastPage={isLastPage('past')}
                 />
             );
         }

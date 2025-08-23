@@ -8,7 +8,7 @@ import type { Task, UserProfile, Service, CampPayout, TaskDocument, VLEProfile }
 import { calculateVleEarnings } from "@/lib/utils";
 import { defaultServices } from "@/lib/seedData";
 import * as XLSX from 'xlsx';
-// import { sendWhatsAppMessage } from "@/services/whatsapp";
+import { sendWhatsAppMessage } from "@/services/whatsapp";
 
 // --- NOTIFICATION HELPERS ---
 export async function createNotification(userId: string, title: string, description: string, link?: string) {
@@ -45,7 +45,7 @@ export async function createNotification(userId: string, title: string, descript
             const whatsappBody = `*${title}*\n\n${description}`;
             // Prepend Indian country code if not present
             const mobileNumber = userProfile.mobile.startsWith('+91') ? userProfile.mobile : `+91${userProfile.mobile}`;
-            // await sendWhatsAppMessage(mobileNumber, whatsappBody); // Temporarily disabled
+            await sendWhatsAppMessage(mobileNumber, whatsappBody);
         }
     } catch (error) {
         console.error("Failed to send WhatsApp notification:", error);

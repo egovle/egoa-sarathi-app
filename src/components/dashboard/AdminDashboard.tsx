@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Loader2, Trash2, Briefcase, UserPlus, Wallet, AlertTriangle, MessageSquare } from 'lucide-react';
+import { Loader2, Trash2, Briefcase, UserPlus, Wallet, AlertTriangle, MessageSquare, UserCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { collection, onSnapshot, query, where, orderBy, getCountFromServer, limit } from 'firebase/firestore';
@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { StatCard } from './shared';
 import Link from 'next/link';
 
-import type { Task, UserProfile } from '@/lib/types';
+import type { Task, UserProfile, VLEProfile } from '@/lib/types';
 
 
 export default function AdminDashboard() {
@@ -25,7 +25,8 @@ export default function AdminDashboard() {
     const { user, userProfile } = useAuth();
 
     // Data states
-    const [tasks, setTasks] = useState<Task[]>([]);
+    const [actionableTasks, setActionableTasks] = useState<Task[]>([]);
+    const [pendingVles, setPendingVles] = useState<VLEProfile[]>([]);
     
     // Stats
     const [stats, setStats] = useState({
@@ -41,6 +42,7 @@ export default function AdminDashboard() {
 
 
     useEffect(() => {
+        setLoading(true);
         const fetchStats = async () => {
              const pendingTasksSnap = await getCountFromServer(query(collection(db, 'tasks'), where('status', 'in', ['Unassigned', 'Pending Price Approval'])));
              const pendingVlesSnap = await getCountFromServer(query(collection(db, 'vles'), where('status', '==', 'Pending')));
@@ -63,22 +65,23 @@ export default function AdminDashboard() {
             collection(db, 'tasks'), 
             where('status', 'in', actionableTaskStatuses), 
             orderBy('date', 'desc'),
-            limit(20) // Limit to the most recent 20 actionable tasks
+            limit(10)
         );
-
         const tasksUnsub = onSnapshot(tasksQuery, (snapshot) => {
-            const taskData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-            setTasks(taskData);
+            setActionableTasks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task));
             setLoading(false);
         }, (error) => {
             console.error("Error fetching tasks:", error);
             setLoading(false);
         });
         
-        // We can keep listening to stats changes in real-time as well
-        const vlesUnsub = onSnapshot(query(collection(db, 'vles'), where('status', '==', 'Pending')), (snapshot) => {
+        const vlesQuery = query(collection(db, 'vles'), where('status', '==', 'Pending'), limit(10));
+        const vlesUnsub = onSnapshot(vlesQuery, (snapshot) => {
+            setPendingVles(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as VLEProfile));
             setStats(s => ({...s, pendingVles: snapshot.size}));
+            setLoading(false);
         });
+
          const paymentsUnsub = onSnapshot(query(collection(db, 'paymentRequests'), where('status', '==', 'pending')), (snapshot) => {
             setStats(s => ({...s, pendingPayments: snapshot.size}));
         });
@@ -101,6 +104,24 @@ export default function AdminDashboard() {
         setIsResetting(false);
     }
     
+    const combinedActionItems = useMemo(() => {
+        const tasks = actionableTasks.map(task => ({
+            id: `task-${task.id}`,
+            item: `${task.service} for ${task.customer}`,
+            type: 'Task',
+            details: task.status,
+            link: `/dashboard/task/${task.id}`
+        }));
+        const vles = pendingVles.map(vle => ({
+            id: `vle-${vle.id}`,
+            item: `${vle.name}`,
+            type: 'VLE Approval',
+            details: vle.status,
+            link: `/dashboard/users`
+        }));
+        return [...tasks, ...vles];
+    }, [actionableTasks, pendingVles]);
+
     return (
         <div className="space-y-6">
              <div className="flex items-center justify-between">
@@ -153,15 +174,19 @@ export default function AdminDashboard() {
                             <TableBody>
                                 {loading ? (
                                     <TableRow><TableCell colSpan={4} className="h-24 text-center"><Loader2 className="mx-auto h-8 w-8 animate-spin" /></TableCell></TableRow>
-                                ) : tasks.length > 0 ? (
-                                    tasks.map(task => (
-                                        <TableRow key={task.id}>
-                                            <TableCell className="font-medium">{task.service}</TableCell>
-                                            <TableCell>Task</TableCell>
-                                            <TableCell><Badge variant="outline">{task.status}</Badge></TableCell>
+                                ) : combinedActionItems.length > 0 ? (
+                                    combinedActionItems.map(item => (
+                                        <TableRow key={item.id}>
+                                            <TableCell className="font-medium">{item.item}</TableCell>
+                                            <TableCell>
+                                                <Badge variant={item.type === 'Task' ? 'secondary' : 'default'}>{item.type}</Badge>
+                                            </TableCell>
+                                            <TableCell><Badge variant="outline">{item.details}</Badge></TableCell>
                                             <TableCell className="text-right">
                                                 <Button asChild variant="outline" size="sm">
-                                                    <Link href={`/dashboard/task/${task.id}`}>View Task</Link>
+                                                    <Link href={item.link}>
+                                                      {item.type === 'Task' ? 'View Task' : 'View Users'}
+                                                    </Link>
                                                 </Button>
                                             </TableCell>
                                         </TableRow>
