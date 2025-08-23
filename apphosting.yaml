@@ -24,7 +24,7 @@ env:
   - variable: CACHE_BUSTER
     value: "1722000002"
   - variable: TWILIO_ACCOUNT_SID
-    value: "AC3dfe264b4f20218062f57b0f308ce3fb"
+    secret: egoa-sarthi-twilio-account-sid
   - variable: TWILIO_AUTH_TOKEN
     secret: egoa-sarthi-twilio-auth-token
   - variable: TWILIO_WHATSAPP_NUMBER
