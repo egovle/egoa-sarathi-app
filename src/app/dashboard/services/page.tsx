@@ -18,7 +18,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import type { Service, DocumentGroup, DocumentOption } from '@/lib/types';
 import { bulkUploadServices } from '@/app/actions';
-import { defaultServices } from '@/lib/seedData';
 import * as XLSX from 'xlsx';
 
 
@@ -218,17 +217,46 @@ const BulkUploadDialog = ({ onFinished }: { onFinished: () => void }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleDownloadTemplate = () => {
-        const templateData = defaultServices.slice(0, 2).map(s => ({
-            id: s.id,
-            name: s.name,
-            customerRate: s.customerRate,
-            vleRate: s.vleRate,
-            governmentFee: s.governmentFee,
-            isVariable: s.isVariable,
-            parentId: s.parentId || '',
-            documentGroups_json: JSON.stringify(s.documentGroups, null, 2),
-        }));
+        const panCardSample = {
+            id: 'pan_new_application_sample',
+            name: 'New Application (Form 49A)',
+            customerRate: 200,
+            vleRate: 100,
+            governmentFee: 107,
+            isVariable: false,
+            parentId: 'pan_card_services',
+            documentGroups_json: JSON.stringify([
+              {
+                key: 'identity_proof',
+                label: 'Identity Proof',
+                isOptional: false,
+                minRequired: 1,
+                type: 'documents',
+                options: [ { key: 'aadhaar_card', label: 'Aadhaar Card', type: 'document', isOptional: false } ]
+              },
+              {
+                key: 'photograph',
+                label: 'Photograph',
+                isOptional: false,
+                minRequired: 1,
+                type: 'documents',
+                options: [ { key: 'photograph', label: 'Photograph', type: 'document', isOptional: false } ]
+              }
+            ], null, 2),
+        };
+        
+        const otherSample = {
+             id: 'some_other_service_id',
+             name: 'Some Other Service',
+             customerRate: 100,
+             vleRate: 80,
+             governmentFee: 20,
+             isVariable: false,
+             parentId: 'other_services',
+             documentGroups_json: '[]'
+        }
 
+        const templateData = [panCardSample, otherSample];
         const worksheet = XLSX.utils.json_to_sheet(templateData);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Services");
@@ -269,7 +297,9 @@ const BulkUploadDialog = ({ onFinished }: { onFinished: () => void }) => {
         <DialogContent>
             <DialogHeader>
                 <DialogTitle>Bulk Upload Services</DialogTitle>
-                <DialogDescription>Download the Excel template, fill it with your service data, and upload it here.</DialogDescription>
+                <DialogDescription>
+                    Use the Excel template to add or update services. The `documentGroups_json` column must contain valid JSON, which can be formatted using an online tool.
+                </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
                 <div className="space-y-2">
