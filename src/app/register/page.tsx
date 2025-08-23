@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useState, type FormEvent, useEffect, useCallback, useMemo } from 'react';
+import { useState, type FormEvent, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, sendEmailVerification } from 'firebase/auth';
@@ -53,6 +53,8 @@ export default function RegisterPage() {
   const [isConfigMissing, setIsConfigMissing] = useState(false);
   const [isLocationManual, setIsLocationManual] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -112,22 +114,25 @@ export default function RegisterPage() {
     return () => clearTimeout(handler);
   }, [pincode, fetchLocation]);
 
-  useEffect(() => {
-    if (step === 2) {
-      const recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible'
-      });
-      signInWithPhoneNumber(auth, `+91${mobile}`, recaptchaVerifier)
-        .then((result) => {
-          setConfirmationResult(result);
-          toast({ title: 'OTP Sent', description: 'Please check your mobile for the verification code.' });
-        }).catch((error) => {
-          console.error("Error sending OTP:", error);
-          toast({ title: 'OTP Send Error', description: 'Could not send verification code. Please try again.', variant: 'destructive' });
-          setStep(1); // Go back to details step
+  const sendOtp = useCallback(() => {
+    if (!recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+            'size': 'invisible'
         });
     }
-  }, [step, mobile, toast]);
+    
+    signInWithPhoneNumber(auth, `+91${mobile}`, recaptchaVerifierRef.current)
+      .then((result) => {
+        setConfirmationResult(result);
+        toast({ title: 'OTP Sent', description: 'Please check your mobile for the verification code.' });
+        setStep(2);
+      }).catch((error) => {
+        console.error("Error sending OTP:", error);
+        toast({ title: 'OTP Send Error', description: 'Could not send verification code. Please try again.', variant: 'destructive' });
+        recaptchaVerifierRef.current?.clear();
+      });
+  }, [mobile, toast]);
+
 
   const handleDetailsSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -143,7 +148,7 @@ export default function RegisterPage() {
         toast({ title: 'Invalid Location', description: 'Please provide a valid pincode and select a city.', variant: 'destructive' });
         return;
     }
-    setStep(2);
+    sendOtp();
   };
   
   const handleOtpSubmit = async (event: FormEvent<HTMLFormElement>) => {
