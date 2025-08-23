@@ -30,6 +30,6 @@ env:
   - variable: TWILIO_WHATSAPP_NUMBER
     value: "whatsapp:+14155238886"
   - variable: TWILIO_WHATSAPP_CONTENT_SID
-    secret: egoa-sarthi-twilio-content-sid
+    value: "HX19233c9a1714df02352d16a49700d75a"
 
     
