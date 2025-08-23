@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useState, type FormEvent, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, type FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, AlertTriangle, ArrowLeft } from 'lucide-react';
-import { createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, sendEmailVerification, signOut } from 'firebase/auth';
+import { Loader2, AlertTriangle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,7 +19,6 @@ import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AppLogo } from '@/components/ui/AppLogo';
 import { ConfirmationResult } from 'firebase/auth';
-
 
 type PostOffice = {
   Name: string;
@@ -36,6 +35,8 @@ export default function RegisterPage() {
   // Form State
   const [role, setRole] = useState('customer');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [mobile, setMobile] = useState('');
   const [pincode, setPincode] = useState('');
@@ -46,25 +47,22 @@ export default function RegisterPage() {
   const [otp, setOtp] = useState('');
 
   // UI State
-  const [step, setStep] = useState(1); // 1 for details, 2 for OTP
+  const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [isPincodeLoading, setIsPincodeLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [isConfigMissing, setIsConfigMissing] = useState(false);
   const [isLocationManual, setIsLocationManual] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (!apiKey || apiKey.startsWith('PASTE_YOUR')) {
       setIsConfigMissing(true);
     }
-    
-    // Make sure we're signed out when visiting the registration page
-    signOut(auth);
   }, []);
 
   const fetchLocation = useCallback(async (searchPincode: string) => {
@@ -85,20 +83,12 @@ export default function RegisterPage() {
         }
       } else {
         setIsLocationManual(true);
-        toast({
-          title: 'Invalid Pincode',
-          description: 'Could not find a location. Please enter manually.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Invalid Pincode', description: 'Please enter manually.', variant: 'destructive' });
       }
     } catch (error) {
       console.error('Failed to fetch pincode data:', error);
       setIsLocationManual(true);
-      toast({
-        title: 'API Error',
-        description: 'Could not fetch location data. Please enter manually.',
-        variant: 'destructive',
-      });
+      toast({ title: 'API Error', description: 'Could not fetch location. Please enter manually.', variant: 'destructive' });
     } finally {
       setIsPincodeLoading(false);
     }
@@ -127,39 +117,35 @@ export default function RegisterPage() {
         return;
     }
     
-    // Ensure the container is clean before rendering a new verifier
     recaptchaContainerRef.current.innerHTML = '';
     
     const verifier = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
-        'size': 'normal', // Use the visible v2 checkbox
+        'size': 'normal',
         'callback': () => {
-            // This callback is executed when the reCAPTCHA is solved.
-            // We can now proceed with sending the OTP.
             signInWithPhoneNumber(auth, `+91${mobile}`, verifier)
               .then((result) => {
                 setConfirmationResult(result);
-                toast({ title: 'OTP Sent', description: 'Please check your mobile for the verification code.' });
+                toast({ title: 'OTP Sent', description: 'Please check your mobile for the code.' });
                 setStep(2);
               }).catch((error) => {
-                console.error("Error sending OTP:", error);
-                toast({ title: 'OTP Send Error', description: 'Could not send verification code. Please check the mobile number and try again.', variant: 'destructive' });
+                console.error("OTP Send Error:", error);
+                toast({ title: 'OTP Send Error', description: error.message, variant: 'destructive' });
               }).finally(() => {
                 setLoading(false);
               });
         },
         'expired-callback': () => {
-            toast({ title: 'reCAPTCHA Expired', description: 'Please solve the reCAPTCHA again.', variant: 'destructive' });
+            toast({ title: 'reCAPTCHA Expired', description: 'Please try again.', variant: 'destructive' });
             setLoading(false);
         }
     });
 
     verifier.render().catch((error) => {
         console.error("reCAPTCHA render error:", error);
-        toast({ title: 'reCAPTCHA Error', description: 'Could not render reCAPTCHA. Please refresh the page.', variant: 'destructive'});
+        toast({ title: 'reCAPTCHA Error', description: 'Could not render reCAPTCHA.', variant: 'destructive'});
         setLoading(false);
     });
   };
-
 
   const handleDetailsSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -167,12 +153,16 @@ export default function RegisterPage() {
       setEmailError('Please enter a valid email address.');
       return;
     }
+    if (password !== confirmPassword) {
+      toast({ title: 'Passwords do not match', variant: 'destructive' });
+      return;
+    }
     if (mobile.length !== 10) {
-        toast({ title: 'Invalid Mobile Number', description: 'Mobile number must be exactly 10 digits.', variant: 'destructive'});
+        toast({ title: 'Invalid Mobile Number', description: 'Must be 10 digits.', variant: 'destructive'});
         return;
     }
     if (!city || !district) {
-        toast({ title: 'Invalid Location', description: 'Please provide a valid pincode and select a city.', variant: 'destructive' });
+        toast({ title: 'Invalid Location', description: 'Provide a valid pincode and city.', variant: 'destructive' });
         return;
     }
     sendOtp();
@@ -189,18 +179,13 @@ export default function RegisterPage() {
       }
       
       try {
-          // This will throw an error if the code is invalid, and we won't proceed.
           await confirmationResult.confirm(otp);
           
-          // Since mobile is verified, create the user account but with a temporary random password
-          const tempPassword = Math.random().toString(36).slice(-8); // A simple random password
-          const userCredential = await createUserWithEmailAndPassword(auth, email, tempPassword);
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const user = userCredential.user;
 
-          // Send email verification
           await sendEmailVerification(user);
 
-          // Now save profile to Firestore
           const fullLocation = `${address}, ${city}, ${district}, ${pincode}`;
           const isAdminUser = role === 'vle' && email === 'admin@egoasarthi.com';
           const userProfile = {
@@ -210,24 +195,23 @@ export default function RegisterPage() {
           const collectionName = role === 'vle' ? 'vles' : (role === 'government' ? 'government' : 'users');
           await setDoc(doc(db, collectionName, user.uid), userProfile);
           
-          toast({ title: 'Mobile Verified!', description: 'Please check your email for a verification link and set your password.' });
+          toast({ title: 'Registration Successful!', description: 'Please check your email for a verification link to complete the process.' });
 
-          // Redirect to set-password page
-          router.push(`/set-password?email=${encodeURIComponent(email)}`);
+          router.push('/login');
 
       } catch (error: any) {
           console.error("OTP verification or user creation failed:", error);
           let errorMessage = 'Could not verify OTP. Please try again.';
           if (error.code === 'auth/invalid-verification-code') {
-              errorMessage = 'The OTP you entered is invalid. Please check and try again.';
+              errorMessage = 'The OTP you entered is invalid.';
           } else if (error.code === 'auth/email-already-in-use') {
               errorMessage = 'An account with this email address already exists.';
           }
           toast({ title: 'Registration Failed', description: errorMessage, variant: 'destructive' });
-          setLoading(false);
+      } finally {
+        setLoading(false);
       }
   };
-
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-background text-foreground p-4">
@@ -269,6 +253,12 @@ export default function RegisterPage() {
                   <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} onBlur={() => email && setEmailError(validateEmail(email) ? '' : 'Please enter a valid email address.')} placeholder="m@example.com" required className={cn(emailError && "border-destructive focus-visible:ring-destructive")} />
                   {emailError && <p className="text-sm text-destructive mt-1">{emailError}</p>}
                 </div>
+                <div className="grid gap-2 text-left relative">
+                    <Label htmlFor="password">Password</Label>
+                    <Input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required />
+                    <Button type="button" variant="ghost" size="icon" onClick={() => setShowPassword(!showPassword)} className="absolute right-1 bottom-1 h-7 w-7 text-muted-foreground hover:bg-transparent"><Eye className="h-4 w-4"/></Button>
+                </div>
+                <div className="grid gap-2 text-left"><Label htmlFor="confirm-password">Confirm Password</Label><Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required /></div>
                 <div className="grid gap-2 text-left"><Label htmlFor="mobile">Mobile Number</Label><Input id="mobile" type="tel" maxLength={10} value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))} placeholder="9876543210" required /></div>
                 <div className="grid gap-2 text-left">
                     <Label htmlFor="pincode">Pincode</Label>
@@ -300,12 +290,9 @@ export default function RegisterPage() {
                       <Input id="otp" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="Enter 6-digit code" required maxLength={6} />
                   </div>
                   <Button type="submit" disabled={loading} className="w-full">
-                      {loading ? <Loader2 className="animate-spin" /> : 'Verify & Continue'}
+                      {loading ? <Loader2 className="animate-spin" /> : 'Verify & Register'}
                   </Button>
-                  <Button variant="link" size="sm" onClick={() => {
-                      setStep(1);
-                      setConfirmationResult(null);
-                  }}>Back to Details</Button>
+                  <Button variant="link" size="sm" onClick={() => { setStep(1); setConfirmationResult(null); }}>Back to Details</Button>
               </form>
           )}
 
@@ -318,5 +305,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-    

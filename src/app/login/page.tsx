@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { useState, type FormEvent, useEffect } from 'react';
-import { signInWithEmailAndPassword, signOut, sendEmailVerification, type User } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -26,9 +26,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   
   const [isConfigMissing, setIsConfigMissing] = useState(false);
-  const [showResendVerification, setShowResendVerification] = useState(false);
-  const [unverifiedUser, setUnverifiedUser] = useState<User | null>(null);
-
+  const [showVerificationError, setShowVerificationError] = useState(false);
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -40,13 +38,18 @@ export default function LoginPage() {
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setShowResendVerification(false);
-    setUnverifiedUser(null);
+    setShowVerificationError(false);
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // This part will only be reached if the login is successful and email is verified.
-      // The auth context will handle the redirect.
+      
+      if (!userCredential.user.emailVerified) {
+        setShowVerificationError(true);
+        await auth.signOut(); // Sign out to prevent user being in a weird state
+        setLoading(false);
+        return;
+      }
+      
       toast({
         title: 'Login Successful',
         description: 'Redirecting to your dashboard...',
@@ -55,12 +58,7 @@ export default function LoginPage() {
     } catch (error: any) {
         console.error('Login failed:', error);
         
-        // Handle specific error for unverified email
-        if (error.code === 'auth/email-not-verified') {
-            setShowResendVerification(true);
-            setUnverifiedUser(auth.currentUser); // Temporarily hold the user object
-            await signOut(auth); // Sign out immediately
-        } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
             toast({
                 title: 'Login Failed',
                 description: 'Invalid email or password. Please try again.',
@@ -74,42 +72,9 @@ export default function LoginPage() {
             });
         }
     } finally {
-      setLoading(false);
+      if(!showVerificationError) setLoading(false);
     }
   };
-  
-  const handleResendVerification = async () => {
-    // This function now needs a user object to work, which we get after a failed login attempt.
-    const userToVerify = auth.currentUser;
-    if (!userToVerify) {
-        toast({
-            title: 'Error',
-            description: 'Could not find user to verify. Please try logging in again first.',
-            variant: 'destructive',
-        });
-        return;
-    }
-
-    setLoading(true);
-    try {
-        await sendEmailVerification(userToVerify);
-        toast({
-            title: 'Verification Email Sent',
-            description: 'A new verification link has been sent to your email address. Please check your inbox.',
-        });
-        setShowResendVerification(false);
-    } catch (error) {
-        console.error('Failed to resend verification email:', error);
-        toast({
-            title: 'Error',
-            description: 'Could not send verification email. Please try again later.',
-            variant: 'destructive',
-        });
-    } finally {
-        setLoading(false);
-    }
-  };
-
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 text-foreground p-4">
@@ -133,15 +98,12 @@ export default function LoginPage() {
             </Alert>
         )}
 
-        {showResendVerification && (
+        {showVerificationError && (
             <Alert variant="destructive" className="mb-4 max-w-sm w-full">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Email Not Verified</AlertTitle>
                 <AlertDescription>
-                    You must verify your email address to log in.
-                    <Button variant="link" className="p-0 h-auto ml-1" onClick={handleResendVerification} disabled={loading}>
-                        {loading ? <Loader2 className="animate-spin" /> : "Resend verification email"}
-                    </Button>
+                    You must verify your email address to log in. Please check your inbox for the verification link.
                 </AlertDescription>
             </Alert>
         )}
@@ -234,5 +196,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    
