@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { useState, type FormEvent, useEffect } from 'react';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -38,7 +38,20 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      if (!userCredential.user.emailVerified) {
+        toast({
+            title: 'Email Not Verified',
+            description: 'Please verify your email address to continue.',
+            variant: 'destructive',
+            duration: 7000,
+        });
+        await signOut(auth); // Sign out the user to prevent them from being in a limbo state
+        setLoading(false);
+        return;
+      }
+
       toast({
         title: 'Login Successful',
         description: 'Redirecting to your dashboard...',

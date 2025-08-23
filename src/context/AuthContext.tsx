@@ -2,12 +2,13 @@
 'use client';
 
 import React from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
+import { usePathname } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
@@ -20,10 +21,13 @@ const AuthContext = React.createContext<AuthContextType>({ user: null, userProfi
 
 export const useAuth = () => React.useContext(AuthContext);
 
+const publicPaths = ['/login', '/register', '/set-password', '/forgot-password', '/'];
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = React.useState<User | null>(null);
   const [userProfile, setUserProfile] = React.useState<UserProfile | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const pathname = usePathname();
 
   const fetchUserProfile = React.useCallback(async (user: User | null): Promise<UserProfile | null> => {
     if (!user) return null;
@@ -59,19 +63,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true);
       if (user) {
+        // If user is on a public page and their email is not verified, allow them to stay.
+        // This is crucial for the set-password flow.
+        const isPublic = publicPaths.some(path => pathname.startsWith(path));
+        if (!user.emailVerified && !isPublic) {
+            toast({
+                title: "Email Verification Required",
+                description: "Please check your inbox and verify your email to continue.",
+                variant: "destructive",
+                duration: 7000
+            });
+            await signOut(auth);
+            setUser(null);
+            setUserProfile(null);
+            setLoading(false);
+            return;
+        }
+
         const profileData = await fetchUserProfile(user);
         
         if (profileData) {
           setUser(user);
           setUserProfile(profileData);
         } else {
-            console.error(`Authenticated user with UID ${user.uid} not found in 'users', 'vles', or 'government' collections. Logging out.`);
-            toast({
-                title: "Profile Not Found",
-                description: "Your account exists, but we couldn't load your profile data. Please contact support or try re-registering.",
-                variant: "destructive",
-                duration: 9000
-            });
+            console.error(`Authenticated user with UID ${user.uid} not found in any collection. Logging out.`);
             await auth.signOut();
             setUserProfile(null);
             setUser(null);
@@ -84,7 +99,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [fetchUserProfile]);
+  }, [fetchUserProfile, pathname]);
 
   const value = {
     user,
@@ -103,5 +118,3 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     </AuthContext.Provider>
   );
 };
-
-    

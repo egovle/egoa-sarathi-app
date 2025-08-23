@@ -1,3 +1,4 @@
+
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
@@ -20,6 +21,9 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
+  // To resolve window is not defined error
+  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = process.env.NODE_ENV === 'development';
+
   const recaptchaKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   if (recaptchaKey) {
     initializeAppCheck(app, {
@@ -36,5 +40,3 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 
 export { app, db, auth, storage };
-
-    
