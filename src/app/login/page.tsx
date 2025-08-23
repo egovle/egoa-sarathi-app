@@ -45,38 +45,54 @@ export default function LoginPage() {
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      if (!userCredential.user.emailVerified) {
-        setUnverifiedUser(userCredential.user);
-        setShowResendVerification(true);
-        await signOut(auth); // Sign out the user to prevent them from being in a limbo state
-        setLoading(false);
-        return;
-      }
-
+      // This part will only be reached if the login is successful and email is verified.
+      // The auth context will handle the redirect.
       toast({
         title: 'Login Successful',
         description: 'Redirecting to your dashboard...',
       });
       router.push('/dashboard');
-    } catch (error: any)
-      {
-      console.error('Login failed:', error);
-      toast({
-        title: 'Login Failed',
-        description: 'Invalid email or password. Please try again.',
-        variant: 'destructive',
-      });
+    } catch (error: any) {
+        console.error('Login failed:', error);
+        
+        // Handle specific error for unverified email
+        if (error.code === 'auth/email-not-verified') {
+            setShowResendVerification(true);
+            setUnverifiedUser(auth.currentUser); // Temporarily hold the user object
+            await signOut(auth); // Sign out immediately
+        } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+            toast({
+                title: 'Login Failed',
+                description: 'Invalid email or password. Please try again.',
+                variant: 'destructive',
+            });
+        } else {
+             toast({
+                title: 'Login Failed',
+                description: 'An unexpected error occurred. Please try again.',
+                variant: 'destructive',
+            });
+        }
     } finally {
       setLoading(false);
     }
   };
   
   const handleResendVerification = async () => {
-    if (!unverifiedUser) return;
+    // This function now needs a user object to work, which we get after a failed login attempt.
+    const userToVerify = auth.currentUser;
+    if (!userToVerify) {
+        toast({
+            title: 'Error',
+            description: 'Could not find user to verify. Please try logging in again first.',
+            variant: 'destructive',
+        });
+        return;
+    }
+
     setLoading(true);
     try {
-        await sendEmailVerification(unverifiedUser);
+        await sendEmailVerification(userToVerify);
         toast({
             title: 'Verification Email Sent',
             description: 'A new verification link has been sent to your email address. Please check your inbox.',
@@ -218,3 +234,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    

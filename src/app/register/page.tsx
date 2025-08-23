@@ -118,37 +118,47 @@ export default function RegisterPage() {
     return () => clearTimeout(handler);
   }, [pincode, fetchLocation]);
 
-  const sendOtp = useCallback(() => {
+  const sendOtp = () => {
     setLoading(true);
     
-    // Ensure the container is clean before rendering
-    if (recaptchaContainerRef.current) {
-        recaptchaContainerRef.current.innerHTML = '';
+    if (!recaptchaContainerRef.current) {
+        toast({ title: 'Error', description: 'reCAPTCHA container not found.', variant: 'destructive'});
+        setLoading(false);
+        return;
     }
     
-    const verifier = new RecaptchaVerifier(auth, recaptchaContainerRef.current!, {
+    // Ensure the container is clean before rendering a new verifier
+    recaptchaContainerRef.current.innerHTML = '';
+    
+    const verifier = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
         'size': 'normal', // Use the visible v2 checkbox
         'callback': () => {
-            // reCAPTCHA solved, this callback is often where you enable the submit button
+            // This callback is executed when the reCAPTCHA is solved.
+            // We can now proceed with sending the OTP.
+            signInWithPhoneNumber(auth, `+91${mobile}`, verifier)
+              .then((result) => {
+                setConfirmationResult(result);
+                toast({ title: 'OTP Sent', description: 'Please check your mobile for the verification code.' });
+                setStep(2);
+              }).catch((error) => {
+                console.error("Error sending OTP:", error);
+                toast({ title: 'OTP Send Error', description: 'Could not send verification code. Please check the mobile number and try again.', variant: 'destructive' });
+              }).finally(() => {
+                setLoading(false);
+              });
         },
         'expired-callback': () => {
             toast({ title: 'reCAPTCHA Expired', description: 'Please solve the reCAPTCHA again.', variant: 'destructive' });
+            setLoading(false);
         }
     });
 
-    signInWithPhoneNumber(auth, `+91${mobile}`, verifier)
-      .then((result) => {
-        setConfirmationResult(result);
-        toast({ title: 'OTP Sent', description: 'Please check your mobile for the verification code.' });
-        setStep(2);
-      }).catch((error) => {
-        console.error("Error sending OTP:", error);
-        toast({ title: 'OTP Send Error', description: 'Could not send verification code. Please check the mobile number and reCAPTCHA, then try again.', variant: 'destructive' });
-        verifier.clear();
-      }).finally(() => {
+    verifier.render().catch((error) => {
+        console.error("reCAPTCHA render error:", error);
+        toast({ title: 'reCAPTCHA Error', description: 'Could not render reCAPTCHA. Please refresh the page.', variant: 'destructive'});
         setLoading(false);
-      });
-  }, [mobile, toast]);
+    });
+  };
 
 
   const handleDetailsSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -308,3 +318,5 @@ export default function RegisterPage() {
     </div>
   );
 }
+
+    
