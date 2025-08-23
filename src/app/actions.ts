@@ -42,10 +42,11 @@ export async function createNotification(userId: string, title: string, descript
         else if (govSnap.exists()) userProfile = govSnap.data() as UserProfile;
 
         if (userProfile?.mobile) {
-            const whatsappBody = `*${title}*\n\n${description}`;
             // Prepend Indian country code if not present
             const mobileNumber = userProfile.mobile.startsWith('+91') ? userProfile.mobile : `+91${userProfile.mobile}`;
-            await sendWhatsAppMessage(mobileNumber, whatsappBody);
+            // Use templated message variables
+            const contentVariables = { '1': title, '2': description };
+            await sendWhatsAppMessage(mobileNumber, contentVariables);
         }
     } catch (error) {
         console.error("Failed to send WhatsApp notification:", error);
