@@ -22,6 +22,8 @@ const AuthContext = React.createContext<AuthContextType>({ user: null, userProfi
 export const useAuth = () => React.useContext(AuthContext);
 
 const publicPaths = ['/login', '/register', '/set-password', '/forgot-password', '/'];
+const policyPaths = ['/about', '/services', '/privacy', '/terms', '/refund-policy'];
+
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = React.useState<User | null>(null);
@@ -63,16 +65,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true);
       if (user) {
-        // If user is on a public page and their email is not verified, allow them to stay.
-        // This is crucial for the set-password flow.
-        const isPublic = publicPaths.some(path => pathname.startsWith(path));
-        if (!user.emailVerified && !isPublic) {
-            toast({
-                title: "Email Verification Required",
-                description: "Please check your inbox and verify your email to continue.",
-                variant: "destructive",
-                duration: 7000
-            });
+        const isAuthPage = publicPaths.some(path => pathname.startsWith(path) && path !== '/');
+        const isPolicyPage = policyPaths.some(path => pathname.startsWith(path));
+
+        if (!user.emailVerified && !isAuthPage && !isPolicyPage && pathname !== '/') {
+            if (pathname !== '/login') {
+                 toast({
+                    title: "Email Verification Required",
+                    description: "Please check your inbox and verify your email to continue.",
+                    variant: "destructive",
+                    duration: 7000
+                });
+            }
             await signOut(auth);
             setUser(null);
             setUserProfile(null);

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LogIn, Mail, Lock, Phone, Loader2, Eye, EyeOff, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { useState, type FormEvent, useEffect } from 'react';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, sendEmailVerification, type User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +26,9 @@ export default function LoginPage() {
   const { toast } = useToast();
   
   const [isConfigMissing, setIsConfigMissing] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [unverifiedUser, setUnverifiedUser] = useState<User | null>(null);
+
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -37,16 +40,15 @@ export default function LoginPage() {
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setShowResendVerification(false);
+    setUnverifiedUser(null);
+
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
       if (!userCredential.user.emailVerified) {
-        toast({
-            title: 'Email Not Verified',
-            description: 'Please verify your email address to continue.',
-            variant: 'destructive',
-            duration: 7000,
-        });
+        setUnverifiedUser(userCredential.user);
+        setShowResendVerification(true);
         await signOut(auth); // Sign out the user to prevent them from being in a limbo state
         setLoading(false);
         return;
@@ -69,6 +71,29 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+  
+  const handleResendVerification = async () => {
+    if (!unverifiedUser) return;
+    setLoading(true);
+    try {
+        await sendEmailVerification(unverifiedUser);
+        toast({
+            title: 'Verification Email Sent',
+            description: 'A new verification link has been sent to your email address. Please check your inbox.',
+        });
+        setShowResendVerification(false);
+    } catch (error) {
+        console.error('Failed to resend verification email:', error);
+        toast({
+            title: 'Error',
+            description: 'Could not send verification email. Please try again later.',
+            variant: 'destructive',
+        });
+    } finally {
+        setLoading(false);
+    }
+  };
+
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 text-foreground p-4">
@@ -88,6 +113,19 @@ export default function LoginPage() {
                 <AlertTitle>Configuration Error!</AlertTitle>
                 <AlertDescription>
                     Your app's API keys are not set correctly. Please follow the setup instructions in the README file to fix this.
+                </AlertDescription>
+            </Alert>
+        )}
+
+        {showResendVerification && (
+            <Alert variant="destructive" className="mb-4 max-w-sm w-full">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Email Not Verified</AlertTitle>
+                <AlertDescription>
+                    You must verify your email address to log in.
+                    <Button variant="link" className="p-0 h-auto ml-1" onClick={handleResendVerification} disabled={loading}>
+                        {loading ? <Loader2 className="animate-spin" /> : "Resend verification email"}
+                    </Button>
                 </AlertDescription>
             </Alert>
         )}

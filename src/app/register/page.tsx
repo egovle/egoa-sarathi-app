@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useState, type FormEvent, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertTriangle, ArrowLeft } from 'lucide-react';
-import { createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, sendEmailVerification, signOut } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -54,13 +54,17 @@ export default function RegisterPage() {
   const [isLocationManual, setIsLocationManual] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
     if (!apiKey || apiKey.startsWith('PASTE_YOUR')) {
       setIsConfigMissing(true);
     }
+    
+    // Make sure we're signed out when visiting the registration page
+    signOut(auth);
   }, []);
 
   const fetchLocation = useCallback(async (searchPincode: string) => {
@@ -116,33 +120,32 @@ export default function RegisterPage() {
 
   const sendOtp = useCallback(() => {
     setLoading(true);
-    if (!recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            'size': 'normal', // Use the visible v2 checkbox
-            'callback': () => {
-                // reCAPTCHA solved, allow user to proceed
-            },
-            'expired-callback': () => {
-                toast({ title: 'reCAPTCHA Expired', description: 'Please solve the reCAPTCHA again.', variant: 'destructive' });
-            }
-        });
-        // Render the reCAPTCHA widget
-        recaptchaVerifierRef.current.render().catch(err => {
-             console.error("reCAPTCHA render error:", err);
-             toast({ title: 'reCAPTCHA Error', description: 'Could not render security check. Please refresh the page.', variant: 'destructive' });
-        });
+    
+    // Ensure the container is clean before rendering
+    if (recaptchaContainerRef.current) {
+        recaptchaContainerRef.current.innerHTML = '';
     }
     
-    signInWithPhoneNumber(auth, `+91${mobile}`, recaptchaVerifierRef.current)
+    const verifier = new RecaptchaVerifier(auth, recaptchaContainerRef.current!, {
+        'size': 'normal', // Use the visible v2 checkbox
+        'callback': () => {
+            // reCAPTCHA solved, this callback is often where you enable the submit button
+        },
+        'expired-callback': () => {
+            toast({ title: 'reCAPTCHA Expired', description: 'Please solve the reCAPTCHA again.', variant: 'destructive' });
+        }
+    });
+
+    signInWithPhoneNumber(auth, `+91${mobile}`, verifier)
       .then((result) => {
         setConfirmationResult(result);
         toast({ title: 'OTP Sent', description: 'Please check your mobile for the verification code.' });
         setStep(2);
-        setLoading(false);
       }).catch((error) => {
         console.error("Error sending OTP:", error);
-        toast({ title: 'OTP Send Error', description: 'Could not send verification code. Please check the mobile number and try again.', variant: 'destructive' });
-        recaptchaVerifierRef.current?.clear();
+        toast({ title: 'OTP Send Error', description: 'Could not send verification code. Please check the mobile number and reCAPTCHA, then try again.', variant: 'destructive' });
+        verifier.clear();
+      }).finally(() => {
         setLoading(false);
       });
   }, [mobile, toast]);
@@ -194,7 +197,7 @@ export default function RegisterPage() {
               name: fullName, email, mobile, pincode, location: fullLocation, role, walletBalance: 0,
               ...(role === 'vle' ? { status: isAdminUser ? 'Approved' : 'Pending', available: isAdminUser, isAdmin: isAdminUser, lastAssigned: {} } : { isAdmin: false }),
           };
-          const collectionName = role === 'vle' ? 'vles' : 'users';
+          const collectionName = role === 'vle' ? 'vles' : (role === 'government' ? 'government' : 'users');
           await setDoc(doc(db, collectionName, user.uid), userProfile);
           
           toast({ title: 'Mobile Verified!', description: 'Please check your email for a verification link and set your password.' });
@@ -247,6 +250,7 @@ export default function RegisterPage() {
                   <RadioGroup defaultValue="customer" value={role} onValueChange={setRole} className="flex gap-4 pt-1">
                     <div className="flex items-center space-x-2"><RadioGroupItem value="customer" id="r1" /><Label htmlFor="r1">Customer</Label></div>
                     <div className="flex items-center space-x-2"><RadioGroupItem value="vle" id="r2" /><Label htmlFor="r2">VLE</Label></div>
+                    <div className="flex items-center space-x-2"><RadioGroupItem value="government" id="r3" /><Label htmlFor="r3">Government</Label></div>
                   </RadioGroup>
                 </div>
                 <div className="grid gap-2 text-left"><Label htmlFor="full-name">Full Name</Label><Input id="full-name" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="John Doe" required /></div>
@@ -269,7 +273,7 @@ export default function RegisterPage() {
                 </div>
                 <div className="grid gap-2 text-left"><Label htmlFor="address">Address (House No, Street)</Label><Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123, Main Street" required /></div>
                 
-                <div id="recaptcha-container" className="flex justify-center my-2"></div>
+                <div ref={recaptchaContainerRef} className="flex justify-center my-2"></div>
 
                 <Button type="submit" disabled={isPincodeLoading || isConfigMissing || loading} className="w-full mt-2">
                     {loading ? <Loader2 className="animate-spin" /> : 'Send OTP'}
@@ -290,9 +294,7 @@ export default function RegisterPage() {
                   </Button>
                   <Button variant="link" size="sm" onClick={() => {
                       setStep(1);
-                      if (recaptchaVerifierRef.current) {
-                          recaptchaVerifierRef.current.clear();
-                      }
+                      setConfirmationResult(null);
                   }}>Back to Details</Button>
               </form>
           )}
@@ -306,5 +308,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-    
