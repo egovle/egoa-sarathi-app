@@ -4,7 +4,6 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -19,24 +18,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize App Check
-if (typeof window !== 'undefined') {
-  // To resolve window is not defined error
-  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = process.env.NODE_ENV === 'development';
-
-  const recaptchaKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-  if (recaptchaKey) {
-    initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider(recaptchaKey),
-        isTokenAutoRefreshEnabled: true
-    });
-  } else {
-    console.warn("Firebase App Check: reCAPTCHA site key is not defined. App Check will not be initialized.");
-  }
-}
-
 const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 
 export { app, db, auth, storage };
+
+    

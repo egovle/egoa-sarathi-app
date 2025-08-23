@@ -115,9 +115,21 @@ export default function RegisterPage() {
   }, [pincode, fetchLocation]);
 
   const sendOtp = useCallback(() => {
+    setLoading(true);
     if (!recaptchaVerifierRef.current) {
         recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-            'size': 'invisible'
+            'size': 'normal', // Use the visible v2 checkbox
+            'callback': () => {
+                // reCAPTCHA solved, allow user to proceed
+            },
+            'expired-callback': () => {
+                toast({ title: 'reCAPTCHA Expired', description: 'Please solve the reCAPTCHA again.', variant: 'destructive' });
+            }
+        });
+        // Render the reCAPTCHA widget
+        recaptchaVerifierRef.current.render().catch(err => {
+             console.error("reCAPTCHA render error:", err);
+             toast({ title: 'reCAPTCHA Error', description: 'Could not render security check. Please refresh the page.', variant: 'destructive' });
         });
     }
     
@@ -126,10 +138,12 @@ export default function RegisterPage() {
         setConfirmationResult(result);
         toast({ title: 'OTP Sent', description: 'Please check your mobile for the verification code.' });
         setStep(2);
+        setLoading(false);
       }).catch((error) => {
         console.error("Error sending OTP:", error);
-        toast({ title: 'OTP Send Error', description: 'Could not send verification code. Please try again.', variant: 'destructive' });
+        toast({ title: 'OTP Send Error', description: 'Could not send verification code. Please check the mobile number and try again.', variant: 'destructive' });
         recaptchaVerifierRef.current?.clear();
+        setLoading(false);
       });
   }, [mobile, toast]);
 
@@ -254,7 +268,13 @@ export default function RegisterPage() {
                     <div className="grid gap-2 text-left"><Label htmlFor="district">District</Label><Input id="district" value={district} onChange={(e) => setDistrict(e.target.value)} placeholder="Auto-populated" required /></div>
                 </div>
                 <div className="grid gap-2 text-left"><Label htmlFor="address">Address (House No, Street)</Label><Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123, Main Street" required /></div>
-                <Button type="submit" disabled={isPincodeLoading || isConfigMissing} className="w-full mt-2">Proceed to OTP Verification</Button>
+                
+                <div id="recaptcha-container" className="flex justify-center my-2"></div>
+
+                <Button type="submit" disabled={isPincodeLoading || isConfigMissing || loading} className="w-full mt-2">
+                    {loading ? <Loader2 className="animate-spin" /> : 'Send OTP'}
+                </Button>
+
                 {role === 'vle' && (<p className="text-xs text-center text-muted-foreground mt-2">VLE accounts require admin approval after registration.</p>)}
               </form>
           )}
@@ -268,19 +288,23 @@ export default function RegisterPage() {
                   <Button type="submit" disabled={loading} className="w-full">
                       {loading ? <Loader2 className="animate-spin" /> : 'Verify & Continue'}
                   </Button>
-                  <Button variant="link" size="sm" onClick={() => setStep(1)}>Back to Details</Button>
+                  <Button variant="link" size="sm" onClick={() => {
+                      setStep(1);
+                      if (recaptchaVerifierRef.current) {
+                          recaptchaVerifierRef.current.clear();
+                      }
+                  }}>Back to Details</Button>
               </form>
           )}
-
-          <div id="recaptcha-container" className="mt-4"></div>
 
           <div className="mt-4 text-center text-sm">
             <span className="text-muted-foreground">Already have an account?{' '}</span>
             <Link href="/login" className={cn("underline font-semibold text-primary", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>Log in</Link>
           </div>
-          <p className="text-xs text-muted-foreground text-center mt-4">This site is protected by reCAPTCHA and the Google <a href="https://policies.google.com/privacy" className="underline">Privacy Policy</a> and <a href="https://policies.google.com/terms" className="underline">Terms of Service</a> apply.</p>
         </CardContent>
       </Card>
     </div>
   );
 }
+
+    
