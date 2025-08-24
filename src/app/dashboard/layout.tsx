@@ -357,10 +357,15 @@ export default function DashboardLayout({
                             {notifications.length > 0 ? (
                             notifications.map((notif) => (
                                 <div key={notif.id} className={cn("group relative p-3 rounded-md transition-colors hover:bg-muted", !notif.read && 'bg-primary/10')}>
-                                    <Link href={notif.link || '/dashboard'} className="block pr-6">
-                                    <p className="font-semibold text-sm">{notif.title}</p>
-                                    <p className="text-sm text-muted-foreground">{notif.description}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(notif.date), { addSuffix: true })}</p>
+                                    <Link href={notif.link || '/dashboard'} className="block pr-6" onClick={() => {
+                                        const popoverTrigger = document.querySelector('[data-radix-popover-trigger][aria-expanded="true"]');
+                                        if (popoverTrigger instanceof HTMLElement) {
+                                            popoverTrigger.click();
+                                        }
+                                    }}>
+                                        <p className="font-semibold text-sm">{notif.title}</p>
+                                        <p className="text-sm text-muted-foreground">{notif.description}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(notif.date), { addSuffix: true })}</p>
                                     </Link>
                                     <Button
                                         variant="ghost"
