@@ -150,7 +150,7 @@ export default function UserManagementPage() {
         const vleRef = doc(db, "vles", userId);
         try {
             await updateDoc(vleRef, { status: 'Approved', available: true });
-            await createNotification(userId, 'Account Approved!', 'Your VLE account has been approved. You can now accept tasks and generate leads.');
+            await createNotification(userId, 'Account Approved!', 'Your VLE account has been approved. You can now accept tasks and generate leads.', '/dashboard');
             toast({ title: "VLE Approved", description: "The VLE has been approved and notified." });
         } catch (error) {
             toast({ title: "Error", description: "Could not approve VLE.", variant: "destructive" });

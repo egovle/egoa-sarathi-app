@@ -68,7 +68,7 @@ export const GroupChat = ({ user, userProfile }: { user: User, userProfile: User
             const messageData: Partial<Omit<GroupChatMessage, 'id'>> = {
                 senderId: user.uid,
                 senderName: userProfile.name,
-                senderRole: userProfile.isAdmin ? 'Admin' : userProfile.role as 'VLE',
+                senderRole: userProfile.isAdmin ? 'Admin' : userProfile.role as 'vle',
                 timestamp: serverTimestamp(),
             };
 
@@ -108,7 +108,7 @@ export const GroupChat = ({ user, userProfile }: { user: User, userProfile: User
                     id,
                     `New message in Group Chat`,
                     `${userProfile.name}: "${notificationText}"`,
-                    `/dashboard`
+                    `/dashboard/group-chat`
                 );
             }
         } catch (error) {

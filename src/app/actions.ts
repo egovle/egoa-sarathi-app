@@ -4,7 +4,7 @@
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc, writeBatch, deleteDoc, getDoc, Timestamp, orderBy, limit } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { Task, UserProfile, Service, CampPayout, TaskDocument, VLEProfile } from "@/lib/types";
+import type { Task, UserProfile, Service, CampPayout, TaskDocument, VLEProfile, HistoryEntry } from "@/lib/types";
 import { calculateVleEarnings } from "@/lib/utils";
 import { defaultServices } from "@/lib/seedData";
 import * as XLSX from 'xlsx';
@@ -226,14 +226,8 @@ export async function createFixedPriceTask(
             transaction.set(doc(db, "tasks", taskId), taskWithStatus);
         });
 
-        // Don't auto-assign anymore, let admin do it.
-        // await autoAssignVleToTask(taskId);
-        await createNotificationForAdmins(
-            "New Task Needs Assignment", 
-            `A new task for "${taskData.service}" has been created and is ready for assignment.`,
-            `/dashboard/task/${taskId}`
-        );
-
+        // Attempt to auto-assign, but don't fail the whole process if it can't.
+        await autoAssignVleToTask(taskId);
 
         return { success: true };
     } catch (error: any) {
@@ -286,13 +280,7 @@ export async function payForVariablePriceTask(task: Task, userProfile: UserProfi
              });
          });
          
-        // Don't auto-assign anymore
-        // await autoAssignVleToTask(task.id);
-        await createNotificationForAdmins(
-            "Task Paid & Needs Assignment", 
-            `A task for "${task.service}" has been paid and is ready for assignment.`,
-            `/dashboard/task/${task.id}`
-        );
+        await autoAssignVleToTask(task.id);
 
         return { success: true };
      } catch (error: any) {
@@ -302,16 +290,74 @@ export async function payForVariablePriceTask(task: Task, userProfile: UserProfi
 }
 
 
-// --- AUTO-ASSIGNMENT LOGIC (Manual now)---
+// --- AUTO-ASSIGNMENT & MANUAL LOGIC ---
+async function autoAssignVleToTask(taskId: string) {
+    const taskRef = doc(db, "tasks", taskId);
+    const taskSnap = await getDoc(taskRef);
+
+    if (!taskSnap.exists()) {
+        console.error(`Task ${taskId} not found for auto-assignment.`);
+        return;
+    }
+    const task = taskSnap.data() as Task;
+
+    const vlesQuery = query(
+        collection(db, "vles"),
+        where("status", "==", "Approved"),
+        where("available", "==", true),
+        where("offeredServices", "array-contains", task.serviceId),
+        where("pincode", "==", task.customerPincode)
+    );
+
+    const vlesSnapshot = await getDocs(vlesQuery);
+    if (vlesSnapshot.empty) {
+        await createNotificationForAdmins(
+            "Auto-Assign Failed", 
+            `No VLE found for "${task.service}" in pincode ${task.customerPincode}. Manual assignment needed.`,
+            `/dashboard/task/${taskId}`
+        );
+        return;
+    }
+
+    const vles = vlesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VLEProfile));
+    
+    // Sort by least recently assigned for this service
+    vles.sort((a, b) => {
+        const aLastAssigned = a.lastAssigned?.[task.serviceId] ? new Date(a.lastAssigned[task.serviceId]).getTime() : 0;
+        const bLastAssigned = b.lastAssigned?.[task.serviceId] ? new Date(b.lastAssigned[task.serviceId]).getTime() : 0;
+        return aLastAssigned - bLastAssigned;
+    });
+
+    const selectedVle = vles[0];
+
+    try {
+        await assignVleToTask(taskId, selectedVle.id, selectedVle.name, "System");
+        // Also update the VLE's lastAssigned timestamp
+        const vleRef = doc(db, "vles", selectedVle.id);
+        await updateDoc(vleRef, {
+            [`lastAssigned.${task.serviceId}`]: new Date().toISOString()
+        });
+    } catch(error) {
+        console.error("Error during auto-assignment final step:", error);
+         await createNotificationForAdmins(
+            "Auto-Assign Error", 
+            `An unexpected error occurred while auto-assigning Task #${taskId.slice(-6).toUpperCase()}. Manual assignment needed.`,
+            `/dashboard/task/${taskId}`
+        );
+    }
+}
+
 export async function assignVleToTask(taskId: string, vleId: string, vleName: string, adminId: string) {
     const taskRef = doc(db, "tasks", taskId);
     
-    const historyEntry = {
+    const historyEntry: HistoryEntry = {
         timestamp: new Date().toISOString(),
         actorId: adminId,
-        actorRole: 'Admin',
+        actorRole: adminId === 'System' ? 'System' : 'Admin',
         action: 'Task Assigned to VLE',
-        details: `Task manually assigned to VLE ${vleName}.`
+        details: adminId === 'System' 
+            ? `Task auto-assigned to VLE ${vleName}.`
+            : `Task manually assigned to VLE ${vleName}.`
     };
 
     try {

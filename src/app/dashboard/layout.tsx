@@ -155,7 +155,7 @@ export default function DashboardLayout({
       }
     };
 
-    const handleClearSingleNotification = async (notifId: string) => {
+    const handleClearSingleNotification = async (notifId: string) {
       if (!user) return;
       const notifRef = doc(db, "notifications", notifId);
       try {
@@ -406,5 +406,3 @@ export default function DashboardLayout({
     </div>
   )
 }
-
-    
