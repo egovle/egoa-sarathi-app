@@ -59,7 +59,7 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     }
     
     const onTaskAccept = async (taskId: string) => {
-        if (!user) return;
+        if (!user || !userProfile) return;
         const taskRef = doc(db, "tasks", taskId);
         
         try {
@@ -74,7 +74,7 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                     actorId: user.uid,
                     actorRole: 'VLE' as const,
                     action: 'Task Accepted',
-                    details: `VLE has accepted the task.`
+                    details: `VLE ${userProfile.name} has accepted the task.`
                 };
     
                 transaction.update(taskRef, { 
@@ -95,6 +95,8 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                 `Your task for "${taskData.service}" has been accepted by a VLE.`,
                 `/dashboard/task/${taskId}`
             );
+
+            await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile?.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`);
             
         } catch (error: any) {
             console.error("Task acceptance failed:", error);

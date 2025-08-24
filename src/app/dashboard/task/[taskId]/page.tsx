@@ -89,7 +89,7 @@ export default function TaskDetailPage() {
             getVleContact();
         }
 
-        if (isAdmin && task?.status === 'Unassigned') {
+        if (isAdmin && task?.status === 'Unassigned' && task.serviceId) {
             const fetchVles = async () => {
                 const vlesQuery = query(
                     collection(db, "vles"),

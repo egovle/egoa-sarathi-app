@@ -35,13 +35,15 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
     useEffect(() => {
         if (service) {
             setName(service.name ?? '');
+            setCustomerRate(service.customerRate?.toString() ?? '0');
+            setVleRate(service.vleRate?.toString() ?? '0');
+            setGovernmentFee(service.governmentFee?.toString() ?? '0');
             setIsVariable(service.isVariable ?? false);
             setParentId(service.parentId ?? 'none');
-            setDocumentGroups(service.documentGroups ?? []);
-            setCustomerRate(service.customerRate?.toString() ?? '');
-            setVleRate(service.vleRate?.toString() ?? '');
-            setGovernmentFee(service.governmentFee?.toString() ?? '');
+            // Deep copy to prevent state mutation issues
+            setDocumentGroups(service.documentGroups ? JSON.parse(JSON.stringify(service.documentGroups)) : []);
         } else {
+            // Reset for new service
             setName('');
             setCustomerRate('');
             setVleRate('');
