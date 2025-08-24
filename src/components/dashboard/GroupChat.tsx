@@ -68,7 +68,7 @@ export const GroupChat = ({ user, userProfile }: { user: User, userProfile: User
             const messageData: Partial<Omit<GroupChatMessage, 'id'>> = {
                 senderId: user.uid,
                 senderName: userProfile.name,
-                senderRole: userProfile.isAdmin ? 'Admin' : userProfile.role as 'vle',
+                senderRole: userProfile.isAdmin ? 'Admin' : 'VLE',
                 timestamp: serverTimestamp(),
             };
 
@@ -210,3 +210,5 @@ export const GroupChat = ({ user, userProfile }: { user: User, userProfile: User
         </div>
     );
 };
+
+    
