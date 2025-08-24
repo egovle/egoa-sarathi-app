@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { collection, onSnapshot, query, where, doc, updateDoc, writeBatch, getDocs, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Search, CheckCircle, Clock, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -109,6 +109,7 @@ const PaymentRequestsTable = ({ requests, onApprove, onReject }: { requests: Pay
 export default function UserManagementPage() {
     const { userProfile, loading: authLoading } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const { toast } = useToast();
 
     const [customers, setCustomers] = useState<CustomerProfile[]>([]);
@@ -118,13 +119,20 @@ export default function UserManagementPage() {
 
     const [loadingData, setLoadingData] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState('vles');
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'vles');
 
     useEffect(() => {
         if (!authLoading && !userProfile?.isAdmin) {
             router.push('/dashboard');
         }
     }, [userProfile, authLoading, router]);
+    
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab) {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         const unsubCustomers = onSnapshot(collection(db, "users"), (snapshot) => {
@@ -239,7 +247,10 @@ export default function UserManagementPage() {
                 </div>
             </CardHeader>
             <CardContent>
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <Tabs value={activeTab} onValueChange={(tab) => {
+                    setActiveTab(tab);
+                    router.push(`/dashboard/users?tab=${tab}`);
+                }}>
                     <TabsList>
                         <TabsTrigger value="vles">VLEs <Badge className="ml-2">{vles.length}</Badge></TabsTrigger>
                         <TabsTrigger value="customers">Customers <Badge className="ml-2">{customers.length}</Badge></TabsTrigger>

@@ -47,23 +47,24 @@ export default function TaskManagementPage() {
         setLoadingData(true);
         if (!userProfile) return;
 
-        let q: Query<DocumentData>;
-        const collectionRef = collection(db, "tasks");
-        
-        let baseConditions = [orderBy("date", "desc")];
+        let baseConditions: any[] = [orderBy("date", "desc")];
+
+        // VLEs see their assigned tasks
         if (userProfile.role === 'vle') {
-            baseConditions.unshift(where("assignedVleId", "==", userProfile.id) as any);
+            baseConditions.unshift(where("assignedVleId", "==", userProfile.id));
         }
+        // Admins see all tasks, so no user-based where clause is added for them.
+
         if (statusFilter !== 'all') {
-             baseConditions.unshift(where("status", "==", statusFilter) as any);
+             baseConditions.unshift(where("status", "==", statusFilter));
         }
         
-        let finalQuery;
+        let finalQuery: Query<DocumentData>;
+        const collectionRef = collection(db, "tasks");
+
         if (direction === 'next' && lastVisible) {
             finalQuery = query(collectionRef, ...baseConditions, startAfter(lastVisible), limit(PAGE_SIZE));
         } else {
-             // For 'prev' or 'initial', we start from the beginning. Firestore doesn't have a simple 'endBefore',
-             // so for simplicity, going back to the first page. A more complex implementation could be done.
             finalQuery = query(collectionRef, ...baseConditions, limit(PAGE_SIZE));
         }
 
@@ -99,9 +100,8 @@ export default function TaskManagementPage() {
     };
 
     const handlePrevPage = () => {
-        // Simple pagination: just go back to the first page
         setPage(1);
-        setLastVisible(null); // Reset pagination cursor
+        setLastVisible(null);
         fetchTasks('initial');
     };
 
@@ -119,7 +119,7 @@ export default function TaskManagementPage() {
     const pageTitle = userProfile?.isAdmin ? "Task Management (All)" : "Your Active Tasks";
     const pageDescription = userProfile?.isAdmin ? "View, search, and manage all tasks in the system." : "Tasks you have accepted and are currently working on.";
     
-    if (authLoading || loadingData || !userProfile) {
+    if (authLoading || !userProfile) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
                 <Loader2 className="h-10 w-10 animate-spin text-primary" />

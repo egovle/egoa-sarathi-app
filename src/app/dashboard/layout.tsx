@@ -25,6 +25,9 @@ import {
   MessageSquare,
   Building,
   HardDriveUpload,
+  AlertTriangle,
+  UserPlus as UserPlusIcon,
+  Wallet,
 } from "lucide-react"
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where, doc, writeBatch, getDocs, deleteDoc } from "firebase/firestore";
@@ -59,12 +62,16 @@ import type { Notification } from "@/lib/types";
 const ALL_NAV_ITEMS = [
     { href: "/dashboard", icon: Home, label: "Home", roles: ['admin', 'vle', 'customer', 'government'] },
     { href: "/dashboard/documents", icon: HardDriveUpload, label: "My Documents", roles: ['customer'] },
-    { href: "/dashboard/task-management", icon: Briefcase, label: "Task Management", roles: ['admin', 'vle'] },
-    { href: "/dashboard/lead-management", icon: FilePlus, label: "Lead Management", roles: ['vle'] },
+    { href: "/dashboard/task-management", icon: Briefcase, label: "All Tasks", roles: ['admin'] },
+    { href: "/dashboard/task-management", icon: Briefcase, label: "My Tasks", roles: ['vle'] },
+    { href: "/dashboard/lead-management", icon: FilePlus, label: "My Leads", roles: ['vle'] },
+    { href: "/dashboard/complaints", icon: AlertTriangle, label: "Complaints", roles: ['admin'] },
     { href: "/dashboard/reports", icon: BarChart, label: "Reports", roles: ['admin', 'vle'] },
     { href: "/dashboard/camps", icon: Tent, label: "Camps", roles: ['admin', 'vle', 'customer', 'government'] },
     { href: "/dashboard/group-chat", icon: MessageSquare, label: "Group Chat", roles: ['admin', 'vle'] },
     { href: "/dashboard/services", icon: ListPlus, label: "Services", roles: ['admin'] },
+    { href: "/dashboard/users?tab=vles", icon: UserPlusIcon, label: "VLE Requests", roles: ['admin'] },
+    { href: "/dashboard/users?tab=payments", icon: Wallet, label: "Payment Requests", roles: ['admin'] },
     { href: "/dashboard/users", icon: Users, label: "User Management", roles: ['admin'] },
     { href: "/dashboard/training", icon: BookOpenCheck, label: "Help", roles: ['admin', 'vle'] },
     { href: "/dashboard/settings", icon: Settings, label: "Settings", roles: ['admin', 'vle', 'customer', 'government']},
@@ -77,6 +84,7 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { user, userProfile } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -179,14 +187,32 @@ export default function DashboardLayout({
   };
   
   const isLinkActive = (href: string) => {
-    if (href === '/dashboard') {
-        return pathname === href;
+    const currentTab = searchParams.get('tab');
+    const [path, query] = href.split('?');
+    
+    // Exact match for dashboard home
+    if (path === '/dashboard' && pathname === href) {
+        return true;
     }
-     // Special case for settings to match profile tab
-    if (href === '/dashboard/settings') {
-        return pathname === '/dashboard' && useSearchParams().get('tab') === 'profile';
+    
+    // Settings page is a special tab on the dashboard home
+    if (path === '/dashboard/settings' || (path === '/dashboard' && href.includes('tab=profile'))) {
+        return pathname === '/dashboard' && currentTab === 'profile';
     }
-    return pathname.startsWith(href);
+
+    // Match for pages with tabs
+    if (query) {
+        const queryTab = new URLSearchParams(query).get('tab');
+        return pathname === path && currentTab === queryTab;
+    }
+
+    // General case for other pages
+    if (path !== '/dashboard') {
+      return pathname.startsWith(path);
+    }
+    
+    // Default case for dashboard home without any other matches
+    return pathname === '/dashboard' && !currentTab;
   }
 
   const NavLink = ({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string; }) => {
