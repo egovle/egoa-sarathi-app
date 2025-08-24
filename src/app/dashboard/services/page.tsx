@@ -34,13 +34,21 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
 
     useEffect(() => {
         if (service) {
-            setName(service.name || '');
-            setCustomerRate(service.customerRate?.toString() || '');
-            setVleRate(service.vleRate?.toString() || '');
-            setGovernmentFee(service.governmentFee?.toString() || '');
-            setIsVariable(service.isVariable || false);
-            setParentId(service.parentId || 'none');
-            setDocumentGroups(service.documentGroups || []);
+            setName(service.name ?? '');
+            setIsVariable(service.isVariable ?? false);
+            setParentId(service.parentId ?? 'none');
+            setDocumentGroups(service.documentGroups ?? []);
+            
+            // Only set rates if it's not a variable service
+            if (!service.isVariable) {
+                setCustomerRate(service.customerRate?.toString() ?? '');
+                setVleRate(service.vleRate?.toString() ?? '');
+                setGovernmentFee(service.governmentFee?.toString() ?? '');
+            } else {
+                setCustomerRate('');
+                setVleRate('');
+                setGovernmentFee('');
+            }
         } else {
             // Reset form for creating new
             setName('');
@@ -73,7 +81,8 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
                 await updateDoc(doc(db, "services", service.id), serviceData as any);
                 toast({ title: 'Service Updated', description: 'The service has been successfully updated.' });
             } else {
-                await addDoc(collection(db, "services"), serviceData);
+                const docRef = doc(collection(db, "services"));
+                await setDoc(docRef, { ...serviceData, id: docRef.id });
                 toast({ title: 'Service Created', description: 'The new service has been added.' });
             }
             onFinished();
