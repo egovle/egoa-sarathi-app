@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, type FormEvent, useMemo, useRef } from 'react';
-import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, setDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -38,19 +38,10 @@ const ServiceForm = ({ service, onFinished, services }: { service?: Service | nu
             setIsVariable(service.isVariable ?? false);
             setParentId(service.parentId ?? 'none');
             setDocumentGroups(service.documentGroups ?? []);
-            
-            // Only set rates if it's not a variable service
-            if (!service.isVariable) {
-                setCustomerRate(service.customerRate?.toString() ?? '');
-                setVleRate(service.vleRate?.toString() ?? '');
-                setGovernmentFee(service.governmentFee?.toString() ?? '');
-            } else {
-                setCustomerRate('');
-                setVleRate('');
-                setGovernmentFee('');
-            }
+            setCustomerRate(service.customerRate?.toString() ?? '');
+            setVleRate(service.vleRate?.toString() ?? '');
+            setGovernmentFee(service.governmentFee?.toString() ?? '');
         } else {
-            // Reset form for creating new
             setName('');
             setCustomerRate('');
             setVleRate('');

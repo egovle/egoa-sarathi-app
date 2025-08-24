@@ -89,6 +89,7 @@ export default function DashboardLayout({
   const { user, userProfile } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   
   const navItems = ALL_NAV_ITEMS.filter(item => {
     const userRole = userProfile?.isAdmin ? 'admin' : userProfile?.role;
@@ -190,28 +191,23 @@ export default function DashboardLayout({
     const currentTab = searchParams.get('tab');
     const [path, query] = href.split('?');
     
-    // Exact match for dashboard home
     if (path === '/dashboard' && pathname === href) {
         return true;
     }
     
-    // Settings page is a special tab on the dashboard home
     if (path === '/dashboard/settings' || (path === '/dashboard' && href.includes('tab=profile'))) {
         return pathname === '/dashboard' && currentTab === 'profile';
     }
 
-    // Match for pages with tabs
     if (query) {
         const queryTab = new URLSearchParams(query).get('tab');
         return pathname === path && currentTab === queryTab;
     }
 
-    // General case for other pages
     if (path !== '/dashboard') {
       return pathname.startsWith(path);
     }
     
-    // Default case for dashboard home without any other matches
     return pathname === '/dashboard' && !currentTab;
   }
 
@@ -315,10 +311,9 @@ export default function DashboardLayout({
                 </Sheet>
 
                 <div className="w-full flex-1">
-                   {/* Optional: Add search bar here if needed in header */}
                 </div>
 
-                 <Popover>
+                 <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
                     <PopoverTrigger asChild>
                     <Button variant="outline" size="icon" className="relative rounded-full">
                         <Bell className="h-5 w-5" />
@@ -357,12 +352,7 @@ export default function DashboardLayout({
                             {notifications.length > 0 ? (
                             notifications.map((notif) => (
                                 <div key={notif.id} className={cn("group relative p-3 rounded-md transition-colors hover:bg-muted", !notif.read && 'bg-primary/10')}>
-                                    <Link href={notif.link || '/dashboard'} className="block pr-6" onClick={() => {
-                                        const popoverTrigger = document.querySelector('[data-radix-popover-trigger][aria-expanded="true"]');
-                                        if (popoverTrigger instanceof HTMLElement) {
-                                            popoverTrigger.click();
-                                        }
-                                    }}>
+                                    <Link href={notif.link || '/dashboard'} className="block pr-6" onClick={() => setIsPopoverOpen(false)}>
                                         <p className="font-semibold text-sm">{notif.title}</p>
                                         <p className="text-sm text-muted-foreground">{notif.description}</p>
                                         <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(notif.date), { addSuffix: true })}</p>

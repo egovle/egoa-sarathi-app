@@ -13,9 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const services = [
-  { name: 'Income Certificate', icon: FileText, description: 'Official proof of income for various financial applications.' },
-  { name: 'Residence Certificate', icon: FileText, description: 'Verify your local residency for official purposes.' },
-  { name: 'PAN Card Services', icon: FileText, description: 'Apply for a new PAN card or make corrections to an existing one.' },
+  { name: 'Income Certificate', icon: FileText, description: 'Official proof of income for various financial applications.', dataAiHint: "certificate document" },
+  { name: 'Residence Certificate', icon: FileText, description: 'Verify your local residency for official purposes.', dataAiHint: "house paper" },
+  { name: 'PAN Card Services', icon: FileText, description: 'Apply for a new PAN card or make corrections to an existing one.', dataAiHint: "tax document" },
 ];
 
 const howItWorks = [
@@ -107,16 +107,26 @@ export default function HomePage() {
                 </div>
                 <div className="mx-auto grid max-w-5xl items-start gap-8 py-12 sm:grid-cols-2 md:gap-12 lg:grid-cols-3">
                     {services.map((service) => (
-                        <Card key={service.name} className="group overflow-hidden bg-card/50 hover:bg-card/90 transition-all duration-300 hover:shadow-primary/10 hover:-translate-y-2 hover:shadow-lg">
-                            <CardHeader className="items-center">
+                         <Card key={service.name} className="group overflow-hidden bg-card/50 hover:bg-card/90 transition-all duration-300 hover:shadow-primary/10 hover:-translate-y-2 hover:shadow-lg flex flex-col">
+                            <CardHeader className="items-center pb-4">
                                 <div className="p-4 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors duration-300">
                                     <service.icon className="h-8 w-8 text-primary" />
                                 </div>
                                 <CardTitle>{service.name}</CardTitle>
                             </CardHeader>
-                            <CardContent>
-                                <p className="text-sm text-center text-muted-foreground">{service.description}</p>
-                            </CardContent>
+                             <CardContent className="flex flex-col flex-1 justify-between">
+                                 <p className="text-sm text-center text-muted-foreground mb-4">{service.description}</p>
+                                 <div className="aspect-video bg-muted rounded-md overflow-hidden">
+                                     <Image
+                                        src={`https://placehold.co/400x225.png`}
+                                        alt={service.name}
+                                        width={400}
+                                        height={225}
+                                        className="object-cover w-full h-full"
+                                        data-ai-hint={service.dataAiHint}
+                                    />
+                                 </div>
+                             </CardContent>
                         </Card>
                     ))}
                 </div>

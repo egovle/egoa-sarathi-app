@@ -8,12 +8,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 
 
 export const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { trigger: React.ReactNode, taskId: string, availableVles: any[], onAssign: (taskId: string, vleId: string, vleName: string) => void }) => {
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
     const [selectedVleId, setSelectedVleId] = useState('');
+    const [isAssigning, setIsAssigning] = useState(false);
 
     const handleAssign = async () => {
         if (!selectedVleId) {
@@ -22,12 +24,15 @@ export const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { 
         }
         const vle = availableVles.find(v => v.id === selectedVleId);
         
+        setIsAssigning(true);
         try {
             await onAssign(taskId, selectedVleId, vle.name);
             toast({ title: 'Task Assigned', description: `Task ${taskId.slice(-6).toUpperCase()} has been assigned.`});
             setOpen(false);
         } catch (error) {
             console.error("Assignment failed, dialog will remain open.");
+        } finally {
+            setIsAssigning(false);
         }
     }
 
@@ -57,7 +62,10 @@ export const AssignVleDialog = ({ trigger, taskId, availableVles, onAssign }: { 
                     </Select>
                 </div>
                 <DialogFooter>
-                    <Button onClick={handleAssign}>Assign VLE</Button>
+                    <Button onClick={handleAssign} disabled={isAssigning || !selectedVleId}>
+                        {isAssigning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Assign VLE
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -68,17 +76,20 @@ export const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: 
     const { toast } = useToast();
     const [open, setOpen] = useState(false);
     const [amount, setAmount] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
+        setIsSubmitting(true);
         const amountToAdd = parseFloat(amount);
         if (isNaN(amountToAdd) || amountToAdd <= 0) {
             toast({ title: 'Invalid Amount', description: 'Please enter a valid positive number.', variant: 'destructive' });
+            setIsSubmitting(false);
             return;
         }
         onAddBalance(amountToAdd);
-        toast({ title: 'Balance Added', description: `₹${amountToAdd.toFixed(2)} has been added to ${vleName}'s wallet.` });
         setOpen(false);
+        setIsSubmitting(false);
     };
 
     const handleOpenChange = (isOpen: boolean) => {
@@ -109,7 +120,10 @@ export const AddBalanceDialog = ({ trigger, vleName, onAddBalance }: { trigger: 
                         />
                     </div>
                     <DialogFooter>
-                        <Button type="submit">Add Balance</Button>
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Add Balance
+                        </Button>
                     </DialogFooter>
                 </form>
             </DialogContent>

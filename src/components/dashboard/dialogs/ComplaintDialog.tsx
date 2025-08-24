@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { CameraUploadDialog } from './CameraUploadDialog';
 import { validateFiles } from '@/lib/utils';
-import { Camera, FileText, FileUp } from 'lucide-react';
+import { Camera, FileText, FileUp, ShieldAlert } from 'lucide-react';
 
 export const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigger: React.ReactNode, taskId: string, onComplaintSubmit: (taskId: string, complaint: any, files: File[]) => void }) => {
     const { toast } = useToast();
@@ -80,7 +80,7 @@ export const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigge
                              <div>
                                 <Label>Attach Documents</Label>
                                 <div className="flex gap-2 mt-2">
-                                    <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="secondary" className="bg-primary/20 text-primary hover:bg-primary/30">
+                                    <Button type="button" onClick={() => fileInputRef.current?.click()} size="sm" variant="outline">
                                         <FileUp className="mr-2 h-4 w-4"/> Choose Files
                                     </Button>
                                     <Button type="button" variant="outline" onClick={() => setIsCameraOpen(true)} size="sm">
@@ -97,7 +97,9 @@ export const ComplaintDialog = ({ trigger, taskId, onComplaintSubmit }: { trigge
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button type="submit">Submit Complaint</Button>
+                            <Button type="submit" variant="destructive">
+                                <ShieldAlert className="mr-2 h-4 w-4" />Submit Complaint
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>

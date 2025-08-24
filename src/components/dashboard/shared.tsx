@@ -346,7 +346,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                               </div>
                                               {uploadedFile ? (
                                                 <div className="flex items-center gap-2">
-                                                    <div className="flex items-center gap-2 text-green-600 font-medium">
+                                                    <div className="flex items-center gap-2 text-primary-foreground/80 font-medium">
                                                         <FileText className="h-4 w-4" />
                                                         <span className="truncate max-w-[150px]">{uploadedFile.name}</span>
                                                     </div>
