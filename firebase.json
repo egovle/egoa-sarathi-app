@@ -1,3 +1,4 @@
+
 {
   "apphosting": [
     {
@@ -15,5 +16,8 @@
       ],
       "alwaysDeployFromSource": true
     }
-  ]
+  ],
+  "storage": {
+    "rules": "storage.rules"
+  }
 }
