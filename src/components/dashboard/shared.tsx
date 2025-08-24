@@ -144,7 +144,6 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                 return isSupplied ? count + 1 : count;
             }, 0);
     
-            // Rule 1: Check if the number of supplied documents meets the minimum required for the group.
             if (suppliedCount < (group.minRequired || 0)) {
                 toast({
                     title: `More Information Required`,
@@ -155,7 +154,6 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                 return;
             }
     
-            // Rule 2: Check if every individually mandatory field has been supplied.
             for (const option of group.options) {
                 if (option.isOptional) {
                     continue;
@@ -346,7 +344,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                                               </div>
                                               {uploadedFile ? (
                                                 <div className="flex items-center gap-2">
-                                                    <div className="flex items-center gap-2 text-primary-foreground/80 font-medium">
+                                                    <div className="flex items-center gap-2 text-foreground font-medium">
                                                         <FileText className="h-4 w-4" />
                                                         <span className="truncate max-w-[150px]">{uploadedFile.name}</span>
                                                     </div>
@@ -421,9 +419,9 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                             </div>
                             {!selectedService.isVariable && (
                             <>
-                                <div className="flex justify-between text-sm text-destructive">
+                                <div className="flex justify-between text-sm text-foreground">
                                     <span className="text-muted-foreground">Service Fee</span>
-                                    <span>- ₹{serviceFee.toFixed(2)}</span>
+                                    <span className='text-destructive'>- ₹{serviceFee.toFixed(2)}</span>
                                 </div>
                                 <Separator className="my-2" />
                                 <div className={`flex justify-between font-semibold ${remainingBalance < 0 ? 'text-destructive' : ''}`}>

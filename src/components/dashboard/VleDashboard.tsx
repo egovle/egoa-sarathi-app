@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { doc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
-import { createNotificationForAdmins } from '@/app/actions';
+import { createNotificationForAdmins, createNotification } from '@/app/actions';
 
 import { ToggleRight, CheckCircle2, XCircle, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +20,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { calculateVleEarnings } from '@/lib/utils';
-import type { Task, Service, VLEProfile, Camp } from '@/lib/types';
+import type { Task, Service, VLEProfile, Camp, TaskDocument } from '@/lib/types';
 
 
 const PendingApprovalView = () => (
@@ -72,7 +72,7 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
                     actorId: user.uid,
-                    actorRole: 'VLE',
+                    actorRole: 'VLE' as const,
                     action: 'Task Accepted',
                     details: `VLE has accepted the task.`
                 };
@@ -84,7 +84,17 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
             });
     
             toast({ title: 'Task Accepted', description: 'You can now begin work on this task.' });
-            await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile?.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`);
+            
+            const taskDoc = await(getDoc(taskRef));
+            const taskData = taskDoc.data() as Task;
+
+            // Notify customer that the task has been accepted
+            await createNotification(
+                taskData.creatorId,
+                'Task Accepted!',
+                `Your task for "${taskData.service}" has been accepted by a VLE.`,
+                `/dashboard/task/${taskId}`
+            );
             
         } catch (error: any) {
             console.error("Task acceptance failed:", error);
@@ -93,16 +103,16 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     }
 
     const onTaskReject = async (taskId: string) => {
-        if (!user) return;
+        if (!user || !userProfile) return;
         const taskRef = doc(db, "tasks", taskId);
 
         try {
             const historyEntry = {
                 timestamp: new Date().toISOString(),
                 actorId: user.uid,
-                actorRole: 'VLE',
+                actorRole: 'VLE' as const,
                 action: 'Task Rejected',
-                details: `VLE has rejected the task. It has been returned to the assignment queue.`
+                details: `VLE ${userProfile.name} rejected the task. It has been returned to the assignment queue.`
             };
             
             await updateDoc(taskRef, {
@@ -115,7 +125,8 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
             toast({ title: 'Task Rejected', description: 'The task has been returned to the admin.' });
             await createNotificationForAdmins(
                 'Task Rejected by VLE',
-                `Task ${taskId.slice(-6).toUpperCase()} was rejected and needs to be reassigned.`
+                `Task ${taskId.slice(-6).toUpperCase()} was rejected and needs to be reassigned.`,
+                 `/dashboard/task/${taskId}`
             );
         } catch (error: any) {
             console.error("Task rejection failed:", error);

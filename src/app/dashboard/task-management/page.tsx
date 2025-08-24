@@ -34,8 +34,8 @@ export default function TaskManagementPage() {
     
     // Pagination State
     const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
-    const [firstVisible, setFirstVisible] = useState<DocumentData | null>(null);
     const [page, setPage] = useState(1);
+    const [isLastPage, setIsLastPage] = useState(false);
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -43,42 +43,37 @@ export default function TaskManagementPage() {
         }
     }, [user, userProfile, authLoading, router]);
 
-    const fetchTasks = useCallback(async (direction: 'next' | 'prev' | 'initial' = 'initial') => {
+    const fetchTasks = useCallback(async (direction: 'next' | 'initial' = 'initial') => {
         setLoadingData(true);
         if (!userProfile) return;
 
-        let baseConditions: any[] = [orderBy("date", "desc")];
-
-        // VLEs see their assigned tasks
+        let conditions: any[] = [orderBy("date", "desc")];
         if (userProfile.role === 'vle') {
-            baseConditions.unshift(where("assignedVleId", "==", userProfile.id));
+            conditions.unshift(where("assignedVleId", "==", userProfile.id));
         }
-        // Admins see all tasks, so no user-based where clause is added for them.
-
         if (statusFilter !== 'all') {
-             baseConditions.unshift(where("status", "==", statusFilter));
+            conditions.unshift(where("status", "==", statusFilter));
         }
-        
-        let finalQuery: Query<DocumentData>;
+
+        let q: Query<DocumentData>;
         const collectionRef = collection(db, "tasks");
 
         if (direction === 'next' && lastVisible) {
-            finalQuery = query(collectionRef, ...baseConditions, startAfter(lastVisible), limit(PAGE_SIZE));
+            q = query(collectionRef, ...conditions, startAfter(lastVisible), limit(PAGE_SIZE));
         } else {
-            finalQuery = query(collectionRef, ...baseConditions, limit(PAGE_SIZE));
+            q = query(collectionRef, ...conditions, limit(PAGE_SIZE));
         }
-
+        
         try {
-            const snapshot = await getDocs(finalQuery);
+            const snapshot = await getDocs(q);
             const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
             setTasks(fetchedTasks);
 
-            if (!snapshot.empty) {
-                setFirstVisible(snapshot.docs[0]);
-                setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+            if (snapshot.empty || snapshot.size < PAGE_SIZE) {
+                setIsLastPage(true);
             } else {
-                setFirstVisible(null);
-                setLastVisible(null);
+                setIsLastPage(false);
+                setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
             }
         } catch (error) {
             console.error("Error fetching tasks:", error);
@@ -89,10 +84,12 @@ export default function TaskManagementPage() {
     
     useEffect(() => {
         if (userProfile) {
+            setPage(1);
+            setLastVisible(null);
             fetchTasks('initial');
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userProfile, statusFilter]); // Re-fetch when filter changes
+    }, [userProfile, statusFilter]);
 
     const handleNextPage = () => {
         setPage(p => p + 1);
@@ -100,6 +97,7 @@ export default function TaskManagementPage() {
     };
 
     const handlePrevPage = () => {
+        // Simple pagination: just go back to page 1
         setPage(1);
         setLastVisible(null);
         fetchTasks('initial');
@@ -198,7 +196,7 @@ export default function TaskManagementPage() {
                 <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={page <= 1}>
                     <ChevronLeft className="mr-2 h-4 w-4" /> Previous
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleNextPage} disabled={tasks.length < PAGE_SIZE}>
+                <Button variant="outline" size="sm" onClick={handleNextPage} disabled={isLastPage}>
                     Next <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
             </CardFooter>

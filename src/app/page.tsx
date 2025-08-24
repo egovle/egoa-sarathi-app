@@ -130,6 +130,11 @@ export default function HomePage() {
                         </Card>
                     ))}
                 </div>
+                 <div className="text-center">
+                    <Button asChild>
+                        <Link href="/services">View All Services</Link>
+                    </Button>
+                </div>
             </div>
         </section>
 

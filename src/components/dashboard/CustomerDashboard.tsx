@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/context/AuthContext';
 import { db, storage } from '@/lib/firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, arrayUnion } from 'firebase/firestore';
 import { createNotificationForAdmins } from '@/app/actions';
 
 
@@ -20,9 +20,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { TaskCreatorDialog } from './shared';
-import { ComplaintDialog } from './dialogs/ComplaintDialog';
-import { FeedbackDialog } from './dialogs/FeedbackDialog';
+import { TaskCreatorDialog } from '@/components/dashboard/shared';
+import { ComplaintDialog } from '@/components/dashboard/dialogs/ComplaintDialog';
+import { FeedbackDialog } from '@/components/dashboard/dialogs/FeedbackDialog';
 import type { Task, Service, UserProfile, Complaint } from '@/lib/types';
 
 
@@ -33,6 +33,7 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
     const [searchQuery, setSearchQuery] = useState('');
 
     const handleComplaintSubmit = async (taskId: string, complaint: any, filesToUpload: File[]) => {
+        if (!user || !userProfile) return;
         const taskRef = doc(db, "tasks", taskId);
         
         const uploadedDocuments: { name: string, url: string }[] = [];
@@ -45,21 +46,49 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
             }
         }
         const complaintWithDocs = { ...complaint, documents: uploadedDocuments };
+        
+        const historyEntry = {
+            timestamp: new Date().toISOString(),
+            actorId: user.uid,
+            actorRole: 'Customer',
+            action: 'Complaint Raised',
+            details: `Complaint: "${complaint.text}"`
+        };
 
-        await updateDoc(taskRef, { complaint: complaintWithDocs, status: 'Complaint Raised' });
+        await updateDoc(taskRef, { 
+            complaint: complaintWithDocs, 
+            status: 'Complaint Raised',
+            history: arrayUnion(historyEntry)
+        });
+
         const taskSnap = await getDoc(taskRef);
-        const taskData = taskSnap.data();
-        await createNotificationForAdmins(
-            'New Complaint Raised',
-            `A complaint was raised for task ${taskId.slice(-6).toUpperCase()} by ${taskData?.customer}.`,
-            `/dashboard/task/${taskId}`
-        );
+        if (taskSnap.exists()) {
+            const taskData = taskSnap.data() as Task;
+            await createNotificationForAdmins(
+                'New Complaint Raised',
+                `A complaint was raised for task ${taskId.slice(-6).toUpperCase()} by ${taskData.customer}.`,
+                `/dashboard/task/${taskId}`
+            );
+        }
         toast({ title: 'Complaint Submitted', description: 'Your complaint has been registered. We will look into it shortly.' });
     }
     
     const handleFeedbackSubmit = async (taskId: string, feedback: any) => {
+        if (!user || !userProfile) return;
         const taskRef = doc(db, "tasks", taskId);
-        await updateDoc(taskRef, { feedback: feedback });
+
+         const historyEntry = {
+            timestamp: new Date().toISOString(),
+            actorId: user.uid,
+            actorRole: 'Customer',
+            action: 'Feedback Submitted',
+            details: `Rating: ${feedback.rating}/5. Comment: "${feedback.comment || 'N/A'}"`
+        };
+
+        await updateDoc(taskRef, { 
+            feedback: feedback,
+            history: arrayUnion(historyEntry)
+        });
         toast({ title: 'Feedback Submitted', description: 'Thank you for your valuable feedback!' });
     }
 
@@ -175,7 +204,7 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
                             <TableBody>
                                 {customerComplaints.length > 0 ? (
                                     customerComplaints.map(c => (
-                                    <TableRow key={c.date}>
+                                    <TableRow key={c.taskId}>
                                         <TableCell className="font-medium">{c.taskId.slice(-6).toUpperCase()}</TableCell>
                                         <TableCell>{c.service}</TableCell>
                                         <TableCell className="max-w-xs break-words">{c.text}</TableCell>

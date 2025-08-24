@@ -3,33 +3,31 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow writes to the tasks folder for anyone
-    match /tasks/{taskId}/{allPaths=**} {
-      allow write: if true;
-      allow read: if request.auth != null; // Only authenticated users can read
-    }
-
-    // Allow profile picture uploads for authenticated users
-    match /profile-pictures/{userId}/{allPaths=**} {
-        allow read: if true;
-        allow write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // Allow training material uploads only for authenticated users (admins)
-    match /training_materials/{allPaths=**} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null; // Further secured by backend logic
-    }
-    
-    // Allow group chat file uploads only for authenticated users
-    match /group_chat_files/{allPaths=**} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null;
-    }
-
-    // Deny all other reads and writes by default
     match /{allPaths=**} {
+      // Default deny all
+      allow read, write: if false;
+    }
+    
+    // Allow any authenticated user to read/write in the 'tasks' directory
+    match /tasks/{taskId}/{allPaths=**} {
       allow read, write: if request.auth != null;
     }
+
+    // Allow any authenticated user to read/write in the 'group_chat_files' directory
+    match /group_chat_files/{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow any authenticated user to write to their own profile picture path
+    match /profile-pictures/{userId}/{allPaths=**} {
+        allow read; // Allow public read for profile pictures
+        allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Allow any authenticated user to upload training materials
+     match /training_materials/{allPaths=**} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null;
+     }
   }
 }
