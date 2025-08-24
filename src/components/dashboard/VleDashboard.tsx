@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, runTransaction, getDoc } from 'firebase/firestore';
 import { createNotificationForAdmins, createNotification } from '@/app/actions';
 
 import { ToggleRight, CheckCircle2, XCircle, Info } from 'lucide-react';
