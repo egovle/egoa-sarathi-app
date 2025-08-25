@@ -1,4 +1,3 @@
-
 'use server';
 
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc, writeBatch, deleteDoc, getDoc, Timestamp, orderBy, limit } from "firebase/firestore";
@@ -99,7 +98,7 @@ export async function createTask(formData: FormData) {
                 const groupKey = keys[0];
                 const optionKey = keys[1];
 
-                const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
+                const storageRef = ref(storage, `tasks/${creatorId}/${Date.now()}_${file.name}`);
                 
                 const metadata = { 
                     customMetadata: { 
@@ -120,7 +119,7 @@ export async function createTask(formData: FormData) {
                 });
                 fileUploadPromises.push(uploadPromise);
             } else if (key.startsWith('text_')) {
-                 const keys = key.replace('text_', '');
+                 const keys = key.replace('text_', '').split(':');
                  customFormData[keys] = value as string;
             }
         }
