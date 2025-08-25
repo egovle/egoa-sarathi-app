@@ -95,14 +95,9 @@ export default function DashboardLayout({
     const userRole = userProfile?.isAdmin ? 'admin' : userProfile?.role;
     if (!userRole) return false;
 
-    // Special handling for User Management vs. requests
-    if (item.href.startsWith('/dashboard/users?tab=')) {
-        return userRole === 'admin';
-    }
-    if (item.href === '/dashboard/users') {
-        // Exclude this if we're on a tabbed version
-        if (searchParams.get('tab')) return false;
-        return userRole === 'admin';
+    // Show User Management only if there's no specific tab selected for it.
+    if (item.href === '/dashboard/users' && searchParams.get('tab')) {
+      return false;
     }
 
     return item.roles.includes(userRole);
@@ -203,11 +198,6 @@ export default function DashboardLayout({
     const currentTab = searchParams.get('tab');
     const [path, query] = href.split('?');
     
-    // Exact match for dashboard home
-    if (href === '/dashboard' && pathname === href) {
-        return true;
-    }
-    
     // Handle settings tab specifically
     if (path === '/dashboard/settings') {
         return pathname === '/dashboard' && searchParams.get('tab') === 'profile';
@@ -218,12 +208,13 @@ export default function DashboardLayout({
         const queryTab = new URLSearchParams(query).get('tab');
         return pathname === path && currentTab === queryTab;
     }
-
+    
     // Handle non-tabbed links
     if (path !== '/dashboard') {
       return pathname.startsWith(path);
     }
     
+    // Exact match for dashboard home
     return pathname === '/dashboard' && !currentTab;
   }
 

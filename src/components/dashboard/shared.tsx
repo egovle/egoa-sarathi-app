@@ -15,7 +15,7 @@ import { validateFiles } from '@/lib/utils';
 import { Briefcase, Users, Users2, AlertTriangle } from 'lucide-react';
 import { createTask } from '@/app/actions';
 import { Badge } from '../ui/badge';
-import type { Service, UserProfile } from '@/lib/types';
+import type { Service, UserProfile, DocumentGroup } from '@/lib/types';
 
 const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
@@ -314,7 +314,7 @@ export const TaskCreatorDialog = ({ buttonTrigger, type, creatorId, creatorProfi
                           <p className="text-xs text-muted-foreground">Note file size limits: PDF (1MB), PNG/JPG (100KB).</p>
                       </div>
                       <div className="space-y-4">
-                        {selectedService.documentGroups.map(group => (
+                        {selectedService.documentGroups.map((group: DocumentGroup) => (
                           <Card key={group.key} className="p-4 bg-muted/50">
                               <CardHeader className="p-0 pb-2">
                                 <CardTitle className="text-base flex items-center gap-2">

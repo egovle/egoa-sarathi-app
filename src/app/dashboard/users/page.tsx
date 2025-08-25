@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { CustomerProfile, VLEProfile, GovernmentProfile, PaymentRequest, Service } from '@/lib/types';
 import { AddBalanceDialog } from '@/components/dashboard/dialogs/AdminDialogs';
-import { createNotification, createNotificationForAdmins } from '@/app/actions';
+import { createNotification } from '@/app/actions';
 
 
 type UserTypes = CustomerProfile | VLEProfile | GovernmentProfile;
@@ -206,15 +206,21 @@ export default function UserManagementPage() {
         const docRef = doc(db, collectionName, userId);
 
         try {
-            await updateDoc(docRef, { walletBalance: (user.walletBalance || 0) + amount });
+            const userSnap = await getDoc(docRef);
+            if (!userSnap.exists()) throw new Error("User not found for balance update.");
+
+            const currentBalance = userSnap.data().walletBalance || 0;
+            await updateDoc(docRef, { walletBalance: currentBalance + amount });
+
             await createNotification(userId, 'Wallet Balance Added', `₹${amount.toFixed(2)} has been added to your wallet by an admin.`);
             toast({ title: "Balance Added", description: `₹${amount.toFixed(2)} added to ${user.name}'s wallet.` });
-        } catch (error) {
-            toast({ title: "Error", description: "Failed to add balance.", variant: "destructive" });
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message || "Failed to add balance.", variant: "destructive" });
         }
     };
     
     const handleApprovePaymentRequest = async (req: PaymentRequest) => {
+        if (!userProfile) return;
         const collectionName = req.userRole === 'vle' ? 'vles' : 'users';
         const userRef = doc(db, collectionName, req.userId);
         const reqRef = doc(db, 'paymentRequests', req.id);
@@ -226,7 +232,7 @@ export default function UserManagementPage() {
             
             const batch = writeBatch(db);
             batch.update(userRef, { walletBalance: currentBalance + req.amount });
-            batch.update(reqRef, { status: 'approved', approvedBy: userProfile?.id, approvedAt: new Date().toISOString() });
+            batch.update(reqRef, { status: 'approved', approvedBy: userProfile.id, approvedAt: new Date().toISOString() });
             await batch.commit();
             
             await createNotification(req.userId, 'Balance Request Approved', `Your request to add ₹${req.amount.toFixed(2)} has been approved.`);

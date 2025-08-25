@@ -22,7 +22,7 @@ import { cn, validateFiles, calculateVleEarnings } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { TaskChat } from '@/components/dashboard/task/TaskChat';
 import { AssignVleDialog, SetPriceDialog, RequestInfoDialog, SubmitAcknowledgementDialog, UploadCertificateDialog } from '@/components/dashboard/task/TaskDialogs';
-import type { Task, HistoryEntry, VLEProfile, Service } from '@/lib/types';
+import type { Task, HistoryEntry, VLEProfile, Service, TaskDocument } from '@/lib/types';
 
 
 export default function TaskDetailPage() {
@@ -121,7 +121,7 @@ export default function TaskDetailPage() {
     const groupedDocuments = useMemo(() => {
         if (!task?.documents) return {};
         
-        return task.documents.reduce((acc: Record<string, any[]>, doc: any) => {
+        return task.documents.reduce((acc: Record<string, TaskDocument[]>, doc: TaskDocument) => {
             const groupKey = doc.groupKey || 'additional_documents';
             if (!acc[groupKey]) {
                 acc[groupKey] = [];
@@ -133,7 +133,7 @@ export default function TaskDetailPage() {
 
     const documentGroupsToRender = useMemo(() => {
         if (!selectedService) return {};
-        const groups: Record<string, {label: string, docs: any[]}> = {};
+        const groups: Record<string, {label: string, docs: TaskDocument[]}> = {};
         
         selectedService.documentGroups.forEach(groupInfo => {
             groups[groupInfo.key] = { label: groupInfo.label, docs: groupedDocuments[groupInfo.key] || [] };
@@ -617,7 +617,7 @@ export default function TaskDetailPage() {
                                         <div key={key}>
                                             <h4 className="font-semibold text-sm mb-2">{group.label}</h4>
                                             <ul className="space-y-3 text-sm pl-4 border-l">
-                                                {group.docs.map((doc: any, index: number) => (
+                                                {group.docs.map((doc: TaskDocument, index: number) => (
                                                     <li key={index}>
                                                         <a href={doc.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-primary hover:underline break-words">
                                                             <FileText className="h-4 w-4 mt-0.5 shrink-0" />

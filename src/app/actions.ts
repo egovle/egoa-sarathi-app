@@ -4,7 +4,7 @@
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc, writeBatch, deleteDoc, getDoc, Timestamp, orderBy, limit } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { Task, UserProfile, Service, CampPayout, TaskDocument, VLEProfile, HistoryEntry } from "@/lib/types";
+import type { Task, UserProfile, Service, CampPayout, TaskDocument, VLEProfile, HistoryEntry, Document } from "@/lib/types";
 import { calculateVleEarnings } from "@/lib/utils";
 import { defaultServices } from "@/lib/seedData";
 import * as XLSX from 'xlsx';
@@ -604,4 +604,24 @@ export async function bulkUploadServices(fileContent: ArrayBuffer) {
         console.error("Bulk upload failed:", error);
         return { success: false, error: "Failed to commit changes to the database." };
     }
+}
+
+// Helper to get a user's phone number
+export async function getUserPhoneNumber(userId: string): Promise<string | null> {
+    const userRef = doc(db, 'users', userId);
+    const vleRef = doc(db, 'vles', userId);
+    const govRef = doc(db, 'government', userId);
+
+    const [userSnap, vleSnap, govSnap] = await Promise.all([
+        getDoc(userRef),
+        getDoc(vleRef),
+        getDoc(govRef)
+    ]);
+    
+    let userProfile: UserProfile | null = null;
+    if(userSnap.exists()) userProfile = userSnap.data() as UserProfile;
+    else if (vleSnap.exists()) userProfile = vleSnap.data() as UserProfile;
+    else if (govSnap.exists()) userProfile = govSnap.data() as UserProfile;
+
+    return userProfile?.mobile || null;
 }
