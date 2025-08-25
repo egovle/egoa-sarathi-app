@@ -53,7 +53,7 @@ const UsersTable = ({ users, onApprove, onAddBalance, userType, services }: { us
                                 <Badge variant={(user as VLEProfile).status === 'Approved' ? 'default' : 'secondary'}>
                                     {(user as VLEProfile).status}
                                 </Badge>
-                                 {(user as VLEProfile).offeredServices && (user as VLEProfile).offeredServices.length > 0 && (
+                                 {Array.isArray((user as VLEProfile).offeredServices) && (user as VLEProfile).offeredServices.length > 0 && (
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
