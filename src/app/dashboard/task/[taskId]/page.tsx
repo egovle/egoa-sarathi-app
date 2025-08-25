@@ -118,12 +118,20 @@ export default function TaskDetailPage() {
     }, [task?.documents]);
 
     const documentGroupsToRender = useMemo(() => {
-        return Object.keys(groupedDocuments).reduce((acc, key) => {
-            const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            acc[key] = { label, docs: groupedDocuments[key] };
-            return acc;
-        }, {} as Record<string, {label: string, docs: any[]}>);
-    }, [groupedDocuments]);
+        if (!selectedService) return {};
+        const groups: Record<string, {label: string, docs: any[]}> = {};
+        
+        selectedService.documentGroups.forEach(groupInfo => {
+            groups[groupInfo.key] = { label: groupInfo.label, docs: groupedDocuments[groupInfo.key] || [] };
+        });
+
+        if (groupedDocuments['additional_documents']) {
+             groups['additional_documents'] = { label: 'Additional Documents', docs: groupedDocuments['additional_documents'] };
+        }
+        
+        return groups;
+
+    }, [groupedDocuments, selectedService]);
 
     const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {

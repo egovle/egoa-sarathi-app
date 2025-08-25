@@ -99,7 +99,7 @@ export async function createTask(formData: FormData) {
                 const groupKey = keys[0];
                 const optionKey = keys[1];
 
-                const storageRef = ref(storage, `tasks/${creatorId}/${Date.now()}_${file.name}`);
+                const storageRef = ref(storage, `tasks/${taskId}/${Date.now()}_${file.name}`);
                 
                 const metadata = { 
                     customMetadata: { 
