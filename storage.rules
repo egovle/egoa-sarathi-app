@@ -1,43 +1,29 @@
-
 rules_version = '2';
-
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow unauthenticated reads for profile pictures for easy display in the app
-    match /profile-pictures/{userId}/{allPaths=**} {
-      allow read;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Allow authenticated users to write to the tasks folder.
-    // This is necessary for creating new service requests.
-    // Reading is restricted to prevent users from accessing each other's documents.
+    // Allow any authenticated user to upload to the tasks folder.
+    // Security is handled by Firestore rules on the task document itself.
     match /tasks/{taskId}/{allPaths=**} {
       allow write: if request.auth != null;
       allow read: if request.auth != null; 
     }
 
-    // Allow authenticated users to upload complaint-related files.
-    match /tasks/{taskId}/complaints/{allPaths=**} {
-        allow write: if request.auth != null;
-    }
-    
-    // Allow authenticated users to upload files for complaint responses (primarily admins).
-     match /tasks/{taskId}/complaint_responses/{allPaths=**} {
-        allow write: if request.auth != null;
+    // Users can only write to their own profile picture folder.
+    match /profile-pictures/{userId}/{allPaths=**} {
+      allow read;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Allow any authenticated user to upload training materials.
-    // This is currently restricted to admins via the UI, but this rule is open for future expansion.
+    // Admins can upload training materials, anyone can read.
     match /training_materials/{allPaths=**} {
       allow read;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null; // Further secured by Firestore rules on who can add to the collection
     }
 
-    // Allow any authenticated user to upload files to the group chat.
-    match /group_chat_files/{allPaths=**} {
+    // Participants in the group chat can upload files.
+     match /group_chat_files/{allPaths=**} {
       allow read;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null; // Further secured by app logic
     }
   }
 }

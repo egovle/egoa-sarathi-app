@@ -22,7 +22,7 @@ import { cn, validateFiles, calculateVleEarnings } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { TaskChat } from '@/components/dashboard/task/TaskChat';
 import { AssignVleDialog, SetPriceDialog, RequestInfoDialog, SubmitAcknowledgementDialog, UploadCertificateDialog } from '@/components/dashboard/task/TaskDialogs';
-import type { Task, HistoryEntry, VLEProfile } from '@/lib/types';
+import type { Task, HistoryEntry, VLEProfile, Service } from '@/lib/types';
 
 
 export default function TaskDetailPage() {
@@ -38,10 +38,24 @@ export default function TaskDetailPage() {
     const [isPayoutProcessing, setIsPayoutProcessing] = useState(false);
     const [informationRequest, setInformationRequest] = useState<string | null>(null);
     const [availableVles, setAvailableVles] = useState<VLEProfile[]>([]);
+    const [services, setServices] = useState<Service[]>([]);
     
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const selectedService = useMemo(() => {
+        if (!task || !services.length) return null;
+        return services.find(s => s.id === task.serviceId);
+    }, [task, services]);
+
+    useEffect(() => {
+        const servicesQuery = query(collection(db, "services"));
+        const unsub = onSnapshot(servicesQuery, (snapshot) => {
+            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
+        });
+        return () => unsub();
+    }, []);
 
     useEffect(() => {
         if (!taskId) return;
@@ -638,9 +652,4 @@ export default function TaskDetailPage() {
             </div>
         </div>
     );
-
-    
-
 }
-
-    
