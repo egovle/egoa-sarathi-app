@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
@@ -7,21 +6,28 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Search, CheckCircle, Clock, UserCheck } from 'lucide-react';
+import { Loader2, Search, CheckCircle, Clock, UserCheck, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import type { CustomerProfile, VLEProfile, GovernmentProfile, PaymentRequest } from '@/lib/types';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import type { CustomerProfile, VLEProfile, GovernmentProfile, PaymentRequest, Service } from '@/lib/types';
 import { AddBalanceDialog } from '@/components/dashboard/dialogs/AdminDialogs';
 import { createNotification, createNotificationForAdmins } from '@/app/actions';
 
 
 type UserTypes = CustomerProfile | VLEProfile | GovernmentProfile;
 
-const UsersTable = ({ users, onApprove, onAddBalance, userType }: { users: UserTypes[], onApprove?: (userId: string) => void, onAddBalance?: (userId: string, amount: number) => void, userType: 'vle' | 'customer' | 'government' }) => (
+const UsersTable = ({ users, onApprove, onAddBalance, userType, services }: { users: UserTypes[], onApprove?: (userId: string) => void, onAddBalance?: (userId: string, amount: number) => void, userType: 'vle' | 'customer' | 'government', services: Service[] }) => {
+    
+    const getServiceNames = (serviceIds: string[] = []) => {
+        return serviceIds.map(id => services.find(s => s.id === id)?.name).filter(Boolean);
+    };
+
+    return (
     <Table>
         <TableHeader>
             <TableRow>
@@ -29,7 +35,7 @@ const UsersTable = ({ users, onApprove, onAddBalance, userType }: { users: UserT
                 <TableHead>Email</TableHead>
                 <TableHead>Mobile</TableHead>
                 <TableHead>Location</TableHead>
-                {userType === 'vle' && <TableHead>Status</TableHead>}
+                {userType === 'vle' && <TableHead>Status / Services</TableHead>}
                 <TableHead className="text-right">Actions</TableHead>
             </TableRow>
         </TableHeader>
@@ -42,16 +48,35 @@ const UsersTable = ({ users, onApprove, onAddBalance, userType }: { users: UserT
                     <TableCell className="max-w-xs truncate">{user.location}</TableCell>
                     {userType === 'vle' && (
                         <TableCell>
-                            <Badge variant={(user as VLEProfile).status === 'Approved' ? 'default' : 'secondary'}>
-                                {(user as VLEProfile).status}
-                            </Badge>
+                            <div className="flex flex-col gap-2">
+                                <Badge variant={(user as VLEProfile).status === 'Approved' ? 'default' : 'secondary'}>
+                                    {(user as VLEProfile).status}
+                                </Badge>
+                                 {(user as VLEProfile).offeredServices && (user as VLEProfile).offeredServices.length > 0 && (
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Badge variant="outline" className="cursor-pointer w-fit">
+                                                    <Briefcase className="mr-1 h-3 w-3" />
+                                                    {(user as VLEProfile).offeredServices.length} services
+                                                </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <ul className="list-disc list-inside">
+                                                   {getServiceNames((user as VLEProfile).offeredServices).map(name => <li key={name}>{name}</li>)}
+                                                </ul>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                )}
+                            </div>
                         </TableCell>
                     )}
                     <TableCell className="text-right space-x-2">
                         {userType === 'vle' && (user as VLEProfile).status === 'Pending' && onApprove && (
                             <Button size="sm" onClick={() => onApprove(user.id)}><UserCheck className="mr-2 h-4 w-4"/>Approve</Button>
                         )}
-                        {onAddBalance && (
+                        {onAddBalance && user.role !== 'government' && (
                             <AddBalanceDialog 
                                 trigger={<Button size="sm" variant="outline">Add Balance</Button>}
                                 vleName={user.name}
@@ -69,7 +94,8 @@ const UsersTable = ({ users, onApprove, onAddBalance, userType }: { users: UserT
             )}
         </TableBody>
     </Table>
-);
+    )
+};
 
 
 const PaymentRequestsTable = ({ requests, onApprove, onReject }: { requests: PaymentRequest[], onApprove: (req: PaymentRequest) => void, onReject: (reqId: string) => void }) => {
@@ -116,6 +142,8 @@ export default function UserManagementPage() {
     const [vles, setVles] = useState<VLEProfile[]>([]);
     const [government, setGovernment] = useState<GovernmentProfile[]>([]);
     const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>([]);
+    const [services, setServices] = useState<Service[]>([]);
+
 
     const [loadingData, setLoadingData] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
@@ -150,8 +178,12 @@ export default function UserManagementPage() {
         const unsubPayments = onSnapshot(query(collection(db, "paymentRequests"), where('status', '==', 'pending')), (snapshot) => {
             setPaymentRequests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as PaymentRequest));
         });
+         const unsubServices = onSnapshot(query(collection(db, "services"), orderBy("name")), (snapshot) => {
+            setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
+        });
 
-        return () => { unsubCustomers(); unsubVles(); unsubGov(); unsubPayments() };
+
+        return () => { unsubCustomers(); unsubVles(); unsubGov(); unsubPayments(); unsubServices(); };
     }, []);
 
     const handleApproveVle = async (userId: string) => {
@@ -258,13 +290,13 @@ export default function UserManagementPage() {
                         <TabsTrigger value="payments">Payment Requests <Badge className="ml-2">{paymentRequests.length}</Badge></TabsTrigger>
                     </TabsList>
                     <TabsContent value="vles" className="mt-4">
-                        <UsersTable users={filteredData as VLEProfile[]} onApprove={handleApproveVle} onAddBalance={handleAddBalance} userType="vle" />
+                        <UsersTable users={filteredData as VLEProfile[]} onApprove={handleApproveVle} onAddBalance={handleAddBalance} userType="vle" services={services} />
                     </TabsContent>
                     <TabsContent value="customers" className="mt-4">
-                         <UsersTable users={filteredData as CustomerProfile[]} onAddBalance={handleAddBalance} userType="customer" />
+                         <UsersTable users={filteredData as CustomerProfile[]} onAddBalance={handleAddBalance} userType="customer" services={services} />
                     </TabsContent>
                     <TabsContent value="government" className="mt-4">
-                         <UsersTable users={filteredData as GovernmentProfile[]} userType="government" />
+                         <UsersTable users={filteredData as GovernmentProfile[]} userType="government" services={services} />
                     </TabsContent>
                     <TabsContent value="payments" className="mt-4">
                         <PaymentRequestsTable requests={paymentRequests} onApprove={handleApprovePaymentRequest} onReject={handleRejectPaymentRequest} />
