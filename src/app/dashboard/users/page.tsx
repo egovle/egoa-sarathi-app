@@ -53,13 +53,13 @@ const UsersTable = ({ users, onApprove, onAddBalance, userType, services }: { us
                                 <Badge variant={(user as VLEProfile).status === 'Approved' ? 'default' : 'secondary'}>
                                     {(user as VLEProfile).status}
                                 </Badge>
-                                 {Array.isArray((user as VLEProfile).offeredServices) && (user as VLEProfile).offeredServices.length > 0 && (
+                                 {Array.isArray((user as VLEProfile).offeredServices) && (user as VLEProfile).offeredServices!.length > 0 && (
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Badge variant="outline" className="cursor-pointer w-fit">
                                                     <Briefcase className="mr-1 h-3 w-3" />
-                                                    {(user as VLEProfile).offeredServices.length} services
+                                                    {(user as VLEProfile).offeredServices!.length} services
                                                 </Badge>
                                             </TooltipTrigger>
                                             <TooltipContent>
@@ -307,3 +307,5 @@ export default function UserManagementPage() {
         </Card>
     );
 }
+
+    

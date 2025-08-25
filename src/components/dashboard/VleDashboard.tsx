@@ -20,7 +20,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { calculateVleEarnings } from '@/lib/utils';
-import type { Task, Service, VLEProfile, Camp, TaskDocument } from '@/lib/types';
+import type { Task, Service, VLEProfile, Camp } from '@/lib/types';
 
 
 const PendingApprovalView = () => (
@@ -247,3 +247,5 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     </div>
 )
 }
+
+    
