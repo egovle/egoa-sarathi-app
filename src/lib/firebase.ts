@@ -22,6 +22,9 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 
+// Set the app name for email templates
+auth.appName = 'eGoa Sarathi';
+
 export { app, db, auth, storage };
 
     
