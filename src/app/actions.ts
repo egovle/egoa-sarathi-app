@@ -1,3 +1,4 @@
+
 'use server';
 
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc, writeBatch, deleteDoc, getDoc, Timestamp, orderBy, limit } from "firebase/firestore";
@@ -119,8 +120,8 @@ export async function createTask(formData: FormData) {
                 });
                 fileUploadPromises.push(uploadPromise);
             } else if (key.startsWith('text_')) {
-                 const keys = key.replace('text_', '').split(':');
-                 customFormData[keys] = value as string;
+                 const fieldKey = key.replace('text_', '');
+                 customFormData[fieldKey] = value as string;
             }
         }
         
@@ -604,3 +605,5 @@ export async function bulkUploadServices(fileContent: ArrayBuffer) {
         return { success: false, error: "Failed to commit changes to the database." };
     }
 }
+
+    

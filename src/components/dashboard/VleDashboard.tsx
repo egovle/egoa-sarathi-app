@@ -85,16 +85,20 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     
             toast({ title: 'Task Accepted', description: 'You can now begin work on this task.' });
             
-            const taskDoc = await(getDoc(taskRef));
+            const taskDoc = await getDoc(taskRef);
+            if (!taskDoc.exists()) return;
+
             const taskData = taskDoc.data() as Task;
 
             // Notify customer that the task has been accepted
-            await createNotification(
-                taskData.creatorId,
-                'Task Accepted!',
-                `Your task for "${taskData.service}" has been accepted by a VLE.`,
-                `/dashboard/task/${taskId}`
-            );
+            if (taskData.creatorId) {
+                await createNotification(
+                    taskData.creatorId,
+                    'Task Accepted!',
+                    `Your task for "${taskData.service}" has been accepted by a VLE.`,
+                    `/dashboard/task/${taskId}`
+                );
+            }
 
             await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile?.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`);
             
