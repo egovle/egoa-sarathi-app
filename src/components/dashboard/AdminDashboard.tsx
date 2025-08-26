@@ -44,7 +44,8 @@ export default function AdminDashboard() {
     useEffect(() => {
         setLoading(true);
         const fetchStats = async () => {
-             const pendingTasksSnap = await getCountFromServer(query(collection(db, 'tasks'), where('status', 'in', ['Unassigned', 'Pending Price Approval'])));
+             const pendingTaskStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance'];
+             const pendingTasksSnap = await getCountFromServer(query(collection(db, 'tasks'), where('status', 'in', pendingTaskStatuses)));
              const pendingVlesSnap = await getCountFromServer(query(collection(db, 'vles'), where('status', '==', 'Pending')));
              const pendingPaymentsSnap = await getCountFromServer(query(collection(db, 'paymentRequests'), where('status', '==', 'pending')));
              const openComplaintsSnap = await getCountFromServer(query(collection(db, 'tasks'), where('complaint.status', '==', 'Open')));
@@ -60,7 +61,7 @@ export default function AdminDashboard() {
         fetchStats();
 
         // Realtime listeners for actionable items
-        const actionableTaskStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Completed', 'Complaint Raised'];
+        const actionableTaskStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Completed', 'Complaint Raised'];
         const tasksQuery = query(
             collection(db, 'tasks'), 
             where('status', 'in', actionableTaskStatuses), 
@@ -117,7 +118,7 @@ export default function AdminDashboard() {
             item: `${vle.name}`,
             type: 'VLE Approval',
             details: vle.status,
-            link: `/dashboard/users`
+            link: `/dashboard/users?tab=vles`
         }));
         return [...tasks, ...vles];
     }, [actionableTasks, pendingVles]);

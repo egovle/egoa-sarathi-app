@@ -52,7 +52,11 @@ export default function TaskManagementPage() {
             conditions.unshift(where("assignedVleId", "==", userProfile.id));
         }
         if (statusFilter !== 'all') {
-            conditions.unshift(where("status", "==", statusFilter));
+             if (statusFilter === 'all-pending') {
+                conditions.unshift(where('status', 'in', ['Unassigned', 'Pending VLE Acceptance', 'Awaiting Payment', 'Awaiting Documents']));
+            } else {
+                conditions.unshift(where("status", "==", statusFilter));
+            }
         }
 
         let q: Query<DocumentData>;
@@ -146,6 +150,7 @@ export default function TaskManagementPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Statuses</SelectItem>
+                                {userProfile.isAdmin && <SelectItem value="all-pending">All Pending</SelectItem>}
                                 <SelectItem value="Unassigned">Unassigned</SelectItem>
                                 <SelectItem value="Pending VLE Acceptance">Pending Acceptance</SelectItem>
                                 <SelectItem value="Awaiting Payment">Awaiting Payment</SelectItem>
