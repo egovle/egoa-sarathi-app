@@ -46,20 +46,24 @@ export default function TaskManagementPage() {
     const buildQuery = useCallback(() => {
         if (!userProfile) return null;
 
-        const constraints: QueryConstraint[] = [orderBy("date", "desc")];
+        const constraints: QueryConstraint[] = [];
 
+        // Base filter for user role
         if (userProfile.role === 'vle') {
             constraints.push(where("assignedVleId", "==", userProfile.id));
         }
 
-        if (statusFilter !== 'all') {
-            if (statusFilter === 'all-pending') {
-                const pendingStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress', 'Awaiting Payment'];
-                constraints.push(where('status', 'in', pendingStatuses));
-            } else {
-                constraints.push(where("status", "==", statusFilter));
-            }
+        // Firestore limitation: If you have a range filter, the first orderBy must be on the same field.
+        // We will filter by status broadly and then apply fine-grained filtering on the client.
+        // We order by date for consistent pagination.
+        if (statusFilter === 'all-pending') {
+             const pendingStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress', 'Awaiting Payment', 'Complaint Raised'];
+             constraints.push(where('status', 'in', pendingStatuses));
+        } else if (statusFilter !== 'all') {
+            constraints.push(where("status", "==", statusFilter));
         }
+        
+        constraints.push(orderBy("date", "desc"));
         
         return query(collection(db, "tasks"), ...constraints);
     }, [userProfile, statusFilter]);
@@ -249,4 +253,3 @@ export default function TaskManagementPage() {
         </Card>
     );
 }
-

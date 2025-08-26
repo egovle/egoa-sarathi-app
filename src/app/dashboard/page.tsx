@@ -62,12 +62,21 @@ export default function DashboardPage() {
 
         let tasksQuery;
         if (userProfile.isAdmin) {
-            tasksQuery = query(collection(db, "tasks"), orderBy("date", "desc"));
+             // AdminDashboard fetches its own data, so we don't need a heavy query here.
+             // We can just set loading to false.
+             setDataLoading(false);
         } else if (userProfile.role === 'vle') {
-            // For VLE dashboard, we only need tasks they are assigned to, regardless of status, to show invitations.
-            tasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid), orderBy("date", "desc"));
+            // For VLE dashboard, we only need tasks they are assigned to for invitations.
+            tasksQuery = query(
+                collection(db, "tasks"), 
+                where("assignedVleId", "==", user.uid), 
+                where('status', '==', 'Pending VLE Acceptance'),
+                orderBy("date", "desc")
+            );
         } else if (userProfile.role === 'customer') {
             tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
+        } else {
+             setDataLoading(false);
         }
         
         if (tasksQuery) {
@@ -79,8 +88,6 @@ export default function DashboardPage() {
                 console.error("Error fetching tasks:", error);
                 setDataLoading(false);
             }));
-        } else {
-             setDataLoading(false);
         }
         
         return () => {
@@ -127,4 +134,3 @@ export default function DashboardPage() {
 
     return renderContent();
 }
-
