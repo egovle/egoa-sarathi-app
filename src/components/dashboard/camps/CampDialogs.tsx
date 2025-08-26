@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, type FormEvent, useMemo } from 'react';
-import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, writeBatch, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -491,3 +491,5 @@ export const CampPayoutDialog = ({ camp, vles, adminProfile, onFinished }: { cam
         </DialogContent>
     );
 };
+
+    
