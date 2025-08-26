@@ -42,13 +42,16 @@ export default function DashboardPage() {
 
     useEffect(() => {
         if (!user || !userProfile) {
-            setDataLoading(false);
+            if (!loading) {
+                setDataLoading(false);
+            }
             return;
         }
 
         setDataLoading(true);
         let unsubscribers: (() => void)[] = [];
 
+        // Fetch services and camps for all roles
         const servicesQuery = query(collection(db, "services"), orderBy("name"));
         unsubscribers.push(onSnapshot(servicesQuery, (snapshot) => {
             setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
@@ -61,21 +64,21 @@ export default function DashboardPage() {
 
 
         let tasksQuery;
+        // Admins see all tasks on their dashboard, handled by AdminDashboard component,
+        // but we fetch tasks here for consistency if needed elsewhere.
         if (userProfile.isAdmin) {
-             // AdminDashboard fetches its own data, so we don't need a heavy query here.
-             // We can just set loading to false.
-             setDataLoading(false);
+             tasksQuery = query(collection(db, "tasks"), orderBy("date", "desc"));
         } else if (userProfile.role === 'vle') {
-            // For VLE dashboard, we only need tasks they are assigned to for invitations.
+            // For VLE dashboard, we fetch tasks assigned to them for invitations.
             tasksQuery = query(
                 collection(db, "tasks"), 
-                where("assignedVleId", "==", user.uid), 
-                where('status', '==', 'Pending VLE Acceptance'),
+                where("assignedVleId", "==", user.uid),
                 orderBy("date", "desc")
             );
         } else if (userProfile.role === 'customer') {
             tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
         } else {
+             // For government or other roles, no specific tasks query needed by default
              setDataLoading(false);
         }
         
@@ -88,12 +91,14 @@ export default function DashboardPage() {
                 console.error("Error fetching tasks:", error);
                 setDataLoading(false);
             }));
+        } else {
+             setDataLoading(false);
         }
         
         return () => {
             unsubscribers.forEach(unsub => unsub());
         };
-    }, [user, userProfile]);
+    }, [user, userProfile, loading]);
 
 
     if (loading || dataLoading || !user || !userProfile) {

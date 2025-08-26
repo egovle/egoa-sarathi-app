@@ -25,143 +25,68 @@ export default function TaskManagementPage() {
     const { user, userProfile, loading: authLoading } = useAuth();
     const router = useRouter();
 
-    const [tasks, setTasks] = useState<Task[]>([]);
+    const [allTasks, setAllTasks] = useState<Task[]>([]);
     const [loadingData, setLoadingData] = useState(true);
     
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     
-    const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
-    const [page, setPage] = useState(1);
-    const [isLastPage, setIsLastPage] = useState(false);
-    const [pageHistory, setPageHistory] = useState<(DocumentData | null)[]>([null]);
-
-
     useEffect(() => {
         if (!authLoading && !user) {
             router.push('/dashboard');
         }
     }, [user, userProfile, authLoading, router]);
-
-    const buildQuery = useCallback(() => {
-        if (!userProfile) return null;
-
-        const constraints: QueryConstraint[] = [];
-
-        // Base filter for user role
-        if (userProfile.role === 'vle') {
-            constraints.push(where("assignedVleId", "==", userProfile.id));
-        }
-
-        // Firestore limitation: If you have a range filter, the first orderBy must be on the same field.
-        // We will filter by status broadly and then apply fine-grained filtering on the client.
-        // We order by date for consistent pagination.
-        if (statusFilter === 'all-pending') {
-             const pendingStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress', 'Awaiting Payment', 'Complaint Raised'];
-             constraints.push(where('status', 'in', pendingStatuses));
-        } else if (statusFilter !== 'all') {
-            constraints.push(where("status", "==", statusFilter));
-        }
-        
-        constraints.push(orderBy("date", "desc"));
-        
-        return query(collection(db, "tasks"), ...constraints);
-    }, [userProfile, statusFilter]);
-    
-    const fetchTasks = useCallback(async (direction: 'initial' | 'next' = 'initial') => {
-        const baseQuery = buildQuery();
-        if (!baseQuery) return;
-
-        setLoadingData(true);
-    
-        let finalQuery: Query<DocumentData>;
-        
-        if (direction === 'next' && lastVisible) {
-            finalQuery = query(baseQuery, startAfter(lastVisible), limit(PAGE_SIZE));
-        } else {
-            finalQuery = query(baseQuery, limit(PAGE_SIZE));
-        }
-    
-        try {
-            const snapshot = await getDocs(finalQuery);
-            const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-            setTasks(fetchedTasks);
-    
-            const newLastVisible = snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null;
-            
-            if (direction === 'next') {
-                 if(newLastVisible) setPageHistory(prev => [...prev, newLastVisible]);
-            }
-            
-            setLastVisible(newLastVisible);
-            
-            setIsLastPage(snapshot.size < PAGE_SIZE);
-
-        } catch (error) {
-            console.error("Error fetching tasks:", error);
-            setTasks([]);
-        } finally {
-            setLoadingData(false);
-        }
-    }, [buildQuery, lastVisible]);
     
     useEffect(() => {
-        if (userProfile) {
-            setPage(1);
-            setLastVisible(null);
-            setPageHistory([null]);
-            fetchTasks('initial');
-        }
-    // We want this to re-run ONLY when filters change, not on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userProfile, statusFilter]);
+        if (!userProfile) return;
 
-    const handleNextPage = () => {
-        if (isLastPage) return;
-        setPage(p => p + 1);
-        fetchTasks('next');
-    };
-
-    const handlePrevPage = async () => {
-        if (page <= 1) return;
-
-        const baseQuery = buildQuery();
-        if (!baseQuery) return;
-        
-        const newPage = page - 1;
-        const newHistory = pageHistory.slice(0, newPage);
-        const previousLastVisible = newHistory[newPage - 1] || null;
-        
-        setPage(newPage);
-        setPageHistory(newHistory);
-        setLastVisible(previousLastVisible);
         setLoadingData(true);
-        
-        let finalQuery;
-        if (previousLastVisible) {
-             finalQuery = query(baseQuery, startAfter(previousLastVisible), limit(PAGE_SIZE));
-        } else {
-             finalQuery = query(baseQuery, limit(PAGE_SIZE));
-        }
-        
-        const snapshot = await getDocs(finalQuery);
-        const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-        setTasks(fetchedTasks);
-        setIsLastPage(snapshot.size < PAGE_SIZE);
-        setLoadingData(false);
-    };
+        let q: Query<DocumentData>;
 
+        if (userProfile.role === 'vle') {
+            q = query(collection(db, "tasks"), where("assignedVleId", "==", userProfile.id), orderBy("date", "desc"));
+        } else { // Admin or other roles that should see all
+            q = query(collection(db, "tasks"), orderBy("date", "desc"));
+        }
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
+            setAllTasks(fetchedTasks);
+            setLoadingData(false);
+        }, (error) => {
+            console.error("Error fetching tasks:", error);
+            setLoadingData(false);
+        });
+
+        return () => unsubscribe();
+    }, [userProfile]);
 
     const filteredTasks = useMemo(() => {
-        if (!searchQuery) return tasks;
-        const lowercasedQuery = searchQuery.toLowerCase();
-        return tasks.filter(task => 
-            task.id.toLowerCase().includes(lowercasedQuery) ||
-            task.service.toLowerCase().includes(lowercasedQuery) ||
-            task.customer.toLowerCase().includes(lowercasedQuery) ||
-            task.assignedVleName?.toLowerCase().includes(lowercasedQuery)
-        );
-    }, [tasks, searchQuery]);
+        let tasksToFilter = allTasks;
+
+        // Apply status filter
+        if (statusFilter !== 'all') {
+             if (statusFilter === 'all-pending') {
+                const pendingStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress', 'Awaiting Payment', 'Complaint Raised'];
+                tasksToFilter = tasksToFilter.filter(task => pendingStatuses.includes(task.status));
+            } else {
+                tasksToFilter = tasksToFilter.filter(task => task.status === statusFilter);
+            }
+        }
+        
+        // Apply search query
+        if (searchQuery) {
+            const lowercasedQuery = searchQuery.toLowerCase();
+            tasksToFilter = tasksToFilter.filter(task => 
+                task.id.toLowerCase().includes(lowercasedQuery) ||
+                task.service.toLowerCase().includes(lowercasedQuery) ||
+                task.customer.toLowerCase().includes(lowercasedQuery) ||
+                task.assignedVleName?.toLowerCase().includes(lowercasedQuery)
+            );
+        }
+
+        return tasksToFilter;
+    }, [allTasks, statusFilter, searchQuery]);
     
     const pageTitle = userProfile?.isAdmin ? "Task Management (All)" : "Your Active Tasks";
     const pageDescription = userProfile?.isAdmin ? "View, search, and manage all tasks in the system." : "Tasks you have accepted and are currently working on.";
@@ -242,14 +167,6 @@ export default function TaskManagementPage() {
                     </TableBody>
                 </Table>
             </CardContent>
-             <CardFooter className="flex justify-end gap-2">
-                <Button variant="outline" size="sm" onClick={handlePrevPage} disabled={page <= 1}>
-                    <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleNextPage} disabled={isLastPage}>
-                    Next <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-            </CardFooter>
         </Card>
     );
 }

@@ -99,7 +99,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
                  const suggestionRef = doc(db, "campSuggestions", suggestion.id);
                  
                  const batch = writeBatch(db);
-                 batch.set(newCampRef, campData);
+                 batch.set(newCampRef, { ...campData, id: newCampRef.id });
                  batch.delete(suggestionRef);
                  await batch.commit();
 
@@ -108,7 +108,8 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
                     await createNotification(suggestion.suggestedBy.id, 'Camp Suggestion Approved!', `Your suggestion for a camp at ${suggestion.location} has been approved.`);
                 }
             } else {
-                await addDoc(collection(db, "camps"), campData);
+                const newCampRef = doc(collection(db, "camps"));
+                await setDoc(newCampRef, { ...campData, id: newCampRef.id });
                 toast({ title: 'Camp Created', description: `${name} has been successfully created.` });
             }
             
@@ -164,7 +165,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
                                 {date ? format(date, "dd/MM/yyyy") : <span>Pick a date</span>}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
+                        <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
                             <DayPicker 
                                 mode="single" 
                                 selected={date} 
