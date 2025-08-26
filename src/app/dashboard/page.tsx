@@ -51,29 +51,26 @@ export default function DashboardPage() {
         unsubscribers.push(onSnapshot(servicesQuery, (snapshot) => {
             setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
         }));
-
-        // Admin data is now fetched inside the AdminDashboard component for scalability.
-        if (userProfile.isAdmin) {
-            return; 
-        }
-
-        // VLEs need their assigned tasks and all upcoming camps for invitations.
-        if (userProfile.role === 'vle') {
-            const assignedTasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
-            unsubscribers.push(onSnapshot(assignedTasksQuery, snapshot => {
-                const allAssigned = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-                setTasks(allAssigned);
-            }));
-
-            const campsQuery = query(collection(db, 'camps'), orderBy('date', 'asc'));
-            unsubscribers.push(onSnapshot(campsQuery, (snapshot) => {
-                const allCampsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp);
-                setCamps(allCampsData);
-            }));
         
-        // Customers only need the tasks they created.
+        // Fetch all upcoming camps for VLEs (for invitations)
+        const campsQuery = query(collection(db, 'camps'), where('date', '>=', new Date().toISOString()), orderBy('date', 'asc'));
+        unsubscribers.push(onSnapshot(campsQuery, (snapshot) => {
+            setCamps(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Camp));
+        }));
+
+
+        // Fetch tasks based on user role
+        let tasksQuery;
+        if (userProfile.isAdmin) {
+            // AdminDashboard fetches its own specific data, so no primary task list needed here
+            // but we can fetch all for other potential uses if needed. For now, it's handled inside the component.
+        } else if (userProfile.role === 'vle') {
+            tasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid));
         } else if (userProfile.role === 'customer') {
-            const tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
+            tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
+        }
+        
+        if (tasksQuery) {
             unsubscribers.push(onSnapshot(tasksQuery, (snapshot) => {
                 const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
                 setTasks(fetchedTasks);

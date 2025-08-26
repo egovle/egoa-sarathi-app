@@ -43,8 +43,9 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         setLoading(true);
+        
         const fetchStats = async () => {
-             const pendingTaskStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance'];
+             const pendingTaskStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned'];
              const pendingTasksSnap = await getCountFromServer(query(collection(db, 'tasks'), where('status', 'in', pendingTaskStatuses)));
              const pendingVlesSnap = await getCountFromServer(query(collection(db, 'vles'), where('status', '==', 'Pending')));
              const pendingPaymentsSnap = await getCountFromServer(query(collection(db, 'paymentRequests'), where('status', '==', 'pending')));
@@ -86,11 +87,16 @@ export default function AdminDashboard() {
          const paymentsUnsub = onSnapshot(query(collection(db, 'paymentRequests'), where('status', '==', 'pending')), (snapshot) => {
             setStats(s => ({...s, pendingPayments: snapshot.size}));
         });
+        
+        const complaintsUnsub = onSnapshot(query(collection(db, 'tasks'), where('complaint.status', '==', 'Open')), (snapshot) => {
+            setStats(s => ({...s, openComplaints: snapshot.size }));
+        });
 
         return () => {
             tasksUnsub();
             vlesUnsub();
             paymentsUnsub();
+            complaintsUnsub();
         }
     }, []);
 

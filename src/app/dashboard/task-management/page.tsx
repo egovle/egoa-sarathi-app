@@ -43,48 +43,53 @@ export default function TaskManagementPage() {
         }
     }, [user, userProfile, authLoading, router]);
 
-    const fetchTasks = useCallback(async (direction: 'next' | 'initial' = 'initial') => {
-        setLoadingData(true);
+    const fetchTasks = useCallback(async (direction: 'initial' | 'next' = 'initial') => {
         if (!userProfile) return;
-
-        let conditions: any[] = [orderBy("date", "desc")];
+        setLoadingData(true);
+    
+        const collectionRef = collection(db, "tasks");
+        let queryConstraints = [orderBy("date", "desc")];
+    
+        // Role-based filtering
         if (userProfile.role === 'vle') {
-            conditions.unshift(where("assignedVleId", "==", userProfile.id));
+            queryConstraints.unshift(where("assignedVleId", "==", userProfile.id));
         }
+    
+        // Status filtering
         if (statusFilter !== 'all') {
-             if (statusFilter === 'all-pending') {
-                conditions.unshift(where('status', 'in', ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned']));
+            if (statusFilter === 'all-pending') {
+                queryConstraints.unshift(where('status', 'in', ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress']));
             } else {
-                conditions.unshift(where("status", "==", statusFilter));
+                queryConstraints.unshift(where("status", "==", statusFilter));
             }
         }
-
-        let q: Query<DocumentData>;
-        const collectionRef = collection(db, "tasks");
-
+    
+        let finalQuery: Query<DocumentData>;
         if (direction === 'next' && lastVisible) {
-            q = query(collectionRef, ...conditions, startAfter(lastVisible), limit(PAGE_SIZE));
+            finalQuery = query(collectionRef, ...queryConstraints, startAfter(lastVisible), limit(PAGE_SIZE));
         } else {
-            q = query(collectionRef, ...conditions, limit(PAGE_SIZE));
+            finalQuery = query(collectionRef, ...queryConstraints, limit(PAGE_SIZE));
         }
-        
+    
         try {
-            const snapshot = await getDocs(q);
+            const snapshot = await getDocs(finalQuery);
             const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
             setTasks(fetchedTasks);
-
-            if (snapshot.empty || snapshot.size < PAGE_SIZE) {
+    
+            if (snapshot.size < PAGE_SIZE) {
                 setIsLastPage(true);
             } else {
-                setIsLastPage(false);
                 setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+                setIsLastPage(false);
             }
         } catch (error) {
             console.error("Error fetching tasks:", error);
+            setTasks([]);
         } finally {
             setLoadingData(false);
         }
     }, [userProfile, statusFilter, lastVisible]);
+
     
     useEffect(() => {
         if (userProfile) {
@@ -92,6 +97,7 @@ export default function TaskManagementPage() {
             setLastVisible(null);
             fetchTasks('initial');
         }
+    // This effect should re-run when filters change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userProfile, statusFilter]);
 
@@ -102,7 +108,7 @@ export default function TaskManagementPage() {
     };
 
     const handlePrevPage = () => {
-        // Simple pagination: just go back to page 1
+        // Simple pagination: just go back to page 1 for now
         setPage(1);
         setLastVisible(null);
         fetchTasks('initial');
