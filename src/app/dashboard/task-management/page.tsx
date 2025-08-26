@@ -53,7 +53,7 @@ export default function TaskManagementPage() {
         }
         if (statusFilter !== 'all') {
              if (statusFilter === 'all-pending') {
-                conditions.unshift(where('status', 'in', ['Unassigned', 'Pending VLE Acceptance', 'Awaiting Payment', 'Awaiting Documents']));
+                conditions.unshift(where('status', 'in', ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned']));
             } else {
                 conditions.unshift(where("status", "==", statusFilter));
             }
@@ -96,6 +96,7 @@ export default function TaskManagementPage() {
     }, [userProfile, statusFilter]);
 
     const handleNextPage = () => {
+        if (isLastPage) return;
         setPage(p => p + 1);
         fetchTasks('next');
     };
@@ -150,7 +151,7 @@ export default function TaskManagementPage() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Statuses</SelectItem>
-                                {userProfile.isAdmin && <SelectItem value="all-pending">All Pending</SelectItem>}
+                                <SelectItem value="all-pending">All Pending</SelectItem>
                                 <SelectItem value="Unassigned">Unassigned</SelectItem>
                                 <SelectItem value="Pending VLE Acceptance">Pending Acceptance</SelectItem>
                                 <SelectItem value="Awaiting Payment">Awaiting Payment</SelectItem>

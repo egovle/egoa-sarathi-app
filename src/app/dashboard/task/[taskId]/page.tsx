@@ -334,7 +334,7 @@ export default function TaskDetailPage() {
     }
     
     const canVleTakeAction = isAssignedVle && task.status === 'Assigned' && !task.acknowledgementNumber;
-    const canVleWorkOnTask = isAssignedVle && (task.status === 'In Progress' || (task.status === 'Assigned' && task.acknowledgementNumber));
+    const canVleWorkOnTask = isAssignedVle && (task.status === 'In Progress' || (task.status === 'Assigned' && !!task.acknowledgementNumber));
     const canAdminSetPrice = isAdmin && task.status === 'Pending Price Approval';
     const canAdminAssignTask = isAdmin && task.status === 'Unassigned';
     const canAdminApprovePayout = isAdmin && task.status === 'Completed';
