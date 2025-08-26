@@ -175,6 +175,11 @@ export async function createTask(formData: FormData) {
         } else {
             const result = await createFixedPriceTask(taskId, taskData, creatorProfile);
             if (result.success) {
+                 await createNotificationForAdmins(
+                    'New Task Created',
+                    `${creatorProfile.name} created a new task for "${service.name}".`,
+                    `/dashboard/task/${taskId}`
+                );
                 return { success: true, message: `Task Created & Paid! ₹${taskData.totalPaid.toFixed(2)} has been deducted from your wallet.` };
             } else {
                 throw new Error(result.error || "An unknown error occurred during task creation.");
@@ -374,6 +379,15 @@ export async function assignVleToTask(taskId: string, vleId: string, vleName: st
             `You have been invited to work on task: ${taskId.slice(-6).toUpperCase()}.`,
             `/dashboard`
         );
+
+        if (adminId !== 'System') {
+             await createNotificationForAdmins(
+                'Task Manually Assigned',
+                `An admin assigned task #${taskId.slice(-6).toUpperCase()} to ${vleName}.`,
+                `/dashboard/task/${taskId}`
+            );
+        }
+
         return { success: true };
     } catch (error: any) {
         console.error("Error during manual assignment:", error);

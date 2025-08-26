@@ -272,6 +272,11 @@ export const SubmitAcknowledgementDialog = ({ taskId, vleId, customerId }: { tas
                 `An acknowledgement number has been submitted for task ${taskId.slice(-6).toUpperCase()}.`,
                 `/dashboard/task/${taskId}`
             );
+            await createNotificationForAdmins(
+                `Task In Progress: #${taskId.slice(-6).toUpperCase()}`,
+                `An acknowledgement number was submitted.`,
+                `/dashboard/task/${taskId}`
+            );
             toast({ title: 'Acknowledgement Submitted', description: 'The task is now in progress.' });
             setAckNumber('');
             setOpen(false);
@@ -365,6 +370,11 @@ export const UploadCertificateDialog = ({ taskId, vleId, customerId, onUploadCom
                 customerId,
                 'Your Certificate is Ready!',
                 `The final certificate for task ${String(taskId).slice(-6).toUpperCase()} is available.`,
+                `/dashboard/task/${taskId}`
+            );
+            await createNotificationForAdmins(
+                `Task Completed: #${taskId.slice(-6).toUpperCase()}`,
+                `The final certificate has been uploaded.`,
                 `/dashboard/task/${taskId}`
             );
             

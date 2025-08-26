@@ -20,7 +20,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { calculateVleEarnings } from '@/lib/utils';
-import type { Task, Service, VLEProfile, Camp } from '@/lib/types';
+import type { Task, VLEProfile, Camp } from '@/lib/types';
 
 
 const PendingApprovalView = () => (
@@ -100,7 +100,7 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                 );
             }
 
-            await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile?.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`);
+            await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile?.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`,  `/dashboard/task/${taskId}`);
             
         } catch (error: any) {
             console.error("Task acceptance failed:", error);

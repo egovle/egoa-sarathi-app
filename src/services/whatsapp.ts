@@ -31,13 +31,13 @@ export async function sendWhatsAppMessage(to: string, contentVariables: { [key: 
   }
 
   try {
-    await client.messages.create({
+    const messageInstance = await client.messages.create({
       from: fromNumber,
       to: to,
       contentSid: contentSid,
       contentVariables: JSON.stringify(contentVariables),
     });
-    console.log(`WhatsApp templated message sent to ${to}`);
+    console.log(`WhatsApp templated message sent to ${to}. SID: ${messageInstance.sid}`);
     return { success: true };
   } catch (error: any) {
     console.error(`Failed to send WhatsApp message to ${to}: ${error.message}`);
