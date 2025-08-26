@@ -118,7 +118,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
             
             onFinished();
         } catch (error: any) {
-            toast({ title: 'Error', description: error.message || 'An unknown error occurred.', variant: 'destructive' });
+            toast({ title: 'Error', description: error.message || 'An unknown error occurred.', variant: "destructive" });
         }
         setLoading(false);
     };
@@ -335,7 +335,7 @@ export const SuggestCampDialog = ({ onFinished, services, userProfile }: { onFin
                                     {date ? format(date, "dd/MM/yyyy") : <span>Pick a date</span>}
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
+                            <PopoverContent className="w-auto p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
                                 <DayPicker 
                                     mode="single" 
                                     selected={date} 
