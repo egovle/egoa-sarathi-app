@@ -143,6 +143,7 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
                         </TableHeader>
                         <TableBody>
                         {filteredTasks.map(task => {
+                            const isCompleted = task.status === 'Paid Out' || task.status === 'Completed';
                             const displayStatus = task.status === 'Paid Out' ? 'Completed' : task.status;
                             return (
                                 <TableRow key={task.id}>
@@ -158,7 +159,7 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuItem asChild><Link href={`/dashboard/task/${task.id}`} className="flex items-center w-full"><Eye className="mr-2 h-4 w-4"/>View Details</Link></DropdownMenuItem>
                                                 
-                                                {displayStatus === 'Completed' && (
+                                                {isCompleted && (
                                                     <>
                                                         <DropdownMenuSeparator />
                                                         {!task.feedback && (
@@ -229,3 +230,5 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
         </Tabs>
     );
 }
+
+    

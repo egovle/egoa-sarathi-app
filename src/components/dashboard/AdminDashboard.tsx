@@ -43,9 +43,10 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         setLoading(true);
+        let unsubscribers: (() => void)[] = [];
         
         const fetchStats = async () => {
-             const pendingTaskStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned'];
+             const pendingTaskStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress', 'Awaiting Payment'];
              const pendingTasksSnap = await getCountFromServer(query(collection(db, 'tasks'), where('status', 'in', pendingTaskStatuses)));
              const pendingVlesSnap = await getCountFromServer(query(collection(db, 'vles'), where('status', '==', 'Pending')));
              const pendingPaymentsSnap = await getCountFromServer(query(collection(db, 'paymentRequests'), where('status', '==', 'pending')));
@@ -76,6 +77,7 @@ export default function AdminDashboard() {
             console.error("Error fetching tasks:", error);
             setLoading(false);
         });
+        unsubscribers.push(tasksUnsub);
         
         const vlesQuery = query(collection(db, 'vles'), where('status', '==', 'Pending'), limit(10));
         const vlesUnsub = onSnapshot(vlesQuery, (snapshot) => {
@@ -83,20 +85,21 @@ export default function AdminDashboard() {
             setStats(s => ({...s, pendingVles: snapshot.size}));
             setLoading(false);
         });
+        unsubscribers.push(vlesUnsub);
+
 
          const paymentsUnsub = onSnapshot(query(collection(db, 'paymentRequests'), where('status', '==', 'pending')), (snapshot) => {
             setStats(s => ({...s, pendingPayments: snapshot.size}));
         });
+        unsubscribers.push(paymentsUnsub);
         
         const complaintsUnsub = onSnapshot(query(collection(db, 'tasks'), where('complaint.status', '==', 'Open')), (snapshot) => {
             setStats(s => ({...s, openComplaints: snapshot.size }));
         });
+        unsubscribers.push(complaintsUnsub);
 
         return () => {
-            tasksUnsub();
-            vlesUnsub();
-            paymentsUnsub();
-            complaintsUnsub();
+            unsubscribers.forEach(unsub => unsub());
         }
     }, []);
 
@@ -209,3 +212,5 @@ export default function AdminDashboard() {
         </div>
     );
 }
+
+    

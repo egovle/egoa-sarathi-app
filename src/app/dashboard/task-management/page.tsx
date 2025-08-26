@@ -36,6 +36,8 @@ export default function TaskManagementPage() {
     const [lastVisible, setLastVisible] = useState<DocumentData | null>(null);
     const [page, setPage] = useState(1);
     const [isLastPage, setIsLastPage] = useState(false);
+    const [pageHistory, setPageHistory] = useState<(DocumentData | null)[]>([null]);
+
 
     useEffect(() => {
         if (!authLoading && !user) {
@@ -43,28 +45,28 @@ export default function TaskManagementPage() {
         }
     }, [user, userProfile, authLoading, router]);
 
-    const fetchTasks = useCallback(async (direction: 'initial' | 'next' = 'initial') => {
+    const fetchTasks = useCallback(async (direction: 'initial' | 'next' | 'prev' = 'initial') => {
         if (!userProfile) return;
         setLoadingData(true);
     
         const collectionRef = collection(db, "tasks");
-        let queryConstraints = [orderBy("date", "desc")];
+        let queryConstraints: any[] = [orderBy("date", "desc")];
     
-        // Role-based filtering
         if (userProfile.role === 'vle') {
-            queryConstraints.unshift(where("assignedVleId", "==", userProfile.id));
+            queryConstraints.push(where("assignedVleId", "==", userProfile.id));
         }
     
-        // Status filtering
         if (statusFilter !== 'all') {
             if (statusFilter === 'all-pending') {
-                queryConstraints.unshift(where('status', 'in', ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress']));
+                const pendingStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress', 'Awaiting Payment'];
+                queryConstraints.push(where('status', 'in', pendingStatuses));
             } else {
-                queryConstraints.unshift(where("status", "==", statusFilter));
+                queryConstraints.push(where("status", "==", statusFilter));
             }
         }
     
         let finalQuery: Query<DocumentData>;
+        
         if (direction === 'next' && lastVisible) {
             finalQuery = query(collectionRef, ...queryConstraints, startAfter(lastVisible), limit(PAGE_SIZE));
         } else {
@@ -76,10 +78,17 @@ export default function TaskManagementPage() {
             const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
             setTasks(fetchedTasks);
     
+            const newLastVisible = snapshot.docs[snapshot.docs.length - 1] || null;
+            
+            if (direction === 'next') {
+                setPageHistory(prev => [...prev, newLastVisible]);
+            }
+            
+            setLastVisible(newLastVisible);
+            
             if (snapshot.size < PAGE_SIZE) {
                 setIsLastPage(true);
             } else {
-                setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
                 setIsLastPage(false);
             }
         } catch (error) {
@@ -95,9 +104,9 @@ export default function TaskManagementPage() {
         if (userProfile) {
             setPage(1);
             setLastVisible(null);
+            setPageHistory([null]);
             fetchTasks('initial');
         }
-    // This effect should re-run when filters change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userProfile, statusFilter]);
 
@@ -108,10 +117,46 @@ export default function TaskManagementPage() {
     };
 
     const handlePrevPage = () => {
-        // Simple pagination: just go back to page 1 for now
-        setPage(1);
-        setLastVisible(null);
-        fetchTasks('initial');
+        if (page <= 1) return;
+        
+        const newPage = page - 1;
+        const newHistory = pageHistory.slice(0, -1);
+        const previousLastVisible = newHistory[newPage -1] || null;
+        
+        setPage(newPage);
+        setPageHistory(newHistory);
+        setLastVisible(previousLastVisible);
+        
+        // Refetch with previous cursor
+        if (userProfile) {
+            setLoadingData(true);
+            const collectionRef = collection(db, "tasks");
+            let queryConstraints: any[] = [orderBy("date", "desc")];
+            if (userProfile.role === 'vle') {
+                queryConstraints.push(where("assignedVleId", "==", userProfile.id));
+            }
+            if (statusFilter !== 'all') {
+                if (statusFilter === 'all-pending') {
+                     queryConstraints.push(where('status', 'in', ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress', 'Awaiting Payment']));
+                } else {
+                    queryConstraints.push(where("status", "==", statusFilter));
+                }
+            }
+
+            let finalQuery;
+            if (previousLastVisible) {
+                 finalQuery = query(collectionRef, ...queryConstraints, startAfter(previousLastVisible), limit(PAGE_SIZE));
+            } else {
+                 finalQuery = query(collectionRef, ...queryConstraints, limit(PAGE_SIZE));
+            }
+            
+            getDocs(finalQuery).then(snapshot => {
+                const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
+                setTasks(fetchedTasks);
+                setIsLastPage(snapshot.size < PAGE_SIZE);
+                setLoadingData(false);
+            });
+        }
     };
 
     const filteredTasks = useMemo(() => {
@@ -215,3 +260,5 @@ export default function TaskManagementPage() {
         </Card>
     );
 }
+
+    

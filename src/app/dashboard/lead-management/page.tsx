@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 import { FilePlus, Search, Loader2 } from 'lucide-react';
@@ -38,15 +38,14 @@ export default function LeadManagementPage() {
         if (!user) return;
         setLoadingData(true);
 
-        const leadsQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid));
+        const leadsQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
         const unsubLeads = onSnapshot(leadsQuery, snapshot => {
             const fetchedLeads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
-            fetchedLeads.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             setLeads(fetchedLeads);
             setLoadingData(false);
         });
 
-        const servicesQuery = query(collection(db, "services"));
+        const servicesQuery = query(collection(db, "services"), orderBy("name"));
         const unsubServices = onSnapshot(servicesQuery, snapshot => {
             setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
         });
@@ -139,3 +138,5 @@ export default function LeadManagementPage() {
         </Card>
     );
 }
+
+    

@@ -71,8 +71,7 @@ export default function LoginPage() {
                 variant: 'destructive',
             });
         }
-    } finally {
-      if(!showVerificationError) setLoading(false);
+        setLoading(false);
     }
   };
 
@@ -196,3 +195,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    

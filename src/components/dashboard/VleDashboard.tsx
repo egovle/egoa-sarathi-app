@@ -63,6 +63,12 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
         const taskRef = doc(db, "tasks", taskId);
         
         try {
+            const taskDocBefore = await getDoc(taskRef);
+            if (!taskDocBefore.exists()) {
+                throw new Error("Task not found.");
+            }
+            const taskData = taskDocBefore.data() as Task;
+            
             await runTransaction(db, async (transaction) => {
                 const taskDoc = await transaction.get(taskRef);
                 if (!taskDoc.exists() || taskDoc.data().status !== 'Pending VLE Acceptance') {
@@ -85,12 +91,6 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     
             toast({ title: 'Task Accepted', description: 'You can now begin work on this task.' });
             
-            const taskDoc = await getDoc(taskRef);
-            if (!taskDoc.exists()) return;
-
-            const taskData = taskDoc.data() as Task;
-
-            // Notify customer that the task has been accepted
             if (taskData.creatorId) {
                 await createNotification(
                     taskData.creatorId,
@@ -100,7 +100,7 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                 );
             }
 
-            await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile?.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`,  `/dashboard/task/${taskId}`);
+            await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`,  `/dashboard/task/${taskId}`);
             
         } catch (error: any) {
             console.error("Task acceptance failed:", error);
@@ -165,47 +165,13 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                 </div>
             </CardContent>
         </Card>
-        <Tabs defaultValue="camp-invitations" className="w-full">
+        <Tabs defaultValue="task-invitations" className="w-full">
             <div className="flex items-center">
                 <TabsList>
-                    <TabsTrigger value="camp-invitations">Camp Invitations <Badge className="ml-2">{campInvitations.length}</Badge></TabsTrigger>
                     <TabsTrigger value="task-invitations">Task Invitations <Badge className="ml-2">{taskInvitations.length}</Badge></TabsTrigger>
+                    <TabsTrigger value="camp-invitations">Camp Invitations <Badge className="ml-2">{campInvitations.length}</Badge></TabsTrigger>
                 </TabsList>
             </div>
-            <TabsContent value="camp-invitations" className="mt-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>New Camp Invitations</CardTitle>
-                        <CardDescription>You have been invited to join these camps. Please respond on the Camp Management page.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Camp Name</TableHead>
-                                    <TableHead>Location</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {campInvitations.length > 0 ? campInvitations.map(camp => (
-                                    <TableRow key={camp.id}>
-                                        <TableCell>{camp.name}</TableCell>
-                                        <TableCell>{camp.location}</TableCell>
-                                        <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button asChild variant="outline" size="sm">
-                                                <Link href="/dashboard/camps">View & Respond</Link>
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new camp invitations.</TableCell></TableRow>}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            </TabsContent>
             <TabsContent value="task-invitations" className="mt-4">
                  <Card>
                     <CardHeader>
@@ -247,7 +213,43 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                     </CardContent>
                 </Card>
             </TabsContent>
+            <TabsContent value="camp-invitations" className="mt-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>New Camp Invitations</CardTitle>
+                        <CardDescription>You have been invited to join these camps. Please respond on the Camp Management page.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Camp Name</TableHead>
+                                    <TableHead>Location</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {campInvitations.length > 0 ? campInvitations.map(camp => (
+                                    <TableRow key={camp.id}>
+                                        <TableCell>{camp.name}</TableCell>
+                                        <TableCell>{camp.location}</TableCell>
+                                        <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href="/dashboard/camps">View & Respond</Link>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new camp invitations.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+            </TabsContent>
         </Tabs>
     </div>
 )
 }
+
+    
