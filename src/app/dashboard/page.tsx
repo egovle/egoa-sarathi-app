@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, where, getDocs } from 'firebase/firestore';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -42,6 +42,7 @@ export default function DashboardPage() {
 
     useEffect(() => {
         if (!user || !userProfile) {
+            setDataLoading(false);
             return;
         }
 
@@ -63,6 +64,7 @@ export default function DashboardPage() {
         if (userProfile.isAdmin) {
             tasksQuery = query(collection(db, "tasks"), orderBy("date", "desc"));
         } else if (userProfile.role === 'vle') {
+            // For VLE dashboard, we only need tasks they are assigned to, regardless of status, to show invitations.
             tasksQuery = query(collection(db, "tasks"), where("assignedVleId", "==", user.uid), orderBy("date", "desc"));
         } else if (userProfile.role === 'customer') {
             tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
@@ -117,7 +119,7 @@ export default function DashboardPage() {
             default:
                  return (
                     <div className="flex items-center justify-center h-[calc(100vh-10rem)]">
-                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                        <p>No dashboard view available for your role.</p>
                     </div>
                 )
         }
@@ -126,4 +128,3 @@ export default function DashboardPage() {
     return renderContent();
 }
 
-    
