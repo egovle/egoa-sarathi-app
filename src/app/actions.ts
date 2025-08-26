@@ -619,23 +619,3 @@ export async function bulkUploadServices(fileContent: ArrayBuffer) {
         return { success: false, error: "Failed to commit changes to the database." };
     }
 }
-
-// Helper to get a user's phone number
-export async function getUserPhoneNumber(userId: string): Promise<string | null> {
-    const userRef = doc(db, 'users', userId);
-    const vleRef = doc(db, 'vles', userId);
-    const govRef = doc(db, 'government', userId);
-
-    const [userSnap, vleSnap, govSnap] = await Promise.all([
-        getDoc(userRef),
-        getDoc(vleRef),
-        getDoc(govRef)
-    ]);
-    
-    let userProfile: UserProfile | null = null;
-    if(userSnap.exists()) userProfile = userSnap.data() as UserProfile;
-    else if (vleSnap.exists()) userProfile = vleSnap.data() as UserProfile;
-    else if (govSnap.exists()) userProfile = govSnap.data() as UserProfile;
-
-    return userProfile?.mobile || null;
-}
