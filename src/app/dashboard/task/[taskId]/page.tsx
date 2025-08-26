@@ -132,7 +132,7 @@ export default function TaskDetailPage() {
     }, [task?.documents]);
 
     const documentGroupsToRender = useMemo(() => {
-        if (!selectedService) return {};
+        if (!selectedService || !selectedService.documentGroups) return {};
         const groups: Record<string, {label: string, docs: TaskDocument[]}> = {};
         
         selectedService.documentGroups.forEach(groupInfo => {

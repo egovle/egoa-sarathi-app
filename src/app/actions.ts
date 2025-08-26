@@ -30,11 +30,9 @@ export async function createNotification(userId: string, title: string, descript
         const vleRef = doc(db, 'vles', userId);
         const govRef = doc(db, 'government', userId);
 
-        const [userSnap, vleSnap, govSnap] = await Promise.all([
-            getDoc(userRef),
-            getDoc(vleRef),
-            getDoc(govRef)
-        ]);
+        const userSnap = await getDoc(userRef);
+        const vleSnap = await getDoc(vleRef);
+        const govSnap = await getDoc(govRef);
         
         let userProfile: UserProfile | null = null;
         if(userSnap.exists()) userProfile = userSnap.data() as UserProfile;
@@ -42,15 +40,15 @@ export async function createNotification(userId: string, title: string, descript
         else if (govSnap.exists()) userProfile = govSnap.data() as UserProfile;
 
         if (userProfile?.mobile) {
-            // Prepend Indian country code if not present
-            const mobileNumber = userProfile.mobile.startsWith('+91') ? userProfile.mobile : `+91${userProfile.mobile}`;
-            // Use templated message variables
+            let mobileNumber = userProfile.mobile;
+            if (mobileNumber.length === 10 && !mobileNumber.startsWith('+91')) {
+                mobileNumber = `+91${mobileNumber}`;
+            }
             const contentVariables = { '1': title, '2': description };
             await sendWhatsAppMessage(mobileNumber, contentVariables);
         }
     } catch (error) {
         console.error("Failed to send WhatsApp notification:", error);
-        // We don't want to fail the whole operation if WhatsApp fails, so we just log the error.
     }
 }
 
@@ -377,7 +375,7 @@ export async function assignVleToTask(taskId: string, vleId: string, vleName: st
             vleId,
             'New Task Invitation',
             `You have been invited to work on task: ${taskId.slice(-6).toUpperCase()}.`,
-            `/dashboard`
+            `/dashboard/task-management`
         );
 
         if (adminId !== 'System') {
