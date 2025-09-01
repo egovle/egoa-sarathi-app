@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useState, type FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, AlertTriangle, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Loader2, AlertTriangle, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
@@ -55,8 +55,10 @@ export default function RegisterPage() {
   const [isLocationManual, setIsLocationManual] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [timer, setTimer] = useState(60);
   
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
@@ -108,6 +110,26 @@ export default function RegisterPage() {
     return () => clearTimeout(handler);
   }, [pincode, fetchLocation]);
 
+  const startTimer = () => {
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    setTimer(60);
+    timerIntervalRef.current = setInterval(() => {
+        setTimer(prev => {
+            if (prev <= 1) {
+                if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+                return 0;
+            }
+            return prev - 1;
+        });
+    }, 1000);
+  };
+  
+  useEffect(() => {
+      return () => {
+          if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      };
+  }, []);
+
   const sendOtp = () => {
     setLoading(true);
     
@@ -127,6 +149,7 @@ export default function RegisterPage() {
                 setConfirmationResult(result);
                 toast({ title: 'OTP Sent', description: 'Please check your mobile for the code.' });
                 setStep(2);
+                startTimer();
               }).catch((error) => {
                 console.error("OTP Send Error:", error);
                 toast({ title: 'OTP Send Error', description: error.message, variant: 'destructive' });
@@ -195,9 +218,11 @@ export default function RegisterPage() {
           const collectionName = role === 'vle' ? 'vles' : (role === 'government' ? 'government' : 'users');
           await setDoc(doc(db, collectionName, user.uid), userProfile);
           
-          toast({ title: 'Registration Successful!', description: 'Please check your email for a verification link to complete the process.' });
+          setStep(3); // Go to success screen
+          setTimeout(() => {
+            router.push('/login');
+          }, 4000);
 
-          router.push('/login');
 
       } catch (error: any) {
           console.error("OTP verification or user creation failed:", error);
@@ -220,16 +245,22 @@ export default function RegisterPage() {
             <Link href="/" className="mx-auto mb-4" prefetch={false}>
                 <AppLogo className="justify-center" />
             </Link>
-            <Button asChild variant="ghost" className="text-muted-foreground w-fit mx-auto -mt-2 mb-2">
-                <Link href="/"><ArrowLeft className="mr-2 h-4 w-4"/>Back to Home</Link>
-            </Button>
-            <CardTitle className="text-2xl tracking-tight">Register for eGoa Sarathi</CardTitle>
+            {step !== 3 && (
+                 <Button asChild variant="ghost" className="text-muted-foreground w-fit mx-auto -mt-2 mb-2">
+                    <Link href="/"><ArrowLeft className="mr-2 h-4 w-4"/>Back to Home</Link>
+                </Button>
+            )}
+            <CardTitle className="text-2xl tracking-tight">
+                {step === 3 ? "Registration Successful!" : "Register for eGoa Sarathi"}
+            </CardTitle>
             <CardDescription>
-                {step === 1 ? "Enter your details to create an account" : "Verify your mobile number to continue"}
+                {step === 1 && "Enter your details to create an account"}
+                {step === 2 && `Enter the OTP sent to +91${mobile}`}
+                {step === 3 && "Please check your email to verify your account."}
             </CardDescription>
         </CardHeader>
         <CardContent>
-          {isConfigMissing && (
+          {isConfigMissing && step !== 3 && (
             <Alert variant="destructive" className="mb-4">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Configuration Error</AlertTitle>
@@ -289,6 +320,12 @@ export default function RegisterPage() {
                       <Label htmlFor="otp">Enter OTP</Label>
                       <Input id="otp" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="Enter 6-digit code" required maxLength={6} />
                   </div>
+                   <div className="text-sm text-center text-muted-foreground">
+                        {timer > 0 ? `Resend OTP in ${timer}s` : "Didn't receive code?"}
+                        <Button type="button" variant="link" size="sm" onClick={sendOtp} disabled={timer > 0} className="disabled:text-muted-foreground">
+                            Resend OTP
+                        </Button>
+                    </div>
                   <Button type="submit" disabled={loading} className="w-full">
                       {loading ? <Loader2 className="animate-spin" /> : 'Verify & Register'}
                   </Button>
@@ -296,12 +333,26 @@ export default function RegisterPage() {
               </form>
           )}
 
-          <div className="mt-4 text-center text-sm">
-            <span className="text-muted-foreground">Already have an account?{' '}</span>
-            <Link href="/login" className={cn("underline font-semibold text-primary", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>Log in</Link>
-          </div>
+          {step === 3 && (
+              <div className='text-center space-y-4'>
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
+                <p className="text-muted-foreground">You will be redirected to the login page shortly. Please check your spam folder if you do not see the verification email.</p>
+                <Button asChild>
+                    <Link href="/login">Go to Login</Link>
+                </Button>
+              </div>
+          )}
+
+          {step !== 3 && (
+            <div className="mt-4 text-center text-sm">
+                <span className="text-muted-foreground">Already have an account?{' '}</span>
+                <Link href="/login" className={cn("underline font-semibold text-primary", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>Log in</Link>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 }
+
+    
