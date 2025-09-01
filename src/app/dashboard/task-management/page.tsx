@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -46,7 +45,12 @@ export default function TaskManagementPage() {
         if (userProfile.isAdmin) {
              q = query(collection(db, "tasks"), orderBy("date", "desc"));
         } else if (userProfile.role === 'vle') {
-            q = query(collection(db, "tasks"), where("assignedVleId", "==", userProfile.id), orderBy("date", "desc"));
+            q = query(
+                collection(db, "tasks"), 
+                where("assignedVleId", "==", userProfile.id), 
+                where("status", "in", ['Assigned', 'Awaiting Documents', 'In Progress', 'Completed', 'Paid Out', 'Complaint Raised']),
+                orderBy("date", "desc")
+            );
         } else {
             setAllTasks([]);
             setLoadingData(false);

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, type FormEvent, useMemo } from 'react';
@@ -33,9 +32,11 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
     const [assignedVles, setAssignedVles] = useState<VLEProfile[]>([]);
 
     useEffect(() => {
-        if (camp) {
+        if (camp && camp.assignedVles) {
             const initialAssignedVles = vles.filter(vle => camp.assignedVles.some(av => av.vleId === vle.id));
             setAssignedVles(initialAssignedVles);
+        } else {
+            setAssignedVles([]);
         }
     }, [camp, vles]);
 
@@ -84,7 +85,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
             services: camp?.services || suggestion?.services || [],
             otherServices: camp?.otherServices || suggestion?.otherServices || '',
             assignedVles: assignedVles.map(vle => {
-                const existingVle = camp?.assignedVles.find(av => av.vleId === vle.id);
+                const existingVle = camp?.assignedVles?.find(av => av.vleId === vle.id);
                 if (existingVle) return existingVle;
                 return { vleId: vle.id, status: 'pending' };
             }),
@@ -235,7 +236,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
                         </Popover>
                         <div className="flex flex-wrap gap-1">
                             {assignedVles.map(vle => {
-                                const status = camp?.assignedVles.find(av => av.vleId === vle.id)?.status || 'pending';
+                                const status = camp?.assignedVles?.find(av => av.vleId === vle.id)?.status || 'pending';
                                 const variant = status === 'accepted' ? 'default' : status === 'rejected' ? 'destructive' : 'secondary';
                                 return (
                                     <Badge key={vle.id} variant={variant} className="flex items-center gap-1">

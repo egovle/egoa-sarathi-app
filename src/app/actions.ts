@@ -1,4 +1,3 @@
-
 'use server';
 
 import { addDoc, arrayUnion, collection, doc, getDocs, query, runTransaction, where, setDoc, updateDoc, writeBatch, deleteDoc, getDoc, Timestamp, orderBy, limit } from "firebase/firestore";
@@ -30,14 +29,23 @@ export async function createNotification(userId: string, title: string, descript
         const vleRef = doc(db, 'vles', userId);
         const govRef = doc(db, 'government', userId);
 
-        const userSnap = await getDoc(userRef);
-        const vleSnap = await getDoc(vleRef);
-        const govSnap = await getDoc(govRef);
-        
         let userProfile: UserProfile | null = null;
-        if(userSnap.exists()) userProfile = userSnap.data() as UserProfile;
-        else if (vleSnap.exists()) userProfile = vleSnap.data() as UserProfile;
-        else if (govSnap.exists()) userProfile = govSnap.data() as UserProfile;
+        
+        const userSnap = await getDoc(userRef);
+        if(userSnap.exists()) {
+            userProfile = userSnap.data() as UserProfile;
+        } else {
+            const vleSnap = await getDoc(vleRef);
+            if (vleSnap.exists()) {
+                userProfile = vleSnap.data() as UserProfile;
+            } else {
+                const govSnap = await getDoc(govRef);
+                if (govSnap.exists()) {
+                    userProfile = govSnap.data() as UserProfile;
+                }
+            }
+        }
+        
 
         if (userProfile?.mobile) {
             let mobileNumber = userProfile.mobile;
@@ -46,6 +54,8 @@ export async function createNotification(userId: string, title: string, descript
             }
             const contentVariables = { '1': title, '2': description };
             await sendWhatsAppMessage(mobileNumber, contentVariables);
+        } else {
+             console.warn(`Could not send WhatsApp notification to user ${userId} because mobile number is missing.`);
         }
     } catch (error) {
         console.error("Failed to send WhatsApp notification:", error);
@@ -282,7 +292,12 @@ export async function payForVariablePriceTask(task: Task, userProfile: UserProfi
                  history: arrayUnion(historyEntry)
              });
          });
-         
+        
+        await createNotificationForAdmins(
+            'Variable Task Paid',
+            `Payment for task #${task.id.slice(-6).toUpperCase()} has been completed. It is ready for assignment.`
+        );
+
         await autoAssignVleToTask(task.id);
 
         return { success: true };
@@ -617,5 +632,3 @@ export async function bulkUploadServices(fileContent: ArrayBuffer) {
         return { success: false, error: "Failed to commit changes to the database." };
     }
 }
-
-    

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -64,10 +63,9 @@ export default function DashboardPage() {
 
 
         let tasksQuery;
-        // Admins see all tasks on their dashboard, handled by AdminDashboard component,
-        // but we fetch tasks here for consistency if needed elsewhere.
         if (userProfile.isAdmin) {
-             tasksQuery = query(collection(db, "tasks"), orderBy("date", "desc"));
+             // For AdminDashboard, we fetch actionable tasks directly inside the component
+             // to keep the logic self-contained. No global fetch needed here for tasks.
         } else if (userProfile.role === 'vle') {
             // For VLE dashboard, we fetch tasks assigned to them for invitations.
             tasksQuery = query(
@@ -77,9 +75,6 @@ export default function DashboardPage() {
             );
         } else if (userProfile.role === 'customer') {
             tasksQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
-        } else {
-             // For government or other roles, no specific tasks query needed by default
-             setDataLoading(false);
         }
         
         if (tasksQuery) {

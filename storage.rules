@@ -1,10 +1,12 @@
-
 rules_version = '2';
 
+// Warning: This is a completely open ruleset. 
+// It allows any user, authenticated or not, to read, write, and delete any file.
+// This should be replaced with secure rules before production use.
 service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
-      allow read, write;
+      allow read, write: if true;
     }
   }
 }
