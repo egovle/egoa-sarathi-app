@@ -295,7 +295,8 @@ export async function payForVariablePriceTask(task: Task, userProfile: UserProfi
         
         await createNotificationForAdmins(
             'Variable Task Paid',
-            `Payment for task #${task.id.slice(-6).toUpperCase()} has been completed. It is ready for assignment.`
+            `Payment for task #${task.id.slice(-6).toUpperCase()} has been completed. It is ready for assignment.`,
+            `/dashboard/task/${task.id}`
         );
 
         await autoAssignVleToTask(task.id);

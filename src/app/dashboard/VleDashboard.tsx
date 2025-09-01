@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -7,8 +6,8 @@ import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, runTransaction } from 'firebase/firestore';
-import { createNotificationForAdmins } from '@/app/actions';
+import { doc, updateDoc, arrayUnion, runTransaction, getDoc } from 'firebase/firestore';
+import { createNotificationForAdmins, createNotification } from '@/app/actions';
 
 import { ToggleRight, CheckCircle2, XCircle, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +19,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { calculateVleEarnings } from '@/lib/utils';
-import type { Task, Service, VLEProfile, Camp } from '@/lib/types';
+import type { Task, VLEProfile, Camp } from '@/lib/types';
 
 
 const PendingApprovalView = () => (
@@ -59,22 +58,24 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     }
     
     const onTaskAccept = async (taskId: string) => {
-        if (!user) return;
+        if (!user || !userProfile) return;
         const taskRef = doc(db, "tasks", taskId);
         
         try {
+            let taskData: Task;
             await runTransaction(db, async (transaction) => {
                 const taskDoc = await transaction.get(taskRef);
                 if (!taskDoc.exists() || taskDoc.data().status !== 'Pending VLE Acceptance') {
                     throw new Error("Task is no longer available for acceptance.");
                 }
+                taskData = taskDoc.data() as Task;
                 
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
                     actorId: user.uid,
-                    actorRole: 'VLE',
+                    actorRole: 'VLE' as const,
                     action: 'Task Accepted',
-                    details: `VLE has accepted the task.`
+                    details: `VLE ${userProfile.name} has accepted the task.`
                 };
     
                 transaction.update(taskRef, { 
@@ -84,7 +85,17 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
             });
     
             toast({ title: 'Task Accepted', description: 'You can now begin work on this task.' });
-            await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile?.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`);
+            
+            if (taskData!.creatorId) {
+                await createNotification(
+                    taskData!.creatorId,
+                    'Task Accepted!',
+                    `Your task for "${taskData!.service}" has been accepted by a VLE.`,
+                    `/dashboard/task/${taskId}`
+                );
+            }
+
+            await createNotificationForAdmins('Task Accepted by VLE', `VLE ${userProfile.name} has accepted task ${taskId.slice(-6).toUpperCase()}.`,  `/dashboard/task/${taskId}`);
             
         } catch (error: any) {
             console.error("Task acceptance failed:", error);
@@ -93,16 +104,16 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     }
 
     const onTaskReject = async (taskId: string) => {
-        if (!user) return;
+        if (!user || !userProfile) return;
         const taskRef = doc(db, "tasks", taskId);
 
         try {
             const historyEntry = {
                 timestamp: new Date().toISOString(),
                 actorId: user.uid,
-                actorRole: 'VLE',
+                actorRole: 'VLE' as const,
                 action: 'Task Rejected',
-                details: `VLE has rejected the task. It has been returned to the assignment queue.`
+                details: `VLE ${userProfile.name} rejected the task. It has been returned to the assignment queue.`
             };
             
             await updateDoc(taskRef, {
@@ -115,7 +126,8 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
             toast({ title: 'Task Rejected', description: 'The task has been returned to the admin.' });
             await createNotificationForAdmins(
                 'Task Rejected by VLE',
-                `Task ${taskId.slice(-6).toUpperCase()} was rejected and needs to be reassigned.`
+                `Task ${taskId.slice(-6).toUpperCase()} was rejected and needs to be reassigned.`,
+                 `/dashboard/task/${taskId}`
             );
         } catch (error: any) {
             console.error("Task rejection failed:", error);
@@ -148,47 +160,13 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                 </div>
             </CardContent>
         </Card>
-        <Tabs defaultValue="camp-invitations" className="w-full">
+        <Tabs defaultValue="task-invitations" className="w-full">
             <div className="flex items-center">
                 <TabsList>
-                    <TabsTrigger value="camp-invitations">Camp Invitations <Badge className="ml-2">{campInvitations.length}</Badge></TabsTrigger>
                     <TabsTrigger value="task-invitations">Task Invitations <Badge className="ml-2">{taskInvitations.length}</Badge></TabsTrigger>
+                    <TabsTrigger value="camp-invitations">Camp Invitations <Badge className="ml-2">{campInvitations.length}</Badge></TabsTrigger>
                 </TabsList>
             </div>
-            <TabsContent value="camp-invitations" className="mt-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>New Camp Invitations</CardTitle>
-                        <CardDescription>You have been invited to join these camps. Please respond on the Camp Management page.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Camp Name</TableHead>
-                                    <TableHead>Location</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {campInvitations.length > 0 ? campInvitations.map(camp => (
-                                    <TableRow key={camp.id}>
-                                        <TableCell>{camp.name}</TableCell>
-                                        <TableCell>{camp.location}</TableCell>
-                                        <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
-                                        <TableCell className="text-right">
-                                            <Button asChild variant="outline" size="sm">
-                                                <Link href="/dashboard/camps">View & Respond</Link>
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new camp invitations.</TableCell></TableRow>}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-            </TabsContent>
             <TabsContent value="task-invitations" className="mt-4">
                  <Card>
                     <CardHeader>
@@ -227,6 +205,40 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
                                }) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No pending task invitations.</TableCell></TableRow>}
                            </TableBody>
                        </Table>
+                    </CardContent>
+                </Card>
+            </TabsContent>
+            <TabsContent value="camp-invitations" className="mt-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>New Camp Invitations</CardTitle>
+                        <CardDescription>You have been invited to join these camps. Please respond on the Camp Management page.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Camp Name</TableHead>
+                                    <TableHead>Location</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead className="text-right">Action</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {campInvitations.length > 0 ? campInvitations.map(camp => (
+                                    <TableRow key={camp.id}>
+                                        <TableCell>{camp.name}</TableCell>
+                                        <TableCell>{camp.location}</TableCell>
+                                        <TableCell>{format(new Date(camp.date), 'dd MMM yyyy')}</TableCell>
+                                        <TableCell className="text-right">
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href="/dashboard/camps">View & Respond</Link>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                )) : <TableRow><TableCell colSpan={4} className="h-24 text-center">No new camp invitations.</TableCell></TableRow>}
+                            </TableBody>
+                        </Table>
                     </CardContent>
                 </Card>
             </TabsContent>
