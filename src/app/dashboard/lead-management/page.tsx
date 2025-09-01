@@ -36,19 +36,24 @@ export default function LeadManagementPage() {
 
     useEffect(() => {
         if (!user) return;
-        setLoadingData(true);
 
         const leadsQuery = query(collection(db, "tasks"), where("creatorId", "==", user.uid), orderBy("date", "desc"));
         const unsubLeads = onSnapshot(leadsQuery, snapshot => {
             const fetchedLeads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
             setLeads(fetchedLeads);
             setLoadingData(false);
+        }, (error) => {
+            console.error("Error fetching leads: ", error);
+            setLoadingData(false);
         });
 
         const servicesQuery = query(collection(db, "services"), orderBy("name"));
         const unsubServices = onSnapshot(servicesQuery, snapshot => {
             setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Service));
+        }, (error) => {
+            console.error("Error fetching services: ", error);
         });
+
 
         return () => {
             unsubLeads();
@@ -138,5 +143,3 @@ export default function LeadManagementPage() {
         </Card>
     );
 }
-
-    

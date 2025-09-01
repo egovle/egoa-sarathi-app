@@ -11,14 +11,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useState, type FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertTriangle, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
-import { createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, sendEmailVerification } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, sendEmailVerification, ConfirmationResult } from 'firebase/auth';
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AppLogo } from '@/components/ui/AppLogo';
-import { ConfirmationResult } from 'firebase/auth';
 
 type PostOffice = {
   Name: string;
@@ -55,7 +54,7 @@ export default function RegisterPage() {
   const [isLocationManual, setIsLocationManual] = useState(false);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [timer, setTimer] = useState(60);
+  const [timer, setTimer] = useState(0);
   
   const recaptchaContainerRef = useRef<HTMLDivElement>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -130,7 +129,7 @@ export default function RegisterPage() {
       };
   }, []);
 
-  const sendOtp = () => {
+  const sendOtp = useCallback(async () => {
     setLoading(true);
     
     if (!recaptchaContainerRef.current) {
@@ -139,56 +138,92 @@ export default function RegisterPage() {
         return;
     }
     
+    // Clear previous reCAPTCHA instance
     recaptchaContainerRef.current.innerHTML = '';
     
     const verifier = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
-        'size': 'normal',
-        'callback': () => {
-            signInWithPhoneNumber(auth, `+91${mobile}`, verifier)
-              .then((result) => {
-                setConfirmationResult(result);
-                toast({ title: 'OTP Sent', description: 'Please check your mobile for the code.' });
-                setStep(2);
-                startTimer();
-              }).catch((error) => {
-                console.error("OTP Send Error:", error);
-                toast({ title: 'OTP Send Error', description: error.message, variant: 'destructive' });
-              }).finally(() => {
-                setLoading(false);
-              });
-        },
+        'size': 'invisible',
+        'callback': () => {},
         'expired-callback': () => {
-            toast({ title: 'reCAPTCHA Expired', description: 'Please try again.', variant: 'destructive' });
+            toast({ title: 'reCAPTCHA Expired', description: 'Please try sending the OTP again.', variant: 'destructive' });
             setLoading(false);
         }
     });
 
-    verifier.render().catch((error) => {
-        console.error("reCAPTCHA render error:", error);
-        toast({ title: 'reCAPTCHA Error', description: 'Could not render reCAPTCHA.', variant: 'destructive'});
+    try {
+        const result = await signInWithPhoneNumber(auth, `+91${mobile}`, verifier);
+        setConfirmationResult(result);
+        toast({ title: 'OTP Sent', description: 'Please check your mobile for the code.' });
+        if (step !== 2) setStep(2);
+        startTimer();
+    } catch (error: any) {
+        console.error("OTP Send Error:", error);
+        toast({ title: 'OTP Send Error', description: error.message, variant: 'destructive' });
+    } finally {
+        verifier.clear();
         setLoading(false);
-    });
-  };
+    }
+  }, [mobile, toast, step]);
 
-  const handleDetailsSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleDetailsSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setLoading(true);
+
+    // --- Validation Checks ---
     if (!validateEmail(email)) {
       setEmailError('Please enter a valid email address.');
+      setLoading(false);
       return;
     }
     if (password !== confirmPassword) {
       toast({ title: 'Passwords do not match', variant: 'destructive' });
+      setLoading(false);
       return;
     }
     if (mobile.length !== 10) {
         toast({ title: 'Invalid Mobile Number', description: 'Must be 10 digits.', variant: 'destructive'});
+        setLoading(false);
         return;
     }
     if (!city || !district) {
         toast({ title: 'Invalid Location', description: 'Provide a valid pincode and city.', variant: 'destructive' });
+        setLoading(false);
         return;
     }
-    sendOtp();
+
+    // --- Duplicate Check ---
+    try {
+        const collectionsToCheck = ['users', 'vles'];
+        const emailQueries = collectionsToCheck.map(c => query(collection(db, c), where('email', '==', email)));
+        const mobileQueries = collectionsToCheck.map(c => query(collection(db, c), where('mobile', '==', mobile)));
+
+        const [emailUserSnap, emailVleSnap, mobileUserSnap, mobileVleSnap] = await Promise.all([
+            getDocs(emailQueries[0]),
+            getDocs(emailQueries[1]),
+            getDocs(mobileQueries[0]),
+            getDocs(mobileQueries[1]),
+        ]);
+
+        if (!emailUserSnap.empty || !emailVleSnap.empty) {
+            toast({ title: 'Registration Error', description: 'An account with this email address already exists.', variant: 'destructive' });
+            setLoading(false);
+            return;
+        }
+
+        if (!mobileUserSnap.empty || !mobileVleSnap.empty) {
+            toast({ title: 'Registration Error', description: 'An account with this mobile number already exists.', variant: 'destructive' });
+            setLoading(false);
+            return;
+        }
+
+    } catch (error) {
+        console.error("Error checking for duplicates:", error);
+        toast({ title: 'Registration Error', description: 'Could not verify user details. Please try again.', variant: 'destructive' });
+        setLoading(false);
+        return;
+    }
+
+    await sendOtp();
   };
   
   const handleOtpSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -255,7 +290,7 @@ export default function RegisterPage() {
             </CardTitle>
             <CardDescription>
                 {step === 1 && "Enter your details to create an account"}
-                {step === 2 && `Enter the OTP sent to +91${mobile}`}
+                {step === 2 && `Enter the OTP sent to +91${mobile}. OTP expires in 2 minutes.`}
                 {step === 3 && "Please check your email to verify your account."}
             </CardDescription>
         </CardHeader>
@@ -322,7 +357,7 @@ export default function RegisterPage() {
                   </div>
                    <div className="text-sm text-center text-muted-foreground">
                         {timer > 0 ? `Resend OTP in ${timer}s` : "Didn't receive code?"}
-                        <Button type="button" variant="link" size="sm" onClick={sendOtp} disabled={timer > 0} className="disabled:text-muted-foreground">
+                        <Button type="button" variant="link" size="sm" onClick={sendOtp} disabled={timer > 0 || loading} className="disabled:text-muted-foreground">
                             Resend OTP
                         </Button>
                     </div>
@@ -354,5 +389,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-    
