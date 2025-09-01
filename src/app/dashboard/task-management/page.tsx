@@ -43,10 +43,14 @@ export default function TaskManagementPage() {
         setLoadingData(true);
         let q: Query<DocumentData>;
 
-        if (userProfile.role === 'vle') {
+        if (userProfile.isAdmin) {
+             q = query(collection(db, "tasks"), orderBy("date", "desc"));
+        } else if (userProfile.role === 'vle') {
             q = query(collection(db, "tasks"), where("assignedVleId", "==", userProfile.id), orderBy("date", "desc"));
-        } else { // Admin or other roles that should see all
-            q = query(collection(db, "tasks"), orderBy("date", "desc"));
+        } else {
+            setAllTasks([]);
+            setLoadingData(false);
+            return;
         }
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -64,7 +68,6 @@ export default function TaskManagementPage() {
     const filteredTasks = useMemo(() => {
         let tasksToFilter = allTasks;
 
-        // Apply status filter
         if (statusFilter !== 'all') {
              if (statusFilter === 'all-pending') {
                 const pendingStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress', 'Awaiting Payment', 'Complaint Raised'];
@@ -74,7 +77,6 @@ export default function TaskManagementPage() {
             }
         }
         
-        // Apply search query
         if (searchQuery) {
             const lowercasedQuery = searchQuery.toLowerCase();
             tasksToFilter = tasksToFilter.filter(task => 

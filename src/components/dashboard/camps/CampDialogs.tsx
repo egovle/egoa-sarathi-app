@@ -190,7 +190,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                            <PopoverContent className="w-[--radix-popover-trigger-width] p-0" onOpenAutoFocus={(e) => e.preventDefault()}>
                                 <div className="p-2">
                                     <div className="relative">
                                         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
@@ -491,5 +491,3 @@ export const CampPayoutDialog = ({ camp, vles, adminProfile, onFinished }: { cam
         </DialogContent>
     );
 };
-
-    
