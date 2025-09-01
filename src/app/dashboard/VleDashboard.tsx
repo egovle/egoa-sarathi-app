@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -62,13 +63,17 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
         const taskRef = doc(db, "tasks", taskId);
         
         try {
-            let taskData: Task;
+            const taskDocBefore = await getDoc(taskRef);
+            if (!taskDocBefore.exists()) {
+                throw new Error("Task not found.");
+            }
+            const taskData = taskDocBefore.data() as Task;
+            
             await runTransaction(db, async (transaction) => {
                 const taskDoc = await transaction.get(taskRef);
                 if (!taskDoc.exists() || taskDoc.data().status !== 'Pending VLE Acceptance') {
                     throw new Error("Task is no longer available for acceptance.");
                 }
-                taskData = taskDoc.data() as Task;
                 
                 const historyEntry = {
                     timestamp: new Date().toISOString(),
@@ -86,11 +91,11 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     
             toast({ title: 'Task Accepted', description: 'You can now begin work on this task.' });
             
-            if (taskData!.creatorId) {
+            if (taskData.creatorId) {
                 await createNotification(
-                    taskData!.creatorId,
+                    taskData.creatorId,
                     'Task Accepted!',
-                    `Your task for "${taskData!.service}" has been accepted by a VLE.`,
+                    `Your task for "${taskData.service}" has been accepted by a VLE.`,
                     `/dashboard/task/${taskId}`
                 );
             }

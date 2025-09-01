@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -17,8 +18,6 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Task } from '@/lib/types';
 
-
-const PAGE_SIZE = 15;
 
 export default function TaskManagementPage() {
     const { user, userProfile, loading: authLoading } = useAuth();
