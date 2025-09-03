@@ -1,18 +1,18 @@
 
 'use client';
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot, query, where, orderBy, getDocs, limit, startAfter, Query, DocumentData, QueryConstraint } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, orderBy, QueryConstraint, getDocs, or } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-import { Search, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,7 +30,7 @@ export default function TaskManagementPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     
     useEffect(() => {
-        if (!authLoading && !user) {
+        if (!authLoading && (!user || (userProfile?.role !== 'admin' && userProfile?.role !== 'vle'))) {
             router.push('/dashboard');
         }
     }, [user, userProfile, authLoading, router]);
@@ -39,22 +39,13 @@ export default function TaskManagementPage() {
         if (!userProfile) return;
 
         setLoadingData(true);
-        let q: Query<DocumentData>;
-
-        if (userProfile.isAdmin) {
-             q = query(collection(db, "tasks"), orderBy("date", "desc"));
-        } else if (userProfile.role === 'vle') {
-            q = query(
-                collection(db, "tasks"), 
-                where("assignedVleId", "==", userProfile.id), 
-                where("status", "in", ['Assigned', 'Awaiting Documents', 'In Progress', 'Completed', 'Paid Out', 'Complaint Raised']),
-                orderBy("date", "desc")
-            );
-        } else {
-            setAllTasks([]);
-            setLoadingData(false);
-            return;
+        let constraints: QueryConstraint[] = [orderBy("date", "desc")];
+        
+        if (userProfile.role === 'vle') {
+            constraints.push(where("assignedVleId", "==", userProfile.id));
         }
+
+        const q = query(collection(db, "tasks"), ...constraints);
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const fetchedTasks = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Task);
@@ -73,8 +64,11 @@ export default function TaskManagementPage() {
 
         if (statusFilter !== 'all') {
              if (statusFilter === 'all-pending') {
-                const pendingStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress', 'Awaiting Payment', 'Complaint Raised'];
+                const pendingStatuses: Task['status'][] = ['Unassigned', 'Pending Price Approval', 'Pending VLE Acceptance', 'Awaiting Documents', 'Assigned', 'In Progress', 'Awaiting Payment'];
                 tasksToFilter = tasksToFilter.filter(task => pendingStatuses.includes(task.status));
+            } else if (statusFilter === 'all-completed') {
+                const completedStatuses: Task['status'][] = ['Completed', 'Paid Out'];
+                tasksToFilter = tasksToFilter.filter(task => completedStatuses.includes(task.status));
             } else {
                 tasksToFilter = tasksToFilter.filter(task => task.status === statusFilter);
             }
@@ -126,6 +120,7 @@ export default function TaskManagementPage() {
                             <SelectContent>
                                 <SelectItem value="all">All Statuses</SelectItem>
                                 <SelectItem value="all-pending">All Pending</SelectItem>
+                                <SelectItem value="all-completed">All Completed</SelectItem>
                                 <SelectItem value="Unassigned">Unassigned</SelectItem>
                                 <SelectItem value="Pending VLE Acceptance">Pending Acceptance</SelectItem>
                                 <SelectItem value="Awaiting Payment">Awaiting Payment</SelectItem>

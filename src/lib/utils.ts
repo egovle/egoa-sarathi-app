@@ -15,8 +15,8 @@ export const fileValidationConfig = {
 };
 
 export const validateFiles = (files: File[], allowedMimeTypes?: string[]): { isValid: boolean, message?: string } => {
-    const validMimeTypes = allowedMimeTypes && allowedMimeTypes.length > 0 
-        ? allowedMimeTypes 
+    const validMimeTypes = Array.isArray(allowedMimeTypes) && allowedMimeTypes.length > 0
+        ? allowedMimeTypes
         : fileValidationConfig.allowedTypes;
     
     const friendlyTypeList = validMimeTypes.map(m => m.split('/')[1].toUpperCase()).join(', ');
