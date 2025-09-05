@@ -11,6 +11,18 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: "https",
+        hostname: "firebasestorage.googleapis.com",
+      },
+      {
+        protocol: 'https',
+        hostname: 'goasarthi.in',
+      },
+       {
+        protocol: 'https',
+        hostname: 'egoa-sarathi-app--egoasarthi.asia-east1.hosted.app',
+      }
     ],
   },
 };
