@@ -1,4 +1,3 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
@@ -26,7 +25,9 @@ if (typeof window !== 'undefined') {
       try {
         initializeAppCheck(app, {
             provider: new ReCaptchaV3Provider(recaptchaSiteKey),
-            isTokenAutoRefreshEnabled: true
+            // IMPORTANT: Set this to `false` to prevent intermittent initialization errors.
+            // The App Check SDK will automatically refresh the token as needed.
+            isTokenAutoRefreshEnabled: false 
         });
         console.log("Firebase App Check initialized successfully.");
       } catch (error) {
