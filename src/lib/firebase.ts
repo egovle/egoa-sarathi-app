@@ -19,14 +19,19 @@ const firebaseConfig = {
 // Initialize Firebase
 const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize App Check
+// Initialize App Check on the client side only
 if (typeof window !== 'undefined') {
   const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   if (recaptchaSiteKey) {
-      initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider(recaptchaSiteKey),
-        isTokenAutoRefreshEnabled: true
-      });
+      try {
+        initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+            isTokenAutoRefreshEnabled: true
+        });
+        console.log("Firebase App Check initialized successfully.");
+      } catch (error) {
+        console.error("Error initializing Firebase App Check:", error);
+      }
   } else {
     console.warn("Firebase App Check: ReCAPTCHA Site Key is not defined. App Check is disabled.");
   }
@@ -37,4 +42,3 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 
 export { app, db, auth, storage };
-

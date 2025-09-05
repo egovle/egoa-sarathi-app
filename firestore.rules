@@ -1,10 +1,10 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Require a valid App Check token for all reads and writes
+    // Require a valid App Check token for all database access.
+    // This is a basic rule; you can add more specific user-based authentication later.
     match /{document=**} {
-      allow read, write: if request.auth != null && request.auth.token.app_check == true;
+      allow read, write: if request.app.token != null;
     }
   }
 }
