@@ -39,7 +39,8 @@ echo "🔼 Pushing changes to remote repository..."
 git push -u origin main
 
 # 5. Deploy to Firebase
-echo "🚀 Deploying to Firebase App Hosting..."
-firebase deploy --only apphosting
+echo "🚀 Deploying to Firebase..."
+# This command now deploys the web app AND the security rules for Firestore and Storage.
+firebase deploy --only apphosting,firestore,storage
 
 echo "🎉 Deployment complete!"
