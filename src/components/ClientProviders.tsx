@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from '@/context/AuthContext';
 
+
 export default function ClientProviders({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleContextmenu = (e: MouseEvent) => {
