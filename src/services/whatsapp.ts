@@ -45,3 +45,4 @@ export async function sendWhatsAppMessage(to: string, contentVariables: { [key: 
     return { success: true, error: error.message };
   }
 }
+
