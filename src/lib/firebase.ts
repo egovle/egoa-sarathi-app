@@ -22,7 +22,7 @@ const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : get
 // Initialize Firestore with long-polling disabled to prevent "Unknown SID" errors
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
-  experimentalForceLongPolling: false,
+  experimentalForceLongPolling: true,
 });
 
 // Initialize App Check
@@ -47,3 +47,5 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 
 export { app, db, auth, storage };
+
+    

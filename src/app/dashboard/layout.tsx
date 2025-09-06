@@ -93,7 +93,14 @@ export default function DashboardLayout({
   
   const navItems = ALL_NAV_ITEMS.filter(item => {
     const userRole = userProfile?.isAdmin ? 'admin' : userProfile?.role;
-    return userRole && item.roles.includes(userRole);
+    if (!userRole) return false;
+
+    // Show User Management only if there's no specific tab selected for it.
+    if (item.href === '/dashboard/users' && searchParams.get('tab')) {
+      return false;
+    }
+
+    return item.roles.includes(userRole);
   });
 
   useEffect(() => {
@@ -189,25 +196,26 @@ export default function DashboardLayout({
   
   const isLinkActive = (href: string) => {
     const currentTab = searchParams.get('tab');
-    const [path, query] = href.split('?');
-    
-    if (path === '/dashboard' && pathname === href) {
-        return true;
-    }
-    
-    if (path === '/dashboard/settings' || (path === '/dashboard' && href.includes('tab=profile'))) {
-        return pathname === '/dashboard' && currentTab === 'profile';
+    const [basePath, query] = href.split('?');
+    const queryParams = new URLSearchParams(query || '');
+    const linkTab = queryParams.get('tab');
+
+    // Handle settings tab, which is a special case
+    if (basePath === '/dashboard/settings') {
+      return pathname === '/dashboard' && currentTab === 'profile';
     }
 
-    if (query) {
-        const queryTab = new URLSearchParams(query).get('tab');
-        return pathname === path && currentTab === queryTab;
-    }
-
-    if (path !== '/dashboard') {
-      return pathname.startsWith(path);
+    // Handle links with tabs
+    if (linkTab) {
+      return pathname === basePath && currentTab === linkTab;
     }
     
+    // Handle non-tabbed links that are not the root dashboard
+    if (basePath !== '/dashboard') {
+      return pathname.startsWith(basePath);
+    }
+    
+    // Handle the root dashboard link itself
     return pathname === '/dashboard' && !currentTab;
   }
 
@@ -226,6 +234,14 @@ export default function DashboardLayout({
         </Link>
     )
   };
+  
+  const onNotificationClick = (link: string | undefined) => {
+    if (link) {
+        router.push(link);
+        setIsPopoverOpen(false);
+    }
+  }
+
 
   return (
     <div className="grid min-h-screen w-full md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]">
@@ -351,12 +367,12 @@ export default function DashboardLayout({
                         <div className="space-y-1 p-2 max-h-80 overflow-y-auto">
                             {notifications.length > 0 ? (
                             notifications.map((notif) => (
-                                <div key={notif.id} className={cn("group relative p-3 rounded-md transition-colors hover:bg-muted", !notif.read && 'bg-primary/10')}>
-                                    <Link href={notif.link || '/dashboard'} className="block pr-6" onClick={() => setIsPopoverOpen(false)}>
+                                <div key={notif.id} className={cn("group relative p-3 rounded-md transition-colors hover:bg-muted cursor-pointer", !notif.read && 'bg-primary/10')} onClick={() => onNotificationClick(notif.link)}>
+                                    <div className="block pr-6">
                                         <p className="font-semibold text-sm">{notif.title}</p>
                                         <p className="text-sm text-muted-foreground">{notif.description}</p>
                                         <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(notif.date), { addSuffix: true })}</p>
-                                    </Link>
+                                    </div>
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -427,3 +443,5 @@ export default function DashboardLayout({
     </div>
   )
 }
+
+    

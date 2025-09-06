@@ -144,7 +144,7 @@ export default function CustomerDashboard({ tasks, services }: { tasks: Task[], 
                         <TableBody>
                         {filteredTasks.map(task => {
                             const isCompleted = task.status === 'Paid Out' || task.status === 'Completed';
-                            const displayStatus = task.status === 'Paid Out' ? 'Completed' : task.status;
+                            const displayStatus = isCompleted ? 'Completed' : task.status;
                             return (
                                 <TableRow key={task.id}>
                                     <TableCell className="font-medium">{task.id.slice(-6).toUpperCase()}</TableCell>

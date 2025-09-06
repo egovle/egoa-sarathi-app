@@ -438,5 +438,7 @@ export default function ReportsPage() {
 
     return userProfile.isAdmin 
         ? <AdminReports tasks={tasks} vles={vles} camps={camps} services={services} /> 
-        : <VleReports tasks={tasks} camps={camps} userProfile={userProfile as VLEProfile} />;
+        : (userProfile.role === 'vle' ? <VleReports tasks={tasks} camps={camps} userProfile={userProfile as VLEProfile} /> : null);
 }
+
+    
