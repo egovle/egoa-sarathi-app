@@ -1,110 +1,104 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
+  
     // --- Helper Functions ---
     function isSignedIn() {
       return request.auth != null;
     }
-
+    
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
     
-    function getUserData(userId) {
-        return get(/databases/$(database)/documents/users/$(userId)).data;
-    }
-    
-    function getVleData(userId) {
-        return get(/databases/$(database)/documents/vles/$(userId)).data;
+    function getRole() {
+      return get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.role;
     }
 
-    function getGovData(userId) {
-        return get(/databases/$(database)/documents/government/$(userId)).data;
-    }
-
-    function isCustomer() {
-      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
-
-    function isVLE() {
-      return isSignedIn() && exists(/databases/$(database)/documents/vles/$(request.auth.uid));
-    }
-    
     function isAdmin() {
-        return isVLE() && getVleData(request.auth.uid).isAdmin == true;
+      // Check if the user exists in the 'vles' collection and their isAdmin flag is true
+      return exists(/databases/$(database)/documents/vles/$(request.auth.uid))
+          && get(/databases/$(database)/documents/vles/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // --- Public Collections ---
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
 
-    // --- User Profiles (customers, vles, government) ---
+    match /campSuggestions/{suggestionId} {
+      allow read, delete: if isAdmin();
+      allow create: if isSignedIn();
+    }
+    
+    match /camps/{campId} {
+        allow read: if isSignedIn();
+        allow create, update, delete: if isAdmin();
+        
+        // VLEs can update their own status in the assignedVles array
+        allow update: if isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['assignedVles']);
+    }
+
+    // --- User-Specific Collections ---
     match /users/{userId} {
-      allow read, update: if isOwner(userId) || isAdmin();
-      allow create: if !isSignedIn(); // Allow creation during registration
+      allow read, update, delete: if isOwner(userId) || isAdmin();
+      allow create: if isSignedIn();
     }
-
+    
     match /vles/{vleId} {
-      allow read: if isSignedIn();
-      allow create: if !isSignedIn(); // Allow creation during registration
-      allow update: if isOwner(vleId) || isAdmin();
+      allow read, update, delete: if isOwner(vleId) || isAdmin();
+      allow create: if isSignedIn();
     }
     
     match /government/{govId} {
-       allow read: if isSignedIn();
-       allow create: if !isSignedIn();
-       allow update: if isOwner(govId) || isAdmin();
+      allow read, update, delete: if isOwner(govId) || isAdmin();
+      allow create: if isSignedIn();
     }
 
-    // --- Core Data ---
-    match /tasks/{taskId} {
-        allow read: if isAdmin() || isOwner(resource.data.creatorId) || isOwner(resource.data.assignedVleId);
-        allow create: if isCustomer() || isVLE();
-        allow update: if isAdmin() || isOwner(resource.data.creatorId) || isOwner(resource.data.assignedVleId);
-    }
-    
-    match /services/{serviceId} {
-        allow read: if true;
-        allow write: if isAdmin();
-    }
-
-    match /camps/{campId} {
-        allow read: if true;
-        allow create, update, delete: if isAdmin();
-    }
-    
-    match /campSuggestions/{suggestionId} {
-        allow read: if isAdmin();
-        allow create: if isVLE() || exists(/databases/$(database)/documents/government/$(request.auth.uid));
-        allow delete: if isAdmin();
-    }
-    
     match /notifications/{notificationId} {
-      allow read, delete: if isOwner(resource.data.userId);
-      allow create: if isAdmin() || isCustomer() || isVLE(); // System can create notifications
-    }
-    
-    match /paymentRequests/{requestId} {
-        allow read: if isAdmin() || isOwner(resource.data.userId);
-        allow create: if isCustomer() || isVLE();
-        allow update: if isAdmin();
+      allow read, update, delete: if isSignedIn() && isOwner(resource.data.userId);
+      allow create: if true; // Server-side creation
     }
 
-    // --- Chat ---
+    match /paymentRequests/{reqId} {
+        allow create: if isSignedIn();
+        allow read, update: if isAdmin();
+    }
+
+    // --- Core Task Logic ---
+    match /tasks/{taskId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && (isOwner(resource.data.creatorId) || isOwner(resource.data.assignedVleId) || isAdmin());
+      allow update: if isSignedIn() && (isOwner(resource.data.creatorId) || isOwner(resource.data.assignedVleId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // --- Chat Collections ---
     match /taskChats/{taskId}/messages/{messageId} {
-       allow read, create: if isAdmin() || isVLE() || isCustomer();
+      allow read, create: if isSignedIn() && (
+        isAdmin() ||
+        isOwner(get(/databases/$(database)/documents/tasks/$(taskId)).data.creatorId) ||
+        isOwner(get(/databases/$(database)/documents/tasks/$(taskId)).data.assignedVleId)
+      );
     }
     
-    match /groupChats/{roomId}/messages/{messageId} {
-        allow read, create: if isAdmin() || isVLE();
+    match /campChats/{campId}/messages/{messageId} {
+      allow read, create: if isSignedIn() && (
+        isAdmin() ||
+        // Check if user is an accepted VLE in the camp
+        get(/databases/$(database)/documents/camps/$(campId)).data.assignedVles.hasAny([
+          {'vleId': request.auth.uid, 'status': 'accepted'}
+        ])
+      );
     }
-    
-     match /campChats/{campId}/messages/{messageId} {
-        allow read, create: if isAdmin() || isVLE();
-     }
-     
-     match /trainingMaterials/{materialId} {
-        allow read: if isVLE() || isAdmin();
-        allow create, delete: if isAdmin();
-     }
+
+    match /groupChats/mainRoom/messages/{messageId} {
+       allow read, create: if isSignedIn() && (
+         // Allow if user is an admin or a VLE (but not a customer/gov)
+         exists(/databases/$(database)/documents/vles/$(request.auth.uid))
+       );
+    }
   }
 }

@@ -122,6 +122,7 @@ export default function TaskManagementPage() {
                                 <SelectItem value="all-pending">All Pending</SelectItem>
                                 <SelectItem value="all-completed">All Completed</SelectItem>
                                 <SelectItem value="Unassigned">Unassigned</SelectItem>
+                                <SelectItem value="Pending Price Approval">Pending Price Approval</SelectItem>
                                 <SelectItem value="Pending VLE Acceptance">Pending Acceptance</SelectItem>
                                 <SelectItem value="Awaiting Payment">Awaiting Payment</SelectItem>
                                 <SelectItem value="Awaiting Documents">Awaiting Documents</SelectItem>
