@@ -22,7 +22,7 @@ env:
   - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
     value: "G-9ZGSFH8X1F"
   - variable: NEXT_PUBLIC_RECAPTCHA_SITE_KEY
-    value: "6Ld5qL8rAAAAAJ-N04VR19ZrZJFVgzp7gUmlGwR8"
+    value: "PASTE_YOUR_NEW_V3_SITE_KEY_HERE"
   - variable: CACHE_BUSTER
     value: "1722000005"
   - variable: TWILIO_ACCOUNT_SID
