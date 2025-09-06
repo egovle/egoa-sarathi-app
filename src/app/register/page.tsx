@@ -100,17 +100,6 @@ export default function RegisterPage() {
     event.preventDefault();
     setLoading(true);
 
-    if (!process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
-      console.error("reCAPTCHA Site Key is not configured.");
-      toast({
-        title: "Configuration Error",
-        description: "The application is not configured correctly. Please contact support.",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
-
     // --- Validation Checks ---
     if (!validateEmail(email)) {
       setEmailError('Please enter a valid email address.');
