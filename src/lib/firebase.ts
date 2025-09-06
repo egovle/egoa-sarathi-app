@@ -1,9 +1,9 @@
+
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -18,24 +18,6 @@ const firebaseConfig = {
 // Initialize Firebase
 const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize App Check on the client side only
-if (typeof window !== 'undefined') {
-  const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
-  if (recaptchaSiteKey) {
-      try {
-        initializeAppCheck(app, {
-            provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
-            // IMPORTANT: Set this to `true` for ReCaptchaEnterpriseProvider.
-            isTokenAutoRefreshEnabled: true
-        });
-        console.log("Firebase App Check with Enterprise provider initialized successfully.");
-      } catch (error) {
-        console.error("Error initializing Firebase App Check:", error);
-      }
-  } else {
-    console.warn("Firebase App Check: ReCAPTCHA Site Key is not defined. App Check is disabled.");
-  }
-}
 
 const db = getFirestore(app);
 const auth = getAuth(app);

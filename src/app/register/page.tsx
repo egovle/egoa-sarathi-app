@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useState, type FormEvent, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertTriangle, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
-import { createUserWithEmailAndPassword, RecaptchaVerifier, signInWithPhoneNumber, sendEmailVerification, ConfirmationResult } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -43,29 +43,15 @@ export default function RegisterPage() {
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
   const [address, setAddress] = useState('');
-  const [otp, setOtp] = useState('');
-
+  
   // UI State
-  const [step, setStep] = useState(1);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isPincodeLoading, setIsPincodeLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
-  const [isConfigMissing, setIsConfigMissing] = useState(false);
   const [isLocationManual, setIsLocationManual] = useState(false);
-  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
   const [showPassword, setShowPassword] = useState(false);
-  const [timer, setTimer] = useState(0);
   
-  const recaptchaContainerRef = useRef<HTMLDivElement>(null);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!apiKey || apiKey.startsWith('PASTE_YOUR')) {
-      setIsConfigMissing(true);
-    }
-  }, []);
-
   const fetchLocation = useCallback(async (searchPincode: string) => {
     setIsPincodeLoading(true);
     setIsLocationManual(false);
@@ -109,63 +95,8 @@ export default function RegisterPage() {
     return () => clearTimeout(handler);
   }, [pincode, fetchLocation]);
 
-  const startTimer = () => {
-    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-    setTimer(60);
-    timerIntervalRef.current = setInterval(() => {
-        setTimer(prev => {
-            if (prev <= 1) {
-                if(timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-                return 0;
-            }
-            return prev - 1;
-        });
-    }, 1000);
-  };
-  
-  useEffect(() => {
-      return () => {
-          if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-      };
-  }, []);
 
-  const sendOtp = useCallback(async () => {
-    setLoading(true);
-    
-    if (!recaptchaContainerRef.current) {
-        toast({ title: 'Error', description: 'reCAPTCHA container not found.', variant: 'destructive'});
-        setLoading(false);
-        return;
-    }
-    
-    // Clear previous reCAPTCHA instance
-    recaptchaContainerRef.current.innerHTML = '';
-    
-    const verifier = new RecaptchaVerifier(auth, recaptchaContainerRef.current, {
-        'size': 'invisible',
-        'callback': () => {},
-        'expired-callback': () => {
-            toast({ title: 'reCAPTCHA Expired', description: 'Please try sending the OTP again.', variant: 'destructive' });
-            setLoading(false);
-        }
-    });
-
-    try {
-        const result = await signInWithPhoneNumber(auth, `+91${mobile}`, verifier);
-        setConfirmationResult(result);
-        toast({ title: 'OTP Sent', description: 'Please check your mobile for the code.' });
-        if (step !== 2) setStep(2);
-        startTimer();
-    } catch (error: any) {
-        console.error("OTP Send Error:", error);
-        toast({ title: 'OTP Send Error', description: error.message, variant: 'destructive' });
-    } finally {
-        verifier.clear();
-        setLoading(false);
-    }
-  }, [mobile, toast, step]);
-
-  const handleDetailsSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleRegister = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
 
@@ -216,29 +147,6 @@ export default function RegisterPage() {
             return;
         }
 
-    } catch (error) {
-        console.error("Error checking for duplicates:", error);
-        toast({ title: 'Registration Error', description: 'Could not verify user details. Please try again.', variant: 'destructive' });
-        setLoading(false);
-        return;
-    }
-
-    await sendOtp();
-  };
-  
-  const handleOtpSubmit = async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      setLoading(true);
-
-      if (!confirmationResult) {
-          toast({ title: 'Verification Error', description: 'OTP confirmation failed. Please try again.', variant: 'destructive' });
-          setLoading(false);
-          return;
-      }
-      
-      try {
-          await confirmationResult.confirm(otp);
-          
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const user = userCredential.user;
 
@@ -253,26 +161,23 @@ export default function RegisterPage() {
           const collectionName = role === 'vle' ? 'vles' : (role === 'government' ? 'government' : 'users');
           await setDoc(doc(db, collectionName, user.uid), userProfile);
           
-          setStep(3); // Go to success screen
+          setIsSuccess(true);
           setTimeout(() => {
             router.push('/login');
           }, 4000);
 
-
-      } catch (error: any) {
-          console.error("OTP verification or user creation failed:", error);
-          let errorMessage = 'Could not verify OTP. Please try again.';
-          if (error.code === 'auth/invalid-verification-code') {
-              errorMessage = 'The OTP you entered is invalid.';
-          } else if (error.code === 'auth/email-already-in-use') {
-              errorMessage = 'An account with this email address already exists.';
-          }
-          toast({ title: 'Registration Failed', description: errorMessage, variant: 'destructive' });
-      } finally {
+    } catch (error: any) {
+        console.error("Registration failed:", error);
+        let errorMessage = 'Could not complete registration. Please try again.';
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = 'An account with this email address already exists.';
+        }
+        toast({ title: 'Registration Failed', description: errorMessage, variant: 'destructive' });
+    } finally {
         setLoading(false);
-      }
+    }
   };
-
+  
   return (
     <div className="flex items-center justify-center min-h-screen bg-background text-foreground p-4">
       <Card className="w-full max-w-sm bg-card/50">
@@ -280,31 +185,21 @@ export default function RegisterPage() {
             <Link href="/" className="mx-auto mb-4" prefetch={false}>
                 <AppLogo className="justify-center" />
             </Link>
-            {step !== 3 && (
+            {!isSuccess && (
                  <Button asChild variant="ghost" className="text-muted-foreground w-fit mx-auto -mt-2 mb-2">
                     <Link href="/"><ArrowLeft className="mr-2 h-4 w-4"/>Back to Home</Link>
                 </Button>
             )}
             <CardTitle className="text-2xl tracking-tight">
-                {step === 3 ? "Registration Successful!" : "Register for eGoa Sarathi"}
+                {isSuccess ? "Registration Successful!" : "Register for eGoa Sarathi"}
             </CardTitle>
             <CardDescription>
-                {step === 1 && "Enter your details to create an account"}
-                {step === 2 && `Enter the OTP sent to +91${mobile}. OTP expires in 2 minutes.`}
-                {step === 3 && "Please check your email to verify your account."}
+                {!isSuccess ? "Enter your details to create an account" : "Please check your email to verify your account."}
             </CardDescription>
         </CardHeader>
         <CardContent>
-          {isConfigMissing && step !== 3 && (
-            <Alert variant="destructive" className="mb-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Configuration Error</AlertTitle>
-                <AlertDescription>The app is not configured correctly. Please follow the instructions in the README file.</AlertDescription>
-            </Alert>
-          )}
-
-          {step === 1 && (
-              <form onSubmit={handleDetailsSubmit} className="grid gap-4">
+          {!isSuccess ? (
+              <form onSubmit={handleRegister} className="grid gap-4">
                 <div className="grid gap-2 text-left">
                   <Label>Register as</Label>
                   <RadioGroup defaultValue="customer" value={role} onValueChange={setRole} className="flex gap-4 pt-1">
@@ -339,36 +234,18 @@ export default function RegisterPage() {
                 </div>
                 <div className="grid gap-2 text-left"><Label htmlFor="address">Address (House No, Street)</Label><Input id="address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123, Main Street" required /></div>
                 
-                <div ref={recaptchaContainerRef} className="flex justify-center my-2"></div>
-
-                <Button type="submit" disabled={isPincodeLoading || isConfigMissing || loading} className="w-full mt-2">
-                    {loading ? <Loader2 className="animate-spin" /> : 'Send OTP'}
+                <Button type="submit" disabled={isPincodeLoading || loading} className="w-full mt-2">
+                    {loading ? <Loader2 className="animate-spin" /> : 'Register'}
                 </Button>
 
                 {role === 'vle' && (<p className="text-xs text-center text-muted-foreground mt-2">VLE accounts require admin approval after registration.</p>)}
+              
+                <div className="mt-4 text-center text-sm">
+                    <span className="text-muted-foreground">Already have an account?{' '}</span>
+                    <Link href="/login" className={cn("underline font-semibold text-primary")} prefetch={false}>Log in</Link>
+                </div>
               </form>
-          )}
-
-          {step === 2 && (
-              <form onSubmit={handleOtpSubmit} className="grid gap-4">
-                  <div className="grid gap-2 text-left">
-                      <Label htmlFor="otp">Enter OTP</Label>
-                      <Input id="otp" value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="Enter 6-digit code" required maxLength={6} />
-                  </div>
-                   <div className="text-sm text-center text-muted-foreground">
-                        {timer > 0 ? `Resend OTP in ${timer}s` : "Didn't receive code?"}
-                        <Button type="button" variant="link" size="sm" onClick={sendOtp} disabled={timer > 0 || loading} className="disabled:text-muted-foreground">
-                            Resend OTP
-                        </Button>
-                    </div>
-                  <Button type="submit" disabled={loading} className="w-full">
-                      {loading ? <Loader2 className="animate-spin" /> : 'Verify & Register'}
-                  </Button>
-                  <Button variant="link" size="sm" onClick={() => { setStep(1); setConfirmationResult(null); }}>Back to Details</Button>
-              </form>
-          )}
-
-          {step === 3 && (
+          ) : (
               <div className='text-center space-y-4'>
                 <CheckCircle className="h-16 w-16 text-green-500 mx-auto" />
                 <p className="text-muted-foreground">You will be redirected to the login page shortly. Please check your spam folder if you do not see the verification email.</p>
@@ -376,13 +253,6 @@ export default function RegisterPage() {
                     <Link href="/login">Go to Login</Link>
                 </Button>
               </div>
-          )}
-
-          {step !== 3 && (
-            <div className="mt-4 text-center text-sm">
-                <span className="text-muted-foreground">Already have an account?{' '}</span>
-                <Link href="/login" className={cn("underline font-semibold text-primary", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>Log in</Link>
-            </div>
           )}
         </CardContent>
       </Card>

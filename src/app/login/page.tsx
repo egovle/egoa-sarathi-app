@@ -25,15 +25,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   
-  const [isConfigMissing, setIsConfigMissing] = useState(false);
   const [showVerificationError, setShowVerificationError] = useState(false);
-
-  useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-    if (!key || key.includes('PASTE_YOUR')) {
-      setIsConfigMissing(true);
-    }
-  }, []);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -87,16 +79,6 @@ export default function LoginPage() {
             </Button>
         </div>
         
-        {isConfigMissing && (
-            <Alert variant="destructive" className="mb-4 max-w-sm w-full">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Configuration Error!</AlertTitle>
-                <AlertDescription>
-                    Your app's API keys are not set correctly. Please follow the setup instructions in the README file to fix this.
-                </AlertDescription>
-            </Alert>
-        )}
-
         {showVerificationError && (
             <Alert variant="destructive" className="mb-4 max-w-sm w-full">
                 <AlertTriangle className="h-4 w-4" />
@@ -166,14 +148,14 @@ export default function LoginPage() {
                     </Button>
                 </div>
               </div>
-              <Button type="submit" disabled={loading || isConfigMissing} className="w-full mt-4">
+              <Button type="submit" disabled={loading} className="w-full mt-4">
                 {loading ? <Loader2 className="animate-spin" /> : 'Secure Sign In'}
               </Button>
             </form>
 
               <div className="mt-6 text-center text-sm">
                   <span className="text-muted-foreground">Don't have an account?{' '}</span>
-                  <Link href="/register" className={cn("underline font-semibold text-primary hover:text-primary/80 transition-colors", isConfigMissing && "pointer-events-none opacity-50")} prefetch={false}>
+                  <Link href="/register" className={cn("underline font-semibold text-primary hover:text-primary/80 transition-colors")} prefetch={false}>
                       Register here
                   </Link>
               </div>
@@ -195,5 +177,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    
