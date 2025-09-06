@@ -32,6 +32,17 @@ export default function LoginPage() {
     setLoading(true);
     setShowVerificationError(false);
 
+    if (!process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+      console.error("reCAPTCHA Site Key is not configured.");
+      toast({
+        title: "Configuration Error",
+        description: "The application is not configured correctly. Please contact support.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
@@ -54,6 +65,12 @@ export default function LoginPage() {
             toast({
                 title: 'Login Failed',
                 description: 'Invalid email or password. Please try again.',
+                variant: 'destructive',
+            });
+        } else if (error.code?.includes('app-check')) {
+            toast({
+                title: 'Security Check Failed',
+                description: 'Could not verify your device. Please refresh and try again.',
                 variant: 'destructive',
             });
         } else {

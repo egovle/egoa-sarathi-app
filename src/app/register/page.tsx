@@ -100,6 +100,17 @@ export default function RegisterPage() {
     event.preventDefault();
     setLoading(true);
 
+    if (!process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY) {
+      console.error("reCAPTCHA Site Key is not configured.");
+      toast({
+        title: "Configuration Error",
+        description: "The application is not configured correctly. Please contact support.",
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     // --- Validation Checks ---
     if (!validateEmail(email)) {
       setEmailError('Please enter a valid email address.');
@@ -124,24 +135,26 @@ export default function RegisterPage() {
 
     // --- Duplicate Check ---
     try {
-        const collectionsToCheck = ['users', 'vles'];
+        const collectionsToCheck = ['users', 'vles', 'government'];
         const emailQueries = collectionsToCheck.map(c => query(collection(db, c), where('email', '==', email)));
         const mobileQueries = collectionsToCheck.map(c => query(collection(db, c), where('mobile', '==', mobile)));
-
-        const [emailUserSnap, emailVleSnap, mobileUserSnap, mobileVleSnap] = await Promise.all([
+        
+        const [emailUserSnap, emailVleSnap, emailGovSnap, mobileUserSnap, mobileVleSnap, mobileGovSnap] = await Promise.all([
             getDocs(emailQueries[0]),
             getDocs(emailQueries[1]),
+            getDocs(emailQueries[2]),
             getDocs(mobileQueries[0]),
             getDocs(mobileQueries[1]),
+            getDocs(mobileQueries[2]),
         ]);
 
-        if (!emailUserSnap.empty || !emailVleSnap.empty) {
+        if (!emailUserSnap.empty || !emailVleSnap.empty || !emailGovSnap.empty) {
             toast({ title: 'Registration Error', description: 'An account with this email address already exists.', variant: 'destructive' });
             setLoading(false);
             return;
         }
 
-        if (!mobileUserSnap.empty || !mobileVleSnap.empty) {
+        if (!mobileUserSnap.empty || !mobileVleSnap.empty || !mobileGovSnap.empty) {
             toast({ title: 'Registration Error', description: 'An account with this mobile number already exists.', variant: 'destructive' });
             setLoading(false);
             return;
@@ -171,6 +184,8 @@ export default function RegisterPage() {
         let errorMessage = 'Could not complete registration. Please try again.';
         if (error.code === 'auth/email-already-in-use') {
             errorMessage = 'An account with this email address already exists.';
+        } else if (error.code?.includes('app-check')) {
+            errorMessage = 'Could not verify your browser. Please refresh and try again.'
         }
         toast({ title: 'Registration Failed', description: errorMessage, variant: 'destructive' });
     } finally {
