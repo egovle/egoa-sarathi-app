@@ -1,4 +1,3 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
@@ -21,6 +20,9 @@ const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : get
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
+  // Pass true to the debug variable to get a debug token in the console.
+  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  
   const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
   if (recaptchaSiteKey) {
     try {
