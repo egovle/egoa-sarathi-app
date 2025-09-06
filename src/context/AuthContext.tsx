@@ -4,11 +4,12 @@
 import React from 'react';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, app } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import type { UserProfile } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { usePathname } from 'next/navigation';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 
 interface AuthContextType {
   user: User | null;
@@ -30,6 +31,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [userProfile, setUserProfile] = React.useState<UserProfile | null>(null);
   const [loading, setLoading] = React.useState(true);
   const pathname = usePathname();
+
+  React.useEffect(() => {
+    // This effect runs only once on the client side
+    if (typeof window !== 'undefined') {
+      const recaptchaSiteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY;
+      if (recaptchaSiteKey) {
+        try {
+          initializeAppCheck(app, {
+            provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+            isTokenAutoRefreshEnabled: true,
+          });
+          console.log('Firebase App Check initialized successfully from AuthContext.');
+        } catch (e) {
+          console.error('Error initializing Firebase App Check', e);
+        }
+      } else {
+        console.warn('NEXT_PUBLIC_RECAPTCHA_SITE_KEY is not defined. App Check is disabled.');
+      }
+    }
+  }, [app]);
 
   const fetchUserProfile = React.useCallback(async (user: User | null): Promise<UserProfile | null> => {
     if (!user) return null;
@@ -62,65 +83,54 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
 
   React.useEffect(() => {
-    // This function ensures that we only try to check auth state after firebase is fully initialized.
-    const initializeAuth = async () => {
-        // The firebase.ts file handles the initialization. We just need to wait for it to complete.
-        // A small delay can ensure all async scripts have loaded, including App Check.
-        await new Promise(resolve => setTimeout(resolve, 50)); 
-        
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-          setLoading(true);
-          if (user) {
-            const isAuthPage = publicPaths.some(path => pathname.startsWith(path) && path !== '/');
-            const isPolicyPage = policyPaths.some(path => pathname.startsWith(path));
-    
-            if (!user.emailVerified && !isAuthPage && !isPolicyPage && pathname !== '/') {
-                if (pathname !== '/login') {
-                     toast({
-                        title: "Email Verification Required",
-                        description: "Please check your inbox and verify your email to continue.",
-                        variant: "destructive",
-                        duration: 7000
-                    });
-                }
-                await signOut(auth);
-                setUser(null);
-                setUserProfile(null);
-                setLoading(false);
-                return;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setLoading(true);
+      if (user) {
+        const isAuthPage = publicPaths.some(path => pathname.startsWith(path) && path !== '/');
+        const isPolicyPage = policyPaths.some(path => pathname.startsWith(path));
+
+        if (!user.emailVerified && !isAuthPage && !isPolicyPage && pathname !== '/') {
+            if (pathname !== '/login') {
+                 toast({
+                    title: "Email Verification Required",
+                    description: "Please check your inbox and verify your email to continue.",
+                    variant: "destructive",
+                    duration: 7000
+                });
             }
-    
-            try {
-              const profileData = await fetchUserProfile(user);
-              
-              if (profileData) {
-                setUser(user);
-                setUserProfile(profileData);
-              } else {
-                  console.error(`Authenticated user with UID ${user.uid} not found in any collection. Logging out.`);
-                  await signOut(auth);
-                  setUserProfile(null);
-                  setUser(null);
-              }
-            } catch (error) {
-              console.error("Error fetching user profile:", error);
-              // This can happen if Firestore access is denied due to App Check
-              // Log out the user to prevent an infinite loop state
-              await signOut(auth);
-              setUser(null);
-              setUserProfile(null);
-            }
-          } else {
+            await signOut(auth);
             setUser(null);
             setUserProfile(null);
+            setLoading(false);
+            return;
+        }
+
+        try {
+          const profileData = await fetchUserProfile(user);
+          
+          if (profileData) {
+            setUser(user);
+            setUserProfile(profileData);
+          } else {
+              console.error(`Authenticated user with UID ${user.uid} not found in any collection. Logging out.`);
+              await signOut(auth);
+              setUserProfile(null);
+              setUser(null);
           }
-          setLoading(false);
-        });
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+          await signOut(auth);
+          setUser(null);
+          setUserProfile(null);
+        }
+      } else {
+        setUser(null);
+        setUserProfile(null);
+      }
+      setLoading(false);
+    });
 
-        return () => unsubscribe();
-    };
-
-    initializeAuth();
+    return () => unsubscribe();
     
   }, [fetchUserProfile, pathname]);
 
