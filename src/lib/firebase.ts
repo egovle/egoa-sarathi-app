@@ -1,7 +1,7 @@
 
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
@@ -18,6 +18,12 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+
+// Initialize Firestore with long-polling disabled to prevent "Unknown SID" errors
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  experimentalForceLongPolling: false,
+});
 
 // Initialize App Check
 if (typeof window !== 'undefined') {
@@ -37,7 +43,6 @@ if (typeof window !== 'undefined') {
   }
 }
 
-const db = getFirestore(app);
 const auth = getAuth(app);
 const storage = getStorage(app);
 
