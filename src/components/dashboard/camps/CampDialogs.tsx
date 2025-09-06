@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, type FormEvent, useMemo } from 'react';
@@ -47,7 +46,7 @@ export const CampFormDialog = ({ camp, suggestion, vles, adminProfile, onFinishe
     const [isDatePopoverOpen, setIsDatePopoverOpen] = useState(false);
 
     const filteredVles = useMemo(() => {
-        const baseList = vles.filter(vle => vle.status === 'Approved' && vle.available);
+        const baseList = vles.filter(vle => vle.status === 'Approved' && !vle.isAdmin);
         if (!vleSearch) return baseList;
         return baseList.filter(vle => 
             vle.name.toLowerCase().includes(vleSearch.toLowerCase()) ||
@@ -493,5 +492,3 @@ export const CampPayoutDialog = ({ camp, vles, adminProfile, onFinished }: { cam
         </DialogContent>
     );
 };
-
-    

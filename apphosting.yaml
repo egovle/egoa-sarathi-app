@@ -23,6 +23,8 @@ env:
     value: "G-9ZGSFH8X1F"
   - variable: NEXT_PUBLIC_RECAPTCHA_SITE_KEY
     value: "6Ld5qL8rAAAAAJ-N04VR19ZrZJFVgzp7gUmlGwR8"
+  - variable: NEXT_PUBLIC_APP_HOSTING_SITE_URL
+    value: "https://egoa-sarathi-app--egoasarthi.asia-east1.hosted.app"
   - variable: CACHE_BUSTER
     value: "1722000005"
   - variable: TWILIO_ACCOUNT_SID

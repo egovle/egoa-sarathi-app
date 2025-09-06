@@ -3,8 +3,22 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+    ];
+  },
   env: {
     NEXT_PUBLIC_RECAPTCHA_SITE_KEY: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
+    NEXT_PUBLIC_APP_HOSTING_SITE_URL: process.env.NEXT_PUBLIC_APP_HOSTING_SITE_URL,
   },
   images: {
     remotePatterns: [
