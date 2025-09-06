@@ -4,7 +4,7 @@ import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -31,10 +31,10 @@ if (typeof window !== 'undefined') {
   if (recaptchaSiteKey) {
     try {
       initializeAppCheck(app, {
-        provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+        provider: new ReCaptchaV3Provider(recaptchaSiteKey),
         isTokenAutoRefreshEnabled: true,
       });
-      console.log('Firebase App Check with Enterprise provider initialized successfully.');
+      console.log('Firebase App Check initialized successfully.');
     } catch (e) {
       console.error('Error initializing Firebase App Check', e);
     }

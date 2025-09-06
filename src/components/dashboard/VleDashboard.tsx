@@ -38,7 +38,7 @@ export default function VleDashboard({ allAssignedTasks, camps }: { allAssignedT
     const { user, userProfile } = useAuth();
     
     const taskInvitations = useMemo(() => 
-        allAssignedTasks.filter(t => t.status === 'Pending VLE Acceptance'), 
+        allAssignedTasks.filter(t => t.status === 'Pending VLE Acceptance'),
     [allAssignedTasks]);
     
     const campInvitations = useMemo(() => {
