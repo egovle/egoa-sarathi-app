@@ -1,10 +1,9 @@
-
 // src/lib/firebase.ts
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -25,12 +24,12 @@ if (typeof window !== 'undefined') {
   if (recaptchaSiteKey) {
       try {
         initializeAppCheck(app, {
-            provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+            provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
             // IMPORTANT: Set this to `false` to prevent intermittent initialization errors.
             // The App Check SDK will automatically refresh the token as needed.
             isTokenAutoRefreshEnabled: false 
         });
-        console.log("Firebase App Check initialized successfully.");
+        console.log("Firebase App Check with Enterprise provider initialized successfully.");
       } catch (error) {
         console.error("Error initializing Firebase App Check:", error);
       }
