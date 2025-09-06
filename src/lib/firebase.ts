@@ -25,9 +25,8 @@ if (typeof window !== 'undefined') {
       try {
         initializeAppCheck(app, {
             provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
-            // IMPORTANT: Set this to `false` to prevent intermittent initialization errors.
-            // The App Check SDK will automatically refresh the token as needed.
-            isTokenAutoRefreshEnabled: false 
+            // IMPORTANT: Set this to `true` for ReCaptchaEnterpriseProvider.
+            isTokenAutoRefreshEnabled: true
         });
         console.log("Firebase App Check with Enterprise provider initialized successfully.");
       } catch (error) {
